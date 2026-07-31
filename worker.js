@@ -307,6 +307,21 @@ async function getRecentActiveWords(env, userId) {
     return result.results;
 }
 
+async function getRecentArchivedWords(env, userId) {
+    const result = await env.DB
+        .prepare(`
+      SELECT id, source_text, translation_uk
+      FROM words
+      WHERE user_id = ? AND is_active = 0
+      ORDER BY id DESC
+      LIMIT ?
+    `)
+        .bind(userId, LIST_LIMIT)
+        .all();
+
+    return result.results;
+}
+
 function listText(words) {
     if (words.length === 0) {
         return "У словнику поки немає активних слів.";
@@ -317,7 +332,7 @@ function listText(words) {
             (word, index) =>
                 `${index + 1}. ${word.source_text} — ${word.translation_uk}`
         )
-        .join("\n")}\n\nАрхів: /archive 1, /archive 5-10 або /archive all`;
+        .join("\n")}\n\nВидалити: /delete 1, /delete 5-10 або /delete all\nПереглянути видалені: /archived`;
 }
 
 function listKeyboard(words) {
@@ -328,8 +343,36 @@ function listKeyboard(words) {
     return {
         inline_keyboard: words.map((word, index) => [
             {
-                text: `🗄 В архів №${index + 1}`,
-                callback_data: `archive:${word.id}`,
+                text: `🗑 Видалити №${index + 1}`,
+                callback_data: `delete:${word.id}`,
+            },
+        ]),
+    };
+}
+
+function archivedText(words) {
+    if (words.length === 0) {
+        return "У архіві поки немає слів.";
+    }
+
+    return `Видалені слова:\n${words
+        .map(
+            (word, index) =>
+                `${index + 1}. ${word.source_text} — ${word.translation_uk}`
+        )
+        .join("\n")}\n\nПовернути: /restore 1, /restore 5-10 або /restore all`;
+}
+
+function archivedKeyboard(words) {
+    if (words.length === 0) {
+        return undefined;
+    }
+
+    return {
+        inline_keyboard: words.map((word, index) => [
+            {
+                text: `↩ Повернути №${index + 1}`,
+                callback_data: `restore:${word.id}`,
             },
         ]),
     };
@@ -339,6 +382,18 @@ async function refreshListMessage(env, chatId, messageId, userId) {
     const words = await getRecentActiveWords(env, userId);
     const text = listText(words);
     const keyboard = listKeyboard(words);
+
+    try {
+        await editMessage(env, chatId, messageId, text, keyboard);
+    } catch {
+        await sendMessage(env, chatId, text, keyboard);
+    }
+}
+
+async function refreshArchivedMessage(env, chatId, messageId, userId) {
+    const words = await getRecentArchivedWords(env, userId);
+    const text = archivedText(words);
+    const keyboard = archivedKeyboard(words);
 
     try {
         await editMessage(env, chatId, messageId, text, keyboard);
@@ -409,8 +464,13 @@ export default {
                 return new Response("ok");
             }
 
-            if (callback.data.startsWith("archive:")) {
-                const wordId = Number(callback.data.replace("archive:", ""));
+            if (
+                callback.data.startsWith("delete:") ||
+                callback.data.startsWith("archive:")
+            ) {
+                const wordId = Number(
+                    callback.data.replace(/^(?:delete|archive):/, "")
+                );
 
                 if (!Number.isInteger(wordId) || wordId <= 0) {
                     await answerCallbackQuery(env, callback.id, "Невірний вибір.");
@@ -430,11 +490,40 @@ export default {
                     env,
                     callback.id,
                     archived.meta.changes > 0
-                        ? "Слово перенесено в архів."
-                        : "Це слово вже неактивне."
+                        ? "Слово видалено."
+                        : "Це слово вже видалене."
                 );
 
                 await refreshListMessage(env, chatId, messageId, userId);
+                return new Response("ok");
+            }
+
+            if (callback.data.startsWith("restore:")) {
+                const wordId = Number(callback.data.replace("restore:", ""));
+
+                if (!Number.isInteger(wordId) || wordId <= 0) {
+                    await answerCallbackQuery(env, callback.id, "Невірний вибір.");
+                    return new Response("ok");
+                }
+
+                const restored = await env.DB
+                    .prepare(`
+              UPDATE words
+              SET is_active = 1
+              WHERE id = ? AND user_id = ? AND is_active = 0
+            `)
+                    .bind(wordId, userId)
+                    .run();
+
+                await answerCallbackQuery(
+                    env,
+                    callback.id,
+                    restored.meta.changes > 0
+                        ? "Слово повернено до каталогу."
+                        : "Це слово вже в каталозі."
+                );
+
+                await refreshArchivedMessage(env, chatId, messageId, userId);
                 return new Response("ok");
             }
 
@@ -558,7 +647,7 @@ export default {
             await sendMessage(
                 env,
                 chatId,
-                "Додай слово так:\n/add resilient\n\nАбо уточни значення:\n/add charge | payment for a service\n\nПереглянь та архівуй слова: /list\nАрхівуй кілька: /archive 5-10\nАрхівуй усі: /archive all"
+                "Додай слово так:\n/add resilient\n\nАбо уточни значення:\n/add charge | payment for a service\n\nПереглянь та видали слова: /list\nВидали кілька: /delete 5-10\nВидали всі: /delete all\nПоверни видалені: /archived"
             );
             return new Response("ok");
         }
@@ -658,7 +747,7 @@ export default {
                 await sendMessage(
                     env,
                     chatId,
-                    "Вкажи номер або діапазон зі списку: /archive 1 чи /archive 5-10. Для всіх слів: /archive all"
+                    "Вкажи номер або діапазон зі списку: /delete 1 чи /delete 5-10. Для всіх слів: /delete all"
                 );
                 return new Response("ok");
             }
@@ -677,7 +766,7 @@ export default {
                     await sendMessage(
                         env,
                         chatId,
-                        "Немає активних слів для архівації."
+                        "Немає активних слів для видалення."
                     );
                     return new Response("ok");
                 }
@@ -685,7 +774,7 @@ export default {
                 await sendMessage(
                     env,
                     chatId,
-                    `✅ В архів перенесено ${archived.meta.changes} ${wordCountLabel(
+                    `✅ Видалено ${archived.meta.changes} ${wordCountLabel(
                         archived.meta.changes
                     )}.`
                 );
@@ -698,7 +787,7 @@ export default {
                 await sendMessage(
                     env,
                     chatId,
-                    "Невірний формат. Використай /archive 1, /archive 5-10 або /archive all."
+                    "Невірний формат. Використай /delete 1, /delete 5-10 або /delete all."
                 );
                 return new Response("ok");
             }
@@ -716,7 +805,7 @@ export default {
                 await sendMessage(
                     env,
                     chatId,
-                    "Можна архівувати позиції від 1 до 10 із поточного /list."
+                    "Можна видалити позиції від 1 до 10 із поточного /list."
                 );
                 return new Response("ok");
             }
@@ -759,8 +848,125 @@ export default {
             await sendMessage(
                 env,
                 chatId,
-                `✅ В архів перенесено ${archived.meta.changes} ${wordCountLabel(
+                `✅ Видалено ${archived.meta.changes} ${wordCountLabel(
                     archived.meta.changes
+                )}.`
+            );
+            return new Response("ok");
+        }
+
+        const restoreMatch = text.match(/^\/restore(?:\s+(.+))?$/i);
+
+        if (restoreMatch) {
+            const selection = restoreMatch[1]?.trim().toLowerCase();
+
+            if (!selection) {
+                await sendMessage(
+                    env,
+                    chatId,
+                    "Вкажи номер або діапазон з /archived: /restore 1 чи /restore 5-10. Для всіх слів: /restore all"
+                );
+                return new Response("ok");
+            }
+
+            if (selection === "all") {
+                const restored = await env.DB
+                    .prepare(`
+              UPDATE words
+              SET is_active = 1
+              WHERE user_id = ? AND is_active = 0
+            `)
+                    .bind(userId)
+                    .run();
+
+                if (restored.meta.changes === 0) {
+                    await sendMessage(
+                        env,
+                        chatId,
+                        "Немає видалених слів для повернення."
+                    );
+                    return new Response("ok");
+                }
+
+                await sendMessage(
+                    env,
+                    chatId,
+                    `✅ Повернено до каталогу ${restored.meta.changes} ${wordCountLabel(
+                        restored.meta.changes
+                    )}.`
+                );
+                return new Response("ok");
+            }
+
+            const rangeMatch = selection.match(/^(\d+)(?:\s*-\s*(\d+))?$/);
+
+            if (!rangeMatch) {
+                await sendMessage(
+                    env,
+                    chatId,
+                    "Невірний формат. Використай /restore 1, /restore 5-10 або /restore all."
+                );
+                return new Response("ok");
+            }
+
+            const start = Number(rangeMatch[1]);
+            const end = Number(rangeMatch[2] ?? rangeMatch[1]);
+
+            if (
+                !Number.isInteger(start) ||
+                !Number.isInteger(end) ||
+                start < 1 ||
+                end < start ||
+                end > LIST_LIMIT
+            ) {
+                await sendMessage(
+                    env,
+                    chatId,
+                    "Можна повернути позиції від 1 до 10 із поточного /archived."
+                );
+                return new Response("ok");
+            }
+
+            const words = await getRecentArchivedWords(env, userId);
+
+            if (end > words.length) {
+                await sendMessage(
+                    env,
+                    chatId,
+                    `У списку видалених лише ${words.length} ${wordCountLabel(
+                        words.length
+                    )}. Онови його командою /archived.`
+                );
+                return new Response("ok");
+            }
+
+            const wordIds = words
+                .slice(start - 1, end)
+                .map((word) => word.id);
+            const placeholders = wordIds.map(() => "?").join(", ");
+            const restored = await env.DB
+                .prepare(`
+              UPDATE words
+              SET is_active = 1
+              WHERE user_id = ? AND is_active = 0 AND id IN (${placeholders})
+            `)
+                .bind(userId, ...wordIds)
+                .run();
+
+            if (restored.meta.changes === 0) {
+                await sendMessage(
+                    env,
+                    chatId,
+                    "Не знайшов видалених слів за цими позиціями. Онови список командою /archived."
+                );
+                return new Response("ok");
+            }
+
+            await sendMessage(
+                env,
+                chatId,
+                `✅ Повернено до каталогу ${restored.meta.changes} ${wordCountLabel(
+                    restored.meta.changes
                 )}.`
             );
             return new Response("ok");
@@ -774,6 +980,19 @@ export default {
                 chatId,
                 listText(words),
                 listKeyboard(words)
+            );
+
+            return new Response("ok");
+        }
+
+        if (text === "/archived") {
+            const words = await getRecentArchivedWords(env, userId);
+
+            await sendMessage(
+                env,
+                chatId,
+                archivedText(words),
+                archivedKeyboard(words)
             );
 
             return new Response("ok");

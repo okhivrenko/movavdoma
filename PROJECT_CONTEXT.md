@@ -60,14 +60,18 @@ When an explicit context is supplied, skip meaning selection and generate the ca
 ### `/list`
 
 Shows the ten most recently added active words for the current Telegram user,
-with an inline archive button for each word.
+with an inline delete button for each word.
 
-### `/archive 1`, `/archive 5-10`, `/archive all`
+### `/delete 1`, `/delete 5-10`, `/delete all`
 
-Archives one word, an inclusive range of positions from the current `/list`, or
-all active words. `/delete` remains a backwards-compatible alias. Archived
-words remain in D1 with `is_active = 0`, so they no longer appear in `/list` and
-can be restored in a future feature.
+Soft-deletes one word, an inclusive range of positions from the current
+`/list`, or all active words. `/archive` remains a backwards-compatible alias.
+
+### `/archived` and `/restore`
+
+`/archived` shows up to ten soft-deleted words with inline restore buttons.
+`/restore 1`, `/restore 5-10`, and `/restore all` return selected archived words
+to the active catalog. Soft-deleted words remain in D1 with `is_active = 0`.
 
 ## Important UX rules
 
