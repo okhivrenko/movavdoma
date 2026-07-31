@@ -1,0 +1,13 @@
+{
+  "name": "vocab-telegram-bot",
+  "main": "worker.js",
+  "compatibility_date": "2026-07-31",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "vocab-words-db",
+      "database_id": "62ded422-e125-42b3-99de-a86fdcf5f9f8",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
