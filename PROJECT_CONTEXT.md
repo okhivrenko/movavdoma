@@ -113,11 +113,21 @@ date.
 
 ## OpenAI integration
 
-- Model: `gpt-5.4-nano`
+- Model: `gpt-5-nano`
 - API: Chat Completions API with structured JSON output.
 - Reasoning effort: `none`.
 - Generate translation and examples in one OpenAI response so all content uses the same selected meaning.
 - Do not independently translate the word through another provider after the user selects a sense.
+
+## Access and cost control
+
+- The bot accepts private chats from multiple Telegram users; every user's
+  words remain isolated by Telegram user ID.
+- Users other than the account identified by the Cloudflare secret
+  `ADMIN_TELEGRAM_USER_ID` can add up to 20 words per local day.
+- The quota is atomically claimed before any OpenAI call. Failed OpenAI calls
+  still count because they may already have consumed API tokens.
+- `daily_word_additions` stores only the user ID, local date, and count.
 
 ## D1 binding
 
@@ -138,6 +148,14 @@ CREATE TABLE IF NOT EXISTS users (
   is_active INTEGER NOT NULL DEFAULT 1,
   last_delivery_local_date TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS daily_word_additions (
+  user_id INTEGER NOT NULL,
+  local_date TEXT NOT NULL,
+  additions INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, local_date),
+  FOREIGN KEY (user_id) REFERENCES users(telegram_user_id)
 );
 
 CREATE TABLE IF NOT EXISTS words (
@@ -199,6 +217,9 @@ CREATE TABLE IF NOT EXISTS pending_words (
 - Do not commit `.dev.vars`, API keys, Telegram tokens, or Cloudflare secrets.
 - Do not rerun the initial migration against the existing production D1 database: its tables were already created manually in Cloudflare.
 - Future schema changes should be added as new numbered migrations.
+- Before deploying quota support to production, execute only
+  `migrations/0002_add_daily_word_additions.sql` against the remote D1 database;
+  do not run the whole migration history.
 
 ## Next product features
 

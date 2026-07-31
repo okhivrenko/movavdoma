@@ -2,6 +2,7 @@ const SENSES_PER_PAGE = 3;
 const MAX_SENSES = 9;
 const LIST_LIMIT = 10;
 const MAX_OPENAI_ATTEMPTS = 3;
+const DAILY_ADD_LIMIT = 20;
 const DAILY_TIME_OPTIONS = Array.from(
     { length: 24 },
     (_, hour) => `${String(hour).padStart(2, "0")}:00`
@@ -84,9 +85,9 @@ async function openAIJson(env, name, schema, instructions, input) {
                         "content-type": "application/json",
                     },
                     body: JSON.stringify({
-                        model: "gpt-5.4-nano",
+                        model: "gpt-5-nano",
                         reasoning_effort: "none",
-                        max_completion_tokens: 700,
+                        max_completion_tokens: 400,
                         response_format: {
                             type: "json_schema",
                             json_schema: { name, strict: true, schema },
@@ -596,6 +597,42 @@ function localDateAndTime(timezone, timestamp) {
     }
 }
 
+function isAdmin(env, userId) {
+    return String(userId) === env.ADMIN_TELEGRAM_USER_ID;
+}
+
+async function claimDailyWordAddition(env, userId) {
+    if (isAdmin(env, userId)) {
+        return true;
+    }
+
+    const user = await env.DB
+        .prepare("SELECT timezone FROM users WHERE telegram_user_id = ?")
+        .bind(userId)
+        .first();
+    const localTime = localDateAndTime(
+        user?.timezone ?? "Europe/Warsaw",
+        Date.now()
+    );
+
+    if (!localTime) {
+        throw new Error("Unable to calculate daily addition date.");
+    }
+
+    const claimed = await env.DB
+        .prepare(`
+          INSERT INTO daily_word_additions (user_id, local_date, additions)
+          VALUES (?, ?, 1)
+          ON CONFLICT(user_id, local_date) DO UPDATE
+          SET additions = additions + 1
+          WHERE additions < ?
+        `)
+        .bind(userId, localTime.date, DAILY_ADD_LIMIT)
+        .run();
+
+    return claimed.meta.changes > 0;
+}
+
 async function getRandomActiveWord(env, userId) {
     return env.DB
         .prepare(`
@@ -1087,6 +1124,33 @@ export default {
                     env,
                     chatId,
                     "Слово має бути до 80 символів, а контекст — до 250."
+                );
+                return new Response("ok");
+            }
+
+            let canAddWord;
+
+            try {
+                canAddWord = await claimDailyWordAddition(env, userId);
+            } catch (error) {
+                console.error({
+                    event: "daily_addition_limit_check_failed",
+                    message:
+                        error instanceof Error ? error.message : "Unknown error",
+                });
+                await sendMessage(
+                    env,
+                    chatId,
+                    "Не вдалося перевірити денний ліміт. Спробуй ще раз за хвилину."
+                );
+                return new Response("ok");
+            }
+
+            if (!canAddWord) {
+                await sendMessage(
+                    env,
+                    chatId,
+                    `На сьогодні вже додано ${DAILY_ADD_LIMIT} слів. Спробуй завтра.`
                 );
                 return new Response("ok");
             }
