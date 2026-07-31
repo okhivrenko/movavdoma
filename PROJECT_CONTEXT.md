@@ -40,10 +40,17 @@ Welcomes the user and shows a persistent reply keyboard with:
 
 - `➕ Додати слово`
 - `📚 Мої слова`
+- `🎓 Вивчені слова`
 - `❓ Допомога`
 
 Users can simply send an English word or phrase; `/add` remains supported.
 `/menu` shows the keyboard again if it was hidden.
+
+To specify an exact meaning, users can send `word | context`, for example:
+
+```text
+charge | payment for a service
+```
 
 ### `/add resilient`
 
@@ -67,19 +74,20 @@ When an explicit context is supplied, skip meaning selection and generate the ca
 ### `/list`
 
 Shows the ten most recently added active words for the current Telegram user,
-with an inline delete button for each word.
+with inline buttons to view examples or mark each word as learned. Examples are
+shown in a separate message to keep the list compact.
 
-### `/delete 1`, `/delete 5-10`, `/delete all`
+### Legacy commands: `/delete 1`, `/delete 5-10`, `/delete all`
 
-Soft-deletes one word, an inclusive range of positions from the current
-`/list`, or all active words. `/archive` remains a backwards-compatible alias.
+Marks one word, an inclusive range of positions from the current `/list`, or
+all active words as learned. `/archive` remains a backwards-compatible alias.
 
-### `/archived` and `/restore`
+### `🎓 Вивчені слова`, `/learned`, and `/restore`
 
-`/archived` shows up to ten soft-deleted words with inline restore buttons.
-`/restore 1`, `/restore 5-10`, and `/restore all` return selected archived words
-to the active catalog. Soft-deleted words remain in D1 with `is_active = 0`.
-These are maintenance commands and are not displayed in the child-facing menu.
+The menu button and `/learned` show up to ten learned words with inline
+`Вивчати` buttons. Selecting one returns it to the active learning catalog.
+`/restore 1`, `/restore 5-10`, and `/restore all` remain supported for bulk
+restoration. Learned words remain in D1 with `is_active = 0`.
 
 ## Important UX rules
 
