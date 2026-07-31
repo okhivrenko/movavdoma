@@ -892,6 +892,38 @@ async function grantDonationBonus(env, requestId, dailyLimit) {
     return request;
 }
 
+async function grantManualDailyLimit(env, userId, dailyLimit) {
+    const user = await env.DB
+        .prepare("SELECT chat_id FROM users WHERE telegram_user_id = ?")
+        .bind(userId)
+        .first();
+
+    if (!user?.chat_id) {
+        return false;
+    }
+
+    await env.DB
+        .prepare(`
+          INSERT INTO user_daily_limits (user_id, daily_limit, donation_request_id, expires_at)
+          VALUES (?, ?, NULL, datetime('now', '+1 month'))
+          ON CONFLICT(user_id) DO UPDATE SET
+            daily_limit = excluded.daily_limit,
+            donation_request_id = NULL,
+            expires_at = excluded.expires_at,
+            granted_at = CURRENT_TIMESTAMP
+        `)
+        .bind(userId, dailyLimit)
+        .run();
+
+    await sendMessage(
+        env,
+        user.chat_id,
+        `🎁 Твій денний ліміт — ${dailyLimit} ${wordCountLabel(dailyLimit)} на наступний місяць.`
+    );
+
+    return true;
+}
+
 async function rejectDonationBonus(env, requestId) {
     const request = await env.DB
         .prepare(`
@@ -1689,6 +1721,71 @@ export default {
 
         if (text === "/help") {
             await sendHelp(env, chatId);
+            return new Response("ok");
+        }
+
+        const grantMatch = text.match(/^\/grant(?:\s+(.+))?$/i);
+
+        if (grantMatch) {
+            if (!isAdmin(env, userId)) {
+                await sendMessage(env, chatId, "Ця команда доступна лише адміну.");
+                return new Response("ok");
+            }
+
+            const parts = grantMatch[1]?.trim().split(/\s+/) ?? [];
+
+            if (parts.length !== 2 || !/^\d+$/.test(parts[0]) || !/^\d+$/.test(parts[1])) {
+                await sendMessage(
+                    env,
+                    chatId,
+                    "Використай: /grant userId ліміт\nНаприклад: /grant 123456789 45"
+                );
+                return new Response("ok");
+            }
+
+            const targetUserId = Number(parts[0]);
+            const dailyLimit = Number(parts[1]);
+
+            if (
+                !Number.isSafeInteger(targetUserId) ||
+                !Number.isSafeInteger(dailyLimit) ||
+                targetUserId <= 0 ||
+                dailyLimit <= 0
+            ) {
+                await sendMessage(
+                    env,
+                    chatId,
+                    "userId і ліміт мають бути додатними цілими числами."
+                );
+                return new Response("ok");
+            }
+
+            try {
+                const granted = await grantManualDailyLimit(
+                    env,
+                    targetUserId,
+                    dailyLimit
+                );
+
+                await sendMessage(
+                    env,
+                    chatId,
+                    granted
+                        ? `✅ Видано ${dailyLimit} ${wordCountLabel(dailyLimit)} на день користувачу ${targetUserId} на 1 місяць.`
+                        : "Користувача не знайдено. Він має спершу написати боту /start."
+                );
+            } catch (error) {
+                console.error({
+                    event: "manual_grant_failed",
+                    message: error instanceof Error ? error.message : "Unknown error",
+                });
+                await sendMessage(
+                    env,
+                    chatId,
+                    "Не вдалося видати ліміт. Спробуй ще раз за хвилину."
+                );
+            }
+
             return new Response("ok");
         }
 

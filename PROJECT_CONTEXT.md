@@ -147,6 +147,9 @@ date.
 - An admin-approved support bonus can replace an individual user's daily limit
   with 30, 50, or 100 words for one calendar month. The admin remains
   unlimited.
+- The admin can manually grant any positive daily limit for one calendar month
+  with `/grant <telegramUserId> <dailyLimit>`, for example
+  `/grant 123456789 45`. The target user must have started the bot first.
 - The quota is atomically claimed before any OpenAI call. Failed OpenAI calls
   still count because they may already have consumed API tokens.
 - `daily_word_additions` stores only the user ID, local date, and count.
