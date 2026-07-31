@@ -36,7 +36,14 @@ Never commit or print these values:
 
 ### `/start`
 
-Explains how to add a word.
+Welcomes the user and shows a persistent reply keyboard with:
+
+- `➕ Додати слово`
+- `📚 Мої слова`
+- `❓ Допомога`
+
+Users can simply send an English word or phrase; `/add` remains supported.
+`/menu` shows the keyboard again if it was hidden.
 
 ### `/add resilient`
 
@@ -72,6 +79,7 @@ Soft-deletes one word, an inclusive range of positions from the current
 `/archived` shows up to ten soft-deleted words with inline restore buttons.
 `/restore 1`, `/restore 5-10`, and `/restore all` return selected archived words
 to the active catalog. Soft-deleted words remain in D1 with `is_active = 0`.
+These are maintenance commands and are not displayed in the child-facing menu.
 
 ## Important UX rules
 

@@ -332,7 +332,7 @@ function listText(words) {
             (word, index) =>
                 `${index + 1}. ${word.source_text} — ${word.translation_uk}`
         )
-        .join("\n")}\n\nВидалити: /delete 1, /delete 5-10 або /delete all\nПереглянути видалені: /archived`;
+        .join("\n")}\n\nНатисни «Видалити» під потрібним словом.`;
 }
 
 function listKeyboard(words) {
@@ -419,6 +419,31 @@ function wordCountLabel(count) {
     }
 
     return "слів";
+}
+
+function mainKeyboard() {
+    return {
+        keyboard: [
+            [{ text: "➕ Додати слово" }],
+            [{ text: "📚 Мої слова" }, { text: "❓ Допомога" }],
+        ],
+        resize_keyboard: true,
+        is_persistent: true,
+    };
+}
+
+async function sendActiveWordList(env, chatId, userId) {
+    const words = await getRecentActiveWords(env, userId);
+    await sendMessage(env, chatId, listText(words), listKeyboard(words));
+}
+
+async function sendHelp(env, chatId) {
+    await sendMessage(
+        env,
+        chatId,
+        "Як користуватися ботом:\n\n1. Натисни «➕ Додати слово» або просто надішли англійське слово чи фразу.\n2. Обери потрібне значення, якщо бот його уточнить.\n3. Відкрий «📚 Мої слова», щоб переглянути свій каталог.\n\nНаприклад, просто надішли: resilient",
+        mainKeyboard()
+    );
 }
 
 export default {
@@ -647,20 +672,73 @@ export default {
             await sendMessage(
                 env,
                 chatId,
-                "Додай слово так:\n/add resilient\n\nАбо уточни значення:\n/add charge | payment for a service\n\nПереглянь та видали слова: /list\nВидали кілька: /delete 5-10\nВидали всі: /delete all\nПоверни видалені: /archived"
+                "Привіт! Я допоможу запам’ятовувати англійські слова.\n\nПросто надішли мені слово або фразу, наприклад: resilient",
+                mainKeyboard()
+            );
+            return new Response("ok");
+        }
+
+        if (text === "/menu") {
+            await sendMessage(env, chatId, "Ось меню:", mainKeyboard());
+            return new Response("ok");
+        }
+
+        if (text === "➕ Додати слово") {
+            await sendMessage(
+                env,
+                chatId,
+                "Надішли англійське слово або фразу. Наприклад: resilient"
+            );
+            return new Response("ok");
+        }
+
+        if (text === "📚 Мої слова") {
+            await sendActiveWordList(env, chatId, userId);
+            return new Response("ok");
+        }
+
+        if (text === "❓ Допомога") {
+            await sendHelp(env, chatId);
+            return new Response("ok");
+        }
+
+        if (text === "/help") {
+            await sendHelp(env, chatId);
+            return new Response("ok");
+        }
+
+        if (text === "/add") {
+            await sendMessage(
+                env,
+                chatId,
+                "Надішли англійське слово або фразу. Наприклад: resilient"
             );
             return new Response("ok");
         }
 
         const addMatch = text.match(/^\/add\s+(.+)$/i);
+        const addInput = addMatch
+            ? addMatch[1]
+            : text.startsWith("/")
+              ? null
+              : text;
 
-        if (addMatch) {
-            const parts = addMatch[1].split("|");
+        if (addInput) {
+            const parts = addInput.split("|");
             const word = parts[0].trim();
             const explicitContext = parts.slice(1).join("|").trim();
 
             if (!word) {
                 await sendMessage(env, chatId, "Напиши слово після /add.");
+                return new Response("ok");
+            }
+
+            if (!/[A-Za-z]/.test(word)) {
+                await sendMessage(
+                    env,
+                    chatId,
+                    "Надішли англійське слово або фразу. Наприклад: resilient"
+                );
                 return new Response("ok");
             }
 
@@ -973,14 +1051,7 @@ export default {
         }
 
         if (text === "/list") {
-            const words = await getRecentActiveWords(env, userId);
-
-            await sendMessage(
-                env,
-                chatId,
-                listText(words),
-                listKeyboard(words)
-            );
+            await sendActiveWordList(env, chatId, userId);
 
             return new Response("ok");
         }
@@ -995,6 +1066,11 @@ export default {
                 archivedKeyboard(words)
             );
 
+            return new Response("ok");
+        }
+
+        if (text.startsWith("/")) {
+            await sendHelp(env, chatId);
             return new Response("ok");
         }
 
