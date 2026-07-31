@@ -2,6 +2,10 @@ const SENSES_PER_PAGE = 3;
 const MAX_SENSES = 9;
 const LIST_LIMIT = 10;
 const MAX_OPENAI_ATTEMPTS = 3;
+const DAILY_TIME_OPTIONS = Array.from(
+    { length: 24 },
+    (_, hour) => `${String(hour).padStart(2, "0")}:00`
+);
 const ADD_WORD_HINT =
     "Надішли англійське слово або фразу.\n\nЯкщо важливе конкретне значення, додай контекст після |:\ncharge | payment for a service\n\nПриклад без контексту: resilient";
 
@@ -529,11 +533,162 @@ function mainKeyboard() {
         keyboard: [
             [{ text: "➕ Додати слово" }],
             [{ text: "📚 Мої слова" }, { text: "🎓 Вивчені слова" }],
+            [{ text: "⏰ Щоденне слово" }],
             [{ text: "❓ Допомога" }],
         ],
         resize_keyboard: true,
         is_persistent: true,
     };
+}
+
+function dailyTimeKeyboard() {
+    const rows = [];
+
+    for (let index = 0; index < DAILY_TIME_OPTIONS.length; index += 4) {
+        rows.push(
+            DAILY_TIME_OPTIONS.slice(index, index + 4).map((dailyTime) => ({
+                text: dailyTime,
+                callback_data: `dailytime:${dailyTime}`,
+            }))
+        );
+    }
+
+    return { inline_keyboard: rows };
+}
+
+async function sendDailySettings(env, chatId, userId) {
+    const user = await env.DB
+        .prepare("SELECT daily_time FROM users WHERE telegram_user_id = ?")
+        .bind(userId)
+        .first();
+
+    await sendMessage(
+        env,
+        chatId,
+        `Щоденне слово зараз приходитиме о ${user?.daily_time ?? "09:00"}.\n\nОбери зручну годину:`,
+        dailyTimeKeyboard()
+    );
+}
+
+function localDateAndTime(timezone, timestamp) {
+    try {
+        const parts = new Intl.DateTimeFormat("en-CA", {
+            timeZone: timezone,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            hourCycle: "h23",
+        }).formatToParts(new Date(timestamp));
+        const values = Object.fromEntries(
+            parts
+                .filter((part) => part.type !== "literal")
+                .map((part) => [part.type, part.value])
+        );
+
+        return {
+            date: `${values.year}-${values.month}-${values.day}`,
+            time: `${values.hour}:${values.minute}`,
+        };
+    } catch {
+        return null;
+    }
+}
+
+async function getRandomActiveWord(env, userId) {
+    return env.DB
+        .prepare(`
+          SELECT id, source_text, translation_uk
+          FROM words
+          WHERE user_id = ? AND is_active = 1
+          ORDER BY RANDOM()
+          LIMIT 1
+        `)
+        .bind(userId)
+        .first();
+}
+
+async function getWordExamples(env, wordId) {
+    const result = await env.DB
+        .prepare(`
+          SELECT sentence_source, sentence_uk
+          FROM examples
+          WHERE word_id = ?
+          ORDER BY position ASC
+        `)
+        .bind(wordId)
+        .all();
+
+    return result.results;
+}
+
+async function sendDueDailyWords(env, scheduledTime) {
+    const users = await env.DB
+        .prepare(`
+          SELECT telegram_user_id, chat_id, timezone, daily_time
+          FROM users
+          WHERE is_active = 1
+        `)
+        .all();
+
+    for (const user of users.results) {
+        const localTime = localDateAndTime(user.timezone, scheduledTime);
+
+        if (!localTime || localTime.time !== user.daily_time) {
+            continue;
+        }
+
+        let claimedDelivery = false;
+
+        try {
+            const word = await getRandomActiveWord(env, user.telegram_user_id);
+
+            if (!word) {
+                continue;
+            }
+
+            const claimed = await env.DB
+                .prepare(`
+                  UPDATE users
+                  SET last_delivery_local_date = ?
+                  WHERE telegram_user_id = ?
+                    AND (last_delivery_local_date IS NULL OR last_delivery_local_date <> ?)
+                `)
+                .bind(localTime.date, user.telegram_user_id, localTime.date)
+                .run();
+
+            if (claimed.meta.changes === 0) {
+                continue;
+            }
+
+            claimedDelivery = true;
+
+            const examples = await getWordExamples(env, word.id);
+            await sendMessage(
+                env,
+                user.chat_id,
+                `📚 Слово дня\n\n${examplesText(word, examples)}`
+            );
+        } catch (error) {
+            console.error({
+                event: "daily_word_delivery_failed",
+                userId: user.telegram_user_id,
+                message: error instanceof Error ? error.message : "Unknown error",
+            });
+
+            if (claimedDelivery) {
+                await env.DB
+                    .prepare(`
+                      UPDATE users
+                      SET last_delivery_local_date = NULL
+                      WHERE telegram_user_id = ? AND last_delivery_local_date = ?
+                    `)
+                    .bind(user.telegram_user_id, localTime.date)
+                    .run();
+            }
+        }
+    }
 }
 
 async function sendActiveWordList(env, chatId, userId) {
@@ -632,6 +787,34 @@ export default {
                     sent
                         ? "Показую приклади."
                         : "Це слово вже недоступне."
+                );
+                return new Response("ok");
+            }
+
+            if (callback.data.startsWith("dailytime:")) {
+                const dailyTime = callback.data.replace("dailytime:", "");
+
+                if (!DAILY_TIME_OPTIONS.includes(dailyTime)) {
+                    await answerCallbackQuery(env, callback.id, "Невірний час.");
+                    return new Response("ok");
+                }
+
+                await env.DB
+                    .prepare(`
+                      UPDATE users
+                      SET daily_time = ?
+                      WHERE telegram_user_id = ?
+                    `)
+                    .bind(dailyTime, userId)
+                    .run();
+
+                await answerCallbackQuery(env, callback.id, "Час збережено.");
+                await editMessage(
+                    env,
+                    chatId,
+                    messageId,
+                    `✅ Готово! Щоденне слово приходитиме о ${dailyTime}.`,
+                    { inline_keyboard: [] }
                 );
                 return new Response("ok");
             }
@@ -846,6 +1029,11 @@ export default {
 
         if (text === "🎓 Вивчені слова") {
             await sendLearnedWordList(env, chatId, userId);
+            return new Response("ok");
+        }
+
+        if (text === "⏰ Щоденне слово") {
+            await sendDailySettings(env, chatId, userId);
             return new Response("ok");
         }
 
@@ -1225,5 +1413,17 @@ export default {
         }
 
         return new Response("ok");
+    },
+
+    async scheduled(controller, env) {
+        try {
+            await sendDueDailyWords(env, controller.scheduledTime);
+        } catch (error) {
+            console.error({
+                event: "daily_word_schedule_failed",
+                message: error instanceof Error ? error.message : "Unknown error",
+            });
+            throw error;
+        }
     },
 };

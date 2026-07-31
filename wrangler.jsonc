@@ -2,6 +2,9 @@
   "name": "vocab-telegram-bot",
   "main": "worker.js",
   "compatibility_date": "2026-07-31",
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
   "d1_databases": [
     {
       "binding": "DB",

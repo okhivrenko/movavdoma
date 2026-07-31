@@ -41,6 +41,7 @@ Welcomes the user and shows a persistent reply keyboard with:
 - `➕ Додати слово`
 - `📚 Мої слова`
 - `🎓 Вивчені слова`
+- `⏰ Щоденне слово`
 - `❓ Допомога`
 
 Users can simply send an English word or phrase; `/add` remains supported.
@@ -88,6 +89,16 @@ The menu button and `/learned` show up to ten learned words with inline
 `Вивчати` buttons. Selecting one returns it to the active learning catalog.
 `/restore 1`, `/restore 5-10`, and `/restore all` remain supported for bulk
 restoration. Learned words remain in D1 with `is_active = 0`.
+
+### Daily word
+
+`⏰ Щоденне слово` lets a user choose a daily delivery hour without typing a
+command. The bot sends one random active word and its examples at that hour.
+The default timezone is `Europe/Warsaw`; Telegram does not provide a user's
+timezone to a bot. A Cloudflare Cron Trigger runs every minute in UTC, while
+the Worker compares each user's configured hour in their stored timezone. It
+uses `last_delivery_local_date` to send no more than one daily word per local
+date.
 
 ## Important UX rules
 
@@ -191,9 +202,7 @@ CREATE TABLE IF NOT EXISTS pending_words (
 
 ## Next product features
 
-1. `/time 09:00` — choose daily delivery time.
-2. Cloudflare scheduled trigger — checks which users are due a word.
-3. Daily word card with buttons:
+1. Daily word card with buttons:
     - `Знаю`
     - `Повторити завтра`
     - `Не знаю`
