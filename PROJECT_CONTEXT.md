@@ -31,6 +31,7 @@ Never commit or print these values:
 - `TELEGRAM_WEBHOOK_SECRET`
 - `OPENAI_API_KEY`
 - `DEEPL_API_KEY` — currently no longer used by the latest card-generation flow, but remains configured in Cloudflare.
+- `MONOBANK_API_TOKEN` — personal Monobank API token used only to read the configured jar statement.
 
 ## Current Worker behavior
 
@@ -100,6 +101,24 @@ the Worker compares each user's configured hour in their stored timezone. It
 uses `last_delivery_local_date` to send no more than one daily word per local
 date.
 
+### Support and bonuses
+
+- The keyboard offers `☕ Підтримати бот` and `🎁 Отримати бонус`.
+- Before a donation, the bot gives the user a short unique code to put in the
+  Monobank payment comment. The public jar is
+  `https://send.monobank.ua/jar/8sko6A3Cma`.
+- A scheduled task reads that jar's statement at most once per minute. Every
+  transaction ID is stored, so overlapping statement windows cannot notify or
+  process the same payment twice.
+- A matching donation creates an admin-only Telegram review card. The bot
+  recommends 30 words/day for donations below ₴100, 50 for ₴100–₴200
+  (inclusive), and 100 for more than ₴200. The admin confirms or changes the
+  recommendation; nothing is granted automatically based on a payment amount.
+- An approved donation limit lasts one calendar month, then automatically
+  falls back to the normal limit.
+- Donors are told that the bonus will arrive shortly. A donation without a
+  matching code is still sent to the admin as an unmatched-payment alert.
+
 ## Important UX rules
 
 - Never mix senses of a word in one card.
@@ -113,7 +132,7 @@ date.
 
 ## OpenAI integration
 
-- Model: `gpt-5-nano`
+- Model: `gpt-5.4-nano`
 - API: Chat Completions API with structured JSON output.
 - Reasoning effort: `none`.
 - Generate translation and examples in one OpenAI response so all content uses the same selected meaning.
@@ -125,6 +144,9 @@ date.
   words remain isolated by Telegram user ID.
 - Users other than the account identified by the Cloudflare secret
   `ADMIN_TELEGRAM_USER_ID` can add up to 20 words per local day.
+- An admin-approved support bonus can replace an individual user's daily limit
+  with 30, 50, or 100 words for one calendar month. The admin remains
+  unlimited.
 - The quota is atomically claimed before any OpenAI call. Failed OpenAI calls
   still count because they may already have consumed API tokens.
 - `daily_word_additions` stores only the user ID, local date, and count.
@@ -156,6 +178,44 @@ CREATE TABLE IF NOT EXISTS daily_word_additions (
   additions INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, local_date),
   FOREIGN KEY (user_id) REFERENCES users(telegram_user_id)
+);
+
+CREATE TABLE IF NOT EXISTS user_daily_limits (
+  user_id INTEGER PRIMARY KEY,
+  daily_limit INTEGER NOT NULL,
+  donation_request_id INTEGER,
+  granted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS donation_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  support_code TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'awaiting_payment',
+  requested_at TEXT,
+  matched_transaction_id TEXT,
+  granted_daily_limit INTEGER,
+  admin_notified_at TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  granted_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS bank_transactions (
+  transaction_id TEXT PRIMARY KEY,
+  amount_kopiykas INTEGER NOT NULL,
+  transaction_time INTEGER NOT NULL,
+  comment TEXT NOT NULL DEFAULT '',
+  matched_request_id INTEGER,
+  admin_notified_at TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS monobank_sync_state (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  jar_id TEXT,
+  last_attempt_at INTEGER NOT NULL DEFAULT 0,
+  last_successful_sync_at INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS words (
@@ -220,6 +280,11 @@ CREATE TABLE IF NOT EXISTS pending_words (
 - Before deploying quota support to production, execute only
   `migrations/0002_add_daily_word_additions.sql` against the remote D1 database;
   do not run the whole migration history.
+- Before deploying support bonuses to production, execute only
+  `migrations/0003_add_donation_bonus_support.sql` against the remote D1 database;
+  do not run the whole migration history.
+- Then execute only `migrations/0004_add_bonus_expiration.sql` against the
+  remote D1 database.
 
 ## Next product features
 

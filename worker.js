@@ -3,6 +3,12 @@ const MAX_SENSES = 9;
 const LIST_LIMIT = 10;
 const MAX_OPENAI_ATTEMPTS = 3;
 const DAILY_ADD_LIMIT = 20;
+const DONATION_TIER_50_KOPIYKAS = 10_000;
+const DONATION_TIER_100_KOPIYKAS = 20_000;
+const MONOBANK_JAR_URL = "https://send.monobank.ua/jar/8sko6A3Cma";
+const MONOBANK_JAR_SEND_ID = "8sko6A3Cma";
+const MONOBANK_MIN_SYNC_INTERVAL_SECONDS = 60;
+const MONOBANK_STATEMENT_OVERLAP_SECONDS = 5 * 60;
 const DAILY_TIME_OPTIONS = Array.from(
     { length: 24 },
     (_, hour) => `${String(hour).padStart(2, "0")}:00`
@@ -85,7 +91,7 @@ async function openAIJson(env, name, schema, instructions, input) {
                         "content-type": "application/json",
                     },
                     body: JSON.stringify({
-                        model: "gpt-5-nano",
+                        model: "gpt-5.4-nano",
                         reasoning_effort: "none",
                         max_completion_tokens: 400,
                         response_format: {
@@ -535,6 +541,7 @@ function mainKeyboard() {
             [{ text: "➕ Додати слово" }],
             [{ text: "📚 Мої слова" }, { text: "🎓 Вивчені слова" }],
             [{ text: "⏰ Щоденне слово" }],
+            [{ text: "☕ Підтримати бот" }, { text: "🎁 Отримати бонус" }],
             [{ text: "❓ Допомога" }],
         ],
         resize_keyboard: true,
@@ -601,6 +608,329 @@ function isAdmin(env, userId) {
     return String(userId) === env.ADMIN_TELEGRAM_USER_ID;
 }
 
+function formatHryvnias(amountKopiykas) {
+    return new Intl.NumberFormat("uk-UA", {
+        style: "currency",
+        currency: "UAH",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+    }).format(amountKopiykas / 100);
+}
+
+function createSupportCode() {
+    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const values = new Uint32Array(5);
+    crypto.getRandomValues(values);
+
+    return `V-${Array.from(values, (value) => alphabet[value % alphabet.length]).join("")}`;
+}
+
+async function getOrCreateDonationRequest(env, userId) {
+    const existing = await getOpenDonationRequest(env, userId);
+
+    if (existing) {
+        return existing;
+    }
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        const supportCode = createSupportCode();
+        const inserted = await env.DB
+            .prepare(`
+              INSERT OR IGNORE INTO donation_requests (user_id, support_code)
+              VALUES (?, ?)
+            `)
+            .bind(userId, supportCode)
+            .run();
+
+        if (inserted.meta.changes > 0) {
+            return { id: inserted.meta.last_row_id, support_code: supportCode, status: "awaiting_payment" };
+        }
+    }
+
+    throw new Error("Unable to generate a unique donation code.");
+}
+
+async function getOpenDonationRequest(env, userId) {
+    return env.DB
+        .prepare(`
+          SELECT id, support_code, status
+          FROM donation_requests
+          WHERE user_id = ? AND status IN ('awaiting_payment', 'awaiting_review')
+          ORDER BY id DESC
+          LIMIT 1
+        `)
+        .bind(userId)
+        .first();
+}
+
+function supportKeyboard() {
+    return {
+        inline_keyboard: [
+            [{ text: "☕ Відкрити банку", url: MONOBANK_JAR_URL }],
+        ],
+    };
+}
+
+async function sendDonationInstructions(env, chatId, userId) {
+    const request = await getOrCreateDonationRequest(env, userId);
+
+    await sendMessage(
+        env,
+        chatId,
+        `Дякую за підтримку! Відкрий банку й, будь ласка, додай цей код у коментар до платежу:\n\n${request.support_code}\n\nПісля переказу натисни «🎁 Отримати бонус». Код допоможе мені точно знайти твій донат.`,
+        supportKeyboard()
+    );
+}
+
+async function getAdminChatId(env) {
+    if (!env.ADMIN_TELEGRAM_USER_ID) {
+        return null;
+    }
+
+    const admin = await env.DB
+        .prepare("SELECT chat_id FROM users WHERE telegram_user_id = ?")
+        .bind(env.ADMIN_TELEGRAM_USER_ID)
+        .first();
+
+    return admin?.chat_id ?? null;
+}
+
+function donationDailyLimit(amountKopiykas) {
+    if (amountKopiykas > DONATION_TIER_100_KOPIYKAS) {
+        return 100;
+    }
+
+    if (amountKopiykas >= DONATION_TIER_50_KOPIYKAS) {
+        return 50;
+    }
+
+    return 30;
+}
+
+function adminDonationKeyboard(requestId, suggestedLimit) {
+    const suggestedButton = suggestedLimit
+        ? [{ text: `Видати ${suggestedLimit}/день на місяць`, callback_data: `bonus:${suggestedLimit}:${requestId}` }]
+        : [];
+
+    return {
+        inline_keyboard: [
+            suggestedButton,
+            [
+                { text: "30/день", callback_data: `bonus:30:${requestId}` },
+                { text: "50/день", callback_data: `bonus:50:${requestId}` },
+                { text: "100/день", callback_data: `bonus:100:${requestId}` },
+            ],
+            [
+                { text: "Відхилити", callback_data: `bonus:reject:${requestId}` },
+            ],
+        ].filter((row) => row.length > 0),
+    };
+}
+
+async function notifyPendingDonationRequests(env) {
+    const adminChatId = await getAdminChatId(env);
+
+    if (!adminChatId) {
+        console.warn({ event: "donation_admin_chat_not_found" });
+        return;
+    }
+
+    const pending = await env.DB
+        .prepare(`
+          SELECT id, user_id, support_code, matched_transaction_id
+          FROM donation_requests
+          WHERE status = 'awaiting_review' AND admin_notified_at IS NULL
+          ORDER BY id ASC
+        `)
+        .all();
+
+    for (const request of pending.results) {
+        const transaction = request.matched_transaction_id
+            ? await env.DB
+                  .prepare("SELECT amount_kopiykas FROM bank_transactions WHERE transaction_id = ?")
+                  .bind(request.matched_transaction_id)
+                  .first()
+            : null;
+        const amount = transaction
+            ? `\nДонат знайдено: ${formatHryvnias(transaction.amount_kopiykas)}.`
+            : "\nПлатіж ще не знайдено автоматично — звір його у банці.";
+        const suggestedLimit = transaction
+            ? donationDailyLimit(transaction.amount_kopiykas)
+            : null;
+
+        await sendMessage(
+            env,
+            adminChatId,
+            `🎁 Заявка на бонус\nКористувач: ${request.user_id}\nКод: ${request.support_code}${amount}${suggestedLimit ? `\nРекомендація: ${suggestedLimit} слів/день на 1 місяць.` : ""}`,
+            adminDonationKeyboard(request.id, suggestedLimit)
+        );
+
+        await env.DB
+            .prepare("UPDATE donation_requests SET admin_notified_at = CURRENT_TIMESTAMP WHERE id = ?")
+            .bind(request.id)
+            .run();
+    }
+}
+
+async function notifyUnmatchedDonations(env) {
+    const adminChatId = await getAdminChatId(env);
+
+    if (!adminChatId) {
+        return;
+    }
+
+    const unmatched = await env.DB
+        .prepare(`
+          SELECT transaction_id, amount_kopiykas, comment
+          FROM bank_transactions
+          WHERE matched_request_id IS NULL AND admin_notified_at IS NULL
+          ORDER BY transaction_time ASC
+        `)
+        .all();
+
+    for (const transaction of unmatched.results) {
+        const comment = transaction.comment ? `\nКоментар: ${transaction.comment}` : "\nБез коментаря.";
+
+        await sendMessage(
+            env,
+            adminChatId,
+            `☕ Новий донат без збігу із заявкою: ${formatHryvnias(transaction.amount_kopiykas)}.${comment}\n\nЯкщо людина напише тобі, звір платіж і видай бонус через її заявку.`
+        );
+
+        await env.DB
+            .prepare("UPDATE bank_transactions SET admin_notified_at = CURRENT_TIMESTAMP WHERE transaction_id = ?")
+            .bind(transaction.transaction_id)
+            .run();
+    }
+}
+
+async function submitDonationBonusRequest(env, chatId, userId) {
+    const request = await getOpenDonationRequest(env, userId);
+
+    if (!request) {
+        await sendMessage(
+            env,
+            chatId,
+            "Спершу натисни «☕ Підтримати бот»: я дам код, який треба додати в коментар до платежу."
+        );
+        return;
+    }
+
+    if (request.status === "awaiting_payment") {
+        await env.DB
+            .prepare(`
+              UPDATE donation_requests
+              SET status = 'awaiting_review', requested_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `)
+            .bind(request.id)
+            .run();
+    }
+
+    await sendMessage(
+        env,
+        chatId,
+        "🎁 Заявку на бонус прийнято. Я перевірю донат і надам бонус найближчим часом. Бонус діє 1 місяць: менше 100 грн — 30 слів/день, від 100 до 200 грн включно — 50 слів/день, понад 200 грн — 100 слів/день."
+    );
+
+    await notifyPendingDonationRequests(env);
+}
+
+async function grantDonationBonus(env, requestId, dailyLimit) {
+    const request = await env.DB
+        .prepare(`
+          SELECT id, user_id, status
+          FROM donation_requests
+          WHERE id = ?
+        `)
+        .bind(requestId)
+        .first();
+
+    if (!request || request.status !== "awaiting_review") {
+        return null;
+    }
+
+    const granted = await env.DB
+        .prepare(`
+          UPDATE donation_requests
+          SET status = 'granted', granted_daily_limit = ?, granted_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND status = 'awaiting_review'
+        `)
+        .bind(dailyLimit, request.id)
+        .run();
+
+    if (granted.meta.changes === 0) {
+        return null;
+    }
+
+    await env.DB
+        .prepare(`
+          INSERT INTO user_daily_limits (user_id, daily_limit, donation_request_id)
+          VALUES (?, ?, ?, datetime('now', '+1 month'))
+          ON CONFLICT(user_id) DO UPDATE SET
+            daily_limit = excluded.daily_limit,
+            donation_request_id = excluded.donation_request_id,
+            expires_at = excluded.expires_at,
+            granted_at = CURRENT_TIMESTAMP
+        `)
+        .bind(request.user_id, dailyLimit, request.id)
+        .run();
+
+    const user = await env.DB
+        .prepare("SELECT chat_id FROM users WHERE telegram_user_id = ?")
+        .bind(request.user_id)
+        .first();
+
+    if (user?.chat_id) {
+        await sendMessage(
+            env,
+            user.chat_id,
+            `🎁 Дякую за підтримку! Твій денний ліміт — ${dailyLimit} ${wordCountLabel(dailyLimit)} на наступний місяць.`
+        );
+    }
+
+    return request;
+}
+
+async function rejectDonationBonus(env, requestId) {
+    const request = await env.DB
+        .prepare(`
+          SELECT id, user_id, status
+          FROM donation_requests
+          WHERE id = ?
+        `)
+        .bind(requestId)
+        .first();
+
+    if (!request || request.status !== "awaiting_review") {
+        return null;
+    }
+
+    const rejected = await env.DB
+        .prepare("UPDATE donation_requests SET status = 'rejected' WHERE id = ? AND status = 'awaiting_review'")
+        .bind(request.id)
+        .run();
+
+    if (rejected.meta.changes === 0) {
+        return null;
+    }
+
+    const user = await env.DB
+        .prepare("SELECT chat_id FROM users WHERE telegram_user_id = ?")
+        .bind(request.user_id)
+        .first();
+
+    if (user?.chat_id) {
+        await sendMessage(
+            env,
+            user.chat_id,
+            "Не вдалося підтвердити донат для бонусу. Натисни «☕ Підтримати бот», отримай новий код і додай його в коментар платежу."
+        );
+    }
+
+    return request;
+}
+
 async function claimDailyWordAddition(env, userId) {
     if (isAdmin(env, userId)) {
         return true;
@@ -608,6 +938,10 @@ async function claimDailyWordAddition(env, userId) {
 
     const user = await env.DB
         .prepare("SELECT timezone FROM users WHERE telegram_user_id = ?")
+        .bind(userId)
+        .first();
+    const limit = await env.DB
+        .prepare("SELECT daily_limit FROM user_daily_limits WHERE user_id = ? AND expires_at > CURRENT_TIMESTAMP")
         .bind(userId)
         .first();
     const localTime = localDateAndTime(
@@ -627,10 +961,182 @@ async function claimDailyWordAddition(env, userId) {
           SET additions = additions + 1
           WHERE additions < ?
         `)
-        .bind(userId, localTime.date, DAILY_ADD_LIMIT)
+        .bind(userId, localTime.date, limit?.daily_limit ?? DAILY_ADD_LIMIT)
         .run();
 
     return claimed.meta.changes > 0;
+}
+
+async function getDailyAdditionLimit(env, userId) {
+    if (isAdmin(env, userId)) {
+        return null;
+    }
+
+    const limit = await env.DB
+        .prepare("SELECT daily_limit FROM user_daily_limits WHERE user_id = ? AND expires_at > CURRENT_TIMESTAMP")
+        .bind(userId)
+        .first();
+
+    return limit?.daily_limit ?? DAILY_ADD_LIMIT;
+}
+
+async function claimMonobankSync(env, nowSeconds) {
+    const claimed = await env.DB
+        .prepare(`
+          UPDATE monobank_sync_state
+          SET last_attempt_at = ?
+          WHERE id = 1 AND last_attempt_at <= ?
+        `)
+        .bind(nowSeconds, nowSeconds - MONOBANK_MIN_SYNC_INTERVAL_SECONDS)
+        .run();
+
+    return claimed.meta.changes > 0;
+}
+
+async function getMonobankJarId(env) {
+    const state = await env.DB
+        .prepare("SELECT jar_id FROM monobank_sync_state WHERE id = 1")
+        .first();
+
+    if (state?.jar_id) {
+        return state.jar_id;
+    }
+
+    const response = await fetch("https://api.monobank.ua/personal/client-info", {
+        headers: { "X-Token": env.MONOBANK_API_TOKEN },
+    });
+
+    if (!response.ok) {
+        throw new Error(`Monobank client info ${response.status}`);
+    }
+
+    const clientInfo = await response.json();
+    const jar = clientInfo.jars?.find(
+        (candidate) => candidate.sendId === MONOBANK_JAR_SEND_ID
+    );
+
+    if (!jar?.id) {
+        throw new Error("Monobank jar was not found for configured public link.");
+    }
+
+    await env.DB
+        .prepare("UPDATE monobank_sync_state SET jar_id = ? WHERE id = 1")
+        .bind(jar.id)
+        .run();
+
+    return jar.id;
+}
+
+async function findDonationRequestByComment(env, comment) {
+    if (!comment) {
+        return null;
+    }
+
+    return env.DB
+        .prepare(`
+          SELECT id
+          FROM donation_requests
+          WHERE status IN ('awaiting_payment', 'awaiting_review')
+            AND instr(upper(?), support_code) > 0
+          ORDER BY id DESC
+          LIMIT 1
+        `)
+        .bind(comment)
+        .first();
+}
+
+async function saveMonobankTransactions(env, transactions) {
+    for (const transaction of transactions) {
+        if (
+            !transaction?.id ||
+            !Number.isInteger(transaction.amount) ||
+            transaction.amount <= 0 ||
+            transaction.currencyCode !== 980
+        ) {
+            continue;
+        }
+
+        const request = await findDonationRequestByComment(
+            env,
+            transaction.comment ?? ""
+        );
+        const inserted = await env.DB
+            .prepare(`
+              INSERT OR IGNORE INTO bank_transactions (
+                transaction_id,
+                amount_kopiykas,
+                transaction_time,
+                comment,
+                matched_request_id
+              )
+              VALUES (?, ?, ?, ?, ?)
+            `)
+            .bind(
+                transaction.id,
+                transaction.amount,
+                transaction.time ?? 0,
+                transaction.comment ?? "",
+                request?.id ?? null
+            )
+            .run();
+
+        if (inserted.meta.changes > 0 && request) {
+            await env.DB
+                .prepare(`
+                  UPDATE donation_requests
+                  SET status = 'awaiting_review',
+                      matched_transaction_id = ?
+                  WHERE id = ? AND status IN ('awaiting_payment', 'awaiting_review')
+                `)
+                .bind(transaction.id, request.id)
+                .run();
+        }
+    }
+}
+
+async function syncMonobankDonations(env, scheduledTime) {
+    if (!env.MONOBANK_API_TOKEN) {
+        return;
+    }
+
+    const nowSeconds = Math.floor(scheduledTime / 1000);
+
+    if (!(await claimMonobankSync(env, nowSeconds))) {
+        return;
+    }
+
+    const jarId = await getMonobankJarId(env);
+    const state = await env.DB
+        .prepare("SELECT last_successful_sync_at FROM monobank_sync_state WHERE id = 1")
+        .first();
+    const from = Math.max(
+        state?.last_successful_sync_at
+            ? state.last_successful_sync_at - MONOBANK_STATEMENT_OVERLAP_SECONDS
+            : nowSeconds - MONOBANK_STATEMENT_OVERLAP_SECONDS,
+        nowSeconds - 2_682_000
+    );
+    const response = await fetch(
+        `https://api.monobank.ua/personal/statement/${encodeURIComponent(jarId)}/${from}/${nowSeconds}`,
+        { headers: { "X-Token": env.MONOBANK_API_TOKEN } }
+    );
+
+    if (!response.ok) {
+        throw new Error(`Monobank statement ${response.status}`);
+    }
+
+    const transactions = await response.json();
+
+    if (!Array.isArray(transactions)) {
+        throw new Error("Monobank statement response is invalid.");
+    }
+
+    await saveMonobankTransactions(env, transactions);
+    await env.DB
+        .prepare("UPDATE monobank_sync_state SET last_successful_sync_at = ? WHERE id = 1")
+        .bind(nowSeconds)
+        .run();
+    await notifyPendingDonationRequests(env);
+    await notifyUnmatchedDonations(env);
 }
 
 async function getRandomActiveWord(env, userId) {
@@ -742,7 +1248,7 @@ async function sendHelp(env, chatId) {
     await sendMessage(
         env,
         chatId,
-        "Як користуватися ботом:\n\n1. Натисни «➕ Додати слово» або просто надішли англійське слово чи фразу.\n2. Якщо знаєш потрібне значення, напиши його після |:\ncharge | payment for a service\n3. Обери потрібне значення, якщо бот його уточнить.\n4. Відкрий «📚 Мої слова», щоб переглянути свій каталог.\n5. Відкрий «🎓 Вивчені слова», щоб повернути слово до навчання.\n\nНаприклад: resilient",
+        "Як користуватися ботом:\n\n1. Натисни «➕ Додати слово» або просто надішли англійське слово чи фразу.\n2. Якщо знаєш потрібне значення, напиши його після |:\ncharge | payment for a service\n3. Обери потрібне значення, якщо бот його уточнить.\n4. Відкрий «📚 Мої слова», щоб переглянути свій каталог.\n5. Відкрий «🎓 Вивчені слова», щоб повернути слово до навчання.\n6. Щоб підтримати бот, натисни «☕ Підтримати бот», додай виданий код у коментар платежу, а потім — «🎁 Отримати бонус».\n\nНаприклад: resilient",
         mainKeyboard()
     );
 }
@@ -787,6 +1293,74 @@ export default {
             const userId = callback.from?.id;
 
             if (!chatId || !messageId || !userId) {
+                return new Response("ok");
+            }
+
+            if (callback.data.startsWith("bonus:")) {
+                if (!isAdmin(env, userId)) {
+                    await answerCallbackQuery(env, callback.id, "Ця дія доступна лише адміну.");
+                    return new Response("ok");
+                }
+
+                const match = callback.data.match(/^bonus:(30|50|100|reject):(\d+)$/);
+
+                if (!match) {
+                    await answerCallbackQuery(env, callback.id, "Невірна заявка.");
+                    return new Response("ok");
+                }
+
+                const action = match[1];
+                const requestId = Number(match[2]);
+
+                if (!Number.isInteger(requestId) || requestId <= 0) {
+                    await answerCallbackQuery(env, callback.id, "Невірна заявка.");
+                    return new Response("ok");
+                }
+
+                try {
+                    if (action === "reject") {
+                        const rejected = await rejectDonationBonus(env, requestId);
+
+                        if (!rejected) {
+                            await answerCallbackQuery(env, callback.id, "Заявку вже оброблено.");
+                            return new Response("ok");
+                        }
+
+                        await answerCallbackQuery(env, callback.id, "Заявку відхилено.");
+                        await editMessage(
+                            env,
+                            chatId,
+                            messageId,
+                            `❌ Заявку #${requestId} відхилено.`,
+                            { inline_keyboard: [] }
+                        );
+                        return new Response("ok");
+                    }
+
+                    const dailyLimit = Number(action);
+                    const granted = await grantDonationBonus(env, requestId, dailyLimit);
+
+                    if (!granted) {
+                        await answerCallbackQuery(env, callback.id, "Заявку вже оброблено.");
+                        return new Response("ok");
+                    }
+
+                    await answerCallbackQuery(env, callback.id, "Бонус надано.");
+                    await editMessage(
+                        env,
+                        chatId,
+                        messageId,
+                        `✅ Заявка #${requestId}: ${dailyLimit} ${wordCountLabel(dailyLimit)} на день, діє 1 місяць.`,
+                        { inline_keyboard: [] }
+                    );
+                } catch (error) {
+                    console.error({
+                        event: "donation_bonus_action_failed",
+                        message: error instanceof Error ? error.message : "Unknown error",
+                    });
+                    await answerCallbackQuery(env, callback.id, "Не вдалося обробити заявку.");
+                }
+
                 return new Response("ok");
             }
 
@@ -1074,6 +1648,40 @@ export default {
             return new Response("ok");
         }
 
+        if (text === "☕ Підтримати бот") {
+            try {
+                await sendDonationInstructions(env, chatId, userId);
+            } catch (error) {
+                console.error({
+                    event: "donation_instructions_failed",
+                    message: error instanceof Error ? error.message : "Unknown error",
+                });
+                await sendMessage(
+                    env,
+                    chatId,
+                    "Не вдалося підготувати код для донату. Спробуй ще раз за хвилину."
+                );
+            }
+            return new Response("ok");
+        }
+
+        if (text === "🎁 Отримати бонус") {
+            try {
+                await submitDonationBonusRequest(env, chatId, userId);
+            } catch (error) {
+                console.error({
+                    event: "donation_bonus_request_failed",
+                    message: error instanceof Error ? error.message : "Unknown error",
+                });
+                await sendMessage(
+                    env,
+                    chatId,
+                    "Не вдалося надіслати заявку на бонус. Спробуй ще раз за хвилину."
+                );
+            }
+            return new Response("ok");
+        }
+
         if (text === "❓ Допомога") {
             await sendHelp(env, chatId);
             return new Response("ok");
@@ -1147,10 +1755,11 @@ export default {
             }
 
             if (!canAddWord) {
+                const dailyLimit = await getDailyAdditionLimit(env, userId);
                 await sendMessage(
                     env,
                     chatId,
-                    `На сьогодні вже додано ${DAILY_ADD_LIMIT} слів. Спробуй завтра.`
+                    `На сьогодні вже додано ${dailyLimit} ${wordCountLabel(dailyLimit)}. Спробуй завтра.`
                 );
                 return new Response("ok");
             }
@@ -1487,7 +2096,15 @@ export default {
                 event: "daily_word_schedule_failed",
                 message: error instanceof Error ? error.message : "Unknown error",
             });
-            throw error;
+        }
+
+        try {
+            await syncMonobankDonations(env, controller.scheduledTime);
+        } catch (error) {
+            console.error({
+                event: "monobank_donation_sync_failed",
+                message: error instanceof Error ? error.message : "Unknown error",
+            });
         }
     },
 };
