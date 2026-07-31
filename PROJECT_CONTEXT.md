@@ -59,12 +59,14 @@ When an explicit context is supplied, skip meaning selection and generate the ca
 
 ### `/list`
 
-Shows the ten most recently added active words for the current Telegram user.
+Shows the ten most recently added active words for the current Telegram user,
+with an inline archive button for each word.
 
-### `/delete 1`
+### `/archive 1`, `/archive 5-10`, `/archive all`
 
-Archives the word at the specified position in the current `/list` output. The
-word remains in D1 with `is_active = 0`, so it no longer appears in `/list` and
+Archives one word, an inclusive range of positions from the current `/list`, or
+all active words. `/delete` remains a backwards-compatible alias. Archived
+words remain in D1 with `is_active = 0`, so they no longer appear in `/list` and
 can be restored in a future feature.
 
 ## Important UX rules

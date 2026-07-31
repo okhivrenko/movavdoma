@@ -1,5 +1,6 @@
 const SENSES_PER_PAGE = 3;
 const MAX_SENSES = 9;
+const LIST_LIMIT = 10;
 
 async function telegramApi(env, method, payload) {
     const response = await fetch(
@@ -291,6 +292,80 @@ async function saveAndSendWord(env, chatId, userId, word, context) {
     );
 }
 
+async function getRecentActiveWords(env, userId) {
+    const result = await env.DB
+        .prepare(`
+      SELECT id, source_text, translation_uk
+      FROM words
+      WHERE user_id = ? AND is_active = 1
+      ORDER BY id DESC
+      LIMIT ?
+    `)
+        .bind(userId, LIST_LIMIT)
+        .all();
+
+    return result.results;
+}
+
+function listText(words) {
+    if (words.length === 0) {
+        return "У словнику поки немає активних слів.";
+    }
+
+    return `Останні слова:\n${words
+        .map(
+            (word, index) =>
+                `${index + 1}. ${word.source_text} — ${word.translation_uk}`
+        )
+        .join("\n")}\n\nАрхів: /archive 1, /archive 5-10 або /archive all`;
+}
+
+function listKeyboard(words) {
+    if (words.length === 0) {
+        return undefined;
+    }
+
+    return {
+        inline_keyboard: words.map((word, index) => [
+            {
+                text: `🗄 В архів №${index + 1}`,
+                callback_data: `archive:${word.id}`,
+            },
+        ]),
+    };
+}
+
+async function refreshListMessage(env, chatId, messageId, userId) {
+    const words = await getRecentActiveWords(env, userId);
+    const text = listText(words);
+    const keyboard = listKeyboard(words);
+
+    try {
+        await editMessage(env, chatId, messageId, text, keyboard);
+    } catch {
+        await sendMessage(env, chatId, text, keyboard);
+    }
+}
+
+function wordCountLabel(count) {
+    const lastTwoDigits = count % 100;
+    const lastDigit = count % 10;
+
+    if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
+        return "слів";
+    }
+
+    if (lastDigit === 1) {
+        return "слово";
+    }
+
+    if (lastDigit >= 2 && lastDigit <= 4) {
+        return "слова";
+    }
+
+    return "слів";
+}
+
 export default {
     async fetch(request, env) {
         if (request.method !== "POST") {
@@ -331,6 +406,35 @@ export default {
             const userId = callback.from?.id;
 
             if (!chatId || !messageId || !userId) {
+                return new Response("ok");
+            }
+
+            if (callback.data.startsWith("archive:")) {
+                const wordId = Number(callback.data.replace("archive:", ""));
+
+                if (!Number.isInteger(wordId) || wordId <= 0) {
+                    await answerCallbackQuery(env, callback.id, "Невірний вибір.");
+                    return new Response("ok");
+                }
+
+                const archived = await env.DB
+                    .prepare(`
+              UPDATE words
+              SET is_active = 0
+              WHERE id = ? AND user_id = ? AND is_active = 1
+            `)
+                    .bind(wordId, userId)
+                    .run();
+
+                await answerCallbackQuery(
+                    env,
+                    callback.id,
+                    archived.meta.changes > 0
+                        ? "Слово перенесено в архів."
+                        : "Це слово вже неактивне."
+                );
+
+                await refreshListMessage(env, chatId, messageId, userId);
                 return new Response("ok");
             }
 
@@ -454,7 +558,7 @@ export default {
             await sendMessage(
                 env,
                 chatId,
-                "Додай слово так:\n/add resilient\n\nАбо уточни значення:\n/add charge | payment for a service\n\nПереглянь слова: /list\nАрхівуй слово зі списку: /delete 1"
+                "Додай слово так:\n/add resilient\n\nАбо уточни значення:\n/add charge | payment for a service\n\nПереглянь та архівуй слова: /list\nАрхівуй кілька: /archive 5-10\nАрхівуй усі: /archive all"
             );
             return new Response("ok");
         }
@@ -545,42 +649,109 @@ export default {
             return new Response("ok");
         }
 
-        const deleteMatch = text.match(/^\/delete(?:\s+(.+))?$/i);
+        const archiveMatch = text.match(/^\/(?:archive|delete)(?:\s+(.+))?$/i);
 
-        if (deleteMatch) {
-            const position = Number(deleteMatch[1]);
+        if (archiveMatch) {
+            const selection = archiveMatch[1]?.trim().toLowerCase();
 
-            if (!Number.isInteger(position) || position < 1 || position > 10) {
+            if (!selection) {
                 await sendMessage(
                     env,
                     chatId,
-                    "Вкажи номер слова зі списку, наприклад: /delete 1"
+                    "Вкажи номер або діапазон зі списку: /archive 1 чи /archive 5-10. Для всіх слів: /archive all"
                 );
                 return new Response("ok");
             }
 
+            if (selection === "all") {
+                const archived = await env.DB
+                    .prepare(`
+              UPDATE words
+              SET is_active = 0
+              WHERE user_id = ? AND is_active = 1
+            `)
+                    .bind(userId)
+                    .run();
+
+                if (archived.meta.changes === 0) {
+                    await sendMessage(
+                        env,
+                        chatId,
+                        "Немає активних слів для архівації."
+                    );
+                    return new Response("ok");
+                }
+
+                await sendMessage(
+                    env,
+                    chatId,
+                    `✅ В архів перенесено ${archived.meta.changes} ${wordCountLabel(
+                        archived.meta.changes
+                    )}.`
+                );
+                return new Response("ok");
+            }
+
+            const rangeMatch = selection.match(/^(\d+)(?:\s*-\s*(\d+))?$/);
+
+            if (!rangeMatch) {
+                await sendMessage(
+                    env,
+                    chatId,
+                    "Невірний формат. Використай /archive 1, /archive 5-10 або /archive all."
+                );
+                return new Response("ok");
+            }
+
+            const start = Number(rangeMatch[1]);
+            const end = Number(rangeMatch[2] ?? rangeMatch[1]);
+
+            if (
+                !Number.isInteger(start) ||
+                !Number.isInteger(end) ||
+                start < 1 ||
+                end < start ||
+                end > LIST_LIMIT
+            ) {
+                await sendMessage(
+                    env,
+                    chatId,
+                    "Можна архівувати позиції від 1 до 10 із поточного /list."
+                );
+                return new Response("ok");
+            }
+
+            const words = await getRecentActiveWords(env, userId);
+
+            if (end > words.length) {
+                await sendMessage(
+                    env,
+                    chatId,
+                    `У поточному списку лише ${words.length} ${wordCountLabel(
+                        words.length
+                    )}. Онови його командою /list.`
+                );
+                return new Response("ok");
+            }
+
+            const wordIds = words
+                .slice(start - 1, end)
+                .map((word) => word.id);
+            const placeholders = wordIds.map(() => "?").join(", ");
             const archived = await env.DB
                 .prepare(`
-          UPDATE words
-          SET is_active = 0
-          WHERE id = (
-            SELECT id
-            FROM words
-            WHERE user_id = ? AND is_active = 1
-            ORDER BY id DESC
-            LIMIT 1 OFFSET ?
-          )
-          AND user_id = ?
-          AND is_active = 1
-        `)
-                .bind(userId, position - 1, userId)
+              UPDATE words
+              SET is_active = 0
+              WHERE user_id = ? AND is_active = 1 AND id IN (${placeholders})
+            `)
+                .bind(userId, ...wordIds)
                 .run();
 
             if (archived.meta.changes === 0) {
                 await sendMessage(
                     env,
                     chatId,
-                    "Не знайшов активного слова з таким номером. Онови список командою /list."
+                    "Не знайшов активних слів за цими позиціями. Онови список командою /list."
                 );
                 return new Response("ok");
             }
@@ -588,36 +759,21 @@ export default {
             await sendMessage(
                 env,
                 chatId,
-                `✅ Слово №${position} перенесено до архіву.`
+                `✅ В архів перенесено ${archived.meta.changes} ${wordCountLabel(
+                    archived.meta.changes
+                )}.`
             );
             return new Response("ok");
         }
 
         if (text === "/list") {
-            const result = await env.DB
-                .prepare(`
-          SELECT source_text, translation_uk
-          FROM words
-          WHERE user_id = ? AND is_active = 1
-          ORDER BY id DESC
-          LIMIT 10
-        `)
-                .bind(userId)
-                .all();
-
-            const words = result.results;
+            const words = await getRecentActiveWords(env, userId);
 
             await sendMessage(
                 env,
                 chatId,
-                words.length
-                    ? `Останні слова:\n${words
-                        .map(
-                            (word, index) =>
-                                `${index + 1}. ${word.source_text} — ${word.translation_uk}`
-                        )
-                        .join("\n")}`
-                    : "У словнику поки немає слів."
+                listText(words),
+                listKeyboard(words)
             );
 
             return new Response("ok");
