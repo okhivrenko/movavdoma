@@ -128,8 +128,7 @@ date.
 
 - The keyboard offers `☕ Підтримати бот` and `🎁 Отримати бонус`.
 - Before a donation, the bot gives the user a short unique code to put in the
-  Monobank payment comment. The public jar is
-  `https://send.monobank.ua/jar/8sko6A3Cma`.
+  Monobank payment comment. The public jar is configured in `worker.js`.
 - A scheduled task reads that jar's statement at most once per minute. Every
   transaction ID is stored, so overlapping statement windows cannot notify or
   process the same payment twice.
@@ -250,6 +249,7 @@ CREATE TABLE IF NOT EXISTS bank_transactions (
 CREATE TABLE IF NOT EXISTS monobank_sync_state (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   jar_id TEXT,
+  jar_send_id TEXT,
   last_attempt_at INTEGER NOT NULL DEFAULT 0,
   last_successful_sync_at INTEGER NOT NULL DEFAULT 0
 );

@@ -37,8 +37,8 @@ const MAX_SENSES = 9;
 // Default daily quota for newly saved words; individual bonuses may raise it.
 const DAILY_ADD_LIMIT = 10;
 // Daily-card quota is separate from the learning-list quota and depends on access.
-const MONOBANK_JAR_URL = "https://send.monobank.ua/jar/8sko6A3Cma";
-const MONOBANK_JAR_SEND_ID = "8sko6A3Cma";
+const MONOBANK_JAR_URL = "https://send.monobank.ua/jar/9vp8W5V9nQ";
+const MONOBANK_JAR_SEND_ID = "9vp8W5V9nQ";
 const MONOBANK_MIN_SYNC_INTERVAL_SECONDS = 60;
 const MONOBANK_STATEMENT_OVERLAP_SECONDS = 5 * 60;
 const BOT_BRAND_NAME = "MovaVDoma";
@@ -1144,10 +1144,12 @@ async function claimMonobankSync(env, nowSeconds) {
 
 async function getMonobankJarId(env) {
     const state = await env.DB
-        .prepare("SELECT jar_id FROM monobank_sync_state WHERE id = 1")
+        .prepare("SELECT jar_id, jar_send_id FROM monobank_sync_state WHERE id = 1")
         .first();
 
-    if (state?.jar_id) {
+    // A jar ID belongs to the sendId that produced it. Re-resolve it whenever
+    // the configured public jar changes instead of reading another jar's statement.
+    if (state?.jar_id && state.jar_send_id === MONOBANK_JAR_SEND_ID) {
         return state.jar_id;
     }
 
@@ -1169,8 +1171,8 @@ async function getMonobankJarId(env) {
     }
 
     await env.DB
-        .prepare("UPDATE monobank_sync_state SET jar_id = ? WHERE id = 1")
-        .bind(jar.id)
+        .prepare("UPDATE monobank_sync_state SET jar_id = ?, jar_send_id = ? WHERE id = 1")
+        .bind(jar.id, MONOBANK_JAR_SEND_ID)
         .run();
 
     return jar.id;
