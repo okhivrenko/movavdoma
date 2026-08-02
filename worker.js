@@ -1,3 +1,6 @@
+// Vocabulary Telegram Bot — Copyright (c) 2026 Oleksii Khivrenko.
+// Publicly viewable under the proprietary terms in LICENSE.
+
 import {
     answerCallbackQuery,
     editMessage,
