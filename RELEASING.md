@@ -39,3 +39,7 @@ This project uses semantic versioning and annotated Git tags.
 
 Tags make it possible to find the exact source code for every deployed release
 and roll back deliberately if needed.
+
+Unless the user explicitly asks otherwise, a completed bot behavior or
+configuration change is committed, pushed to `main`, and deployed after this
+checklist passes.

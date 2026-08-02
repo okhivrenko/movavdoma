@@ -27,8 +27,11 @@
 - Before and after every production migration, run `wrangler d1 migrations
   list <database> --remote`; deployment may continue only when the final check
   reports no pending migrations.
-- Do not deploy, push, tag, or change Cloudflare settings unless explicitly
-  requested by the user.
+- After a user-authorized change that affects bot behavior, configuration, or
+  production data, run the required checks and then commit, push, and deploy
+  by default. Do not do so only when the user explicitly asks to keep the
+  change local, not deploy it, or not push it. Documentation-only changes may
+  be pushed without a Worker deployment.
 
 ## Product invariants
 

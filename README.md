@@ -1,5 +1,7 @@
 # Vocabulary Telegram Bot
 
+[Privacy Policy](./PRIVACY_POLICY.md)
+
 Cloudflare Worker bot for learning English vocabulary in Ukrainian.
 
 ## Common commands

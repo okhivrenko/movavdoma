@@ -40,6 +40,7 @@ const MONOBANK_JAR_URL = "https://send.monobank.ua/jar/8sko6A3Cma";
 const MONOBANK_JAR_SEND_ID = "8sko6A3Cma";
 const MONOBANK_MIN_SYNC_INTERVAL_SECONDS = 60;
 const MONOBANK_STATEMENT_OVERLAP_SECONDS = 5 * 60;
+const PRIVACY_POLICY_URL = "https://vocab-telegram-bot.alexeykhivrenko.workers.dev/privacy";
 const DAILY_TIME_OPTIONS = Array.from(
     { length: 24 },
     (_, hour) => `${String(hour).padStart(2, "0")}:00`
@@ -1596,10 +1597,67 @@ async function sendHelp(env, chatId, userId) {
     );
 }
 
+// A public, static policy page is intentionally served before webhook
+// authentication so Telegram and users can open it without bot credentials.
+function privacyPolicyPage() {
+    return `<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy - LingoPath</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #16243a; background: #f6f8fb; }
+    body { margin: 0; padding: 32px 16px; }
+    main { max-width: 760px; margin: 0 auto; padding: 42px; background: #fff; border: 1px solid #dce4ef; border-radius: 20px; box-shadow: 0 12px 35px rgba(31, 52, 81, .08); }
+    h1 { margin: 0 0 8px; font-size: 32px; } h2 { margin-top: 32px; font-size: 21px; } p, li { color: #40516a; line-height: 1.6; } .date { color: #66758b; margin-top: 0; } strong { color: #16243a; } code { padding: 2px 5px; background: #edf2f8; border-radius: 4px; }
+  </style>
+</head>
+<body><main>
+  <h1>Privacy Policy for LingoPath</h1>
+  <p class="date">Дата набуття чинності: 2 серпня 2026 року</p>
+  <p>LingoPath - Telegram-бот для вивчення лексики. Нижче описано, які дані бот обробляє, навіщо це потрібно та як із нами зв'язатися.</p>
+
+  <h2>1. Які дані обробляються</h2>
+  <ul><li>Telegram user ID і chat ID;</li><li>слова, фрази, необов'язковий контекст і повідомлення feedback;</li><li>налаштування навчання: рівень, час нагадування, статуси слів і ліміти;</li><li>створені переклади, приклади та прогрес навчання;</li><li>технічні записи для захисту від повторних Telegram-оновлень і роботи нагадувань;</li><li>для заявки на бонус: код підтримки, статус заявки й відомості з виписки банки Monobank - сума, час і коментар до платежу.</li></ul>
+  <p>Бот не запитує і не зберігає номери карток, CVV або паролі Telegram.</p>
+
+  <h2>2. Навіщо це потрібно</h2>
+  <p>Дані використовуються лише для створення карток слів, збереження словника й прогресу, надсилання увімкнених нагадувань, керування бонусами, обробки feedback і безпечної роботи бота.</p>
+
+  <h2>3. Сторонні сервіси</h2>
+  <ul><li><strong>Telegram</strong> доставляє повідомлення між вами та ботом.</li><li><strong>Cloudflare</strong> розміщує бот і базу даних D1.</li><li><strong>OpenAI</strong> отримує слово або фразу та необов'язковий контекст для створення перекладу, значень і прикладів.</li><li><strong>Monobank</strong> використовується лише для перевірки донату до підключеної банки.</li></ul>
+  <p>Повідомлення через «📩 Зв'язатися з нами» та «💬 Відгук» пересилаються адміну бота. Дані не продаються й не використовуються для реклами.</p>
+
+  <h2>4. Строк зберігання</h2>
+  <p>Активні слова зберігаються, доки ви не попросите видалити дані. Вивчені слова автоматично видаляються через 30 днів після позначення як вивчені разом із прикладами та історією повторень. Технічні записи зберігаються лише настільки, наскільки це потрібно для роботи, безпеки й підтримки бота.</p>
+
+  <h2>5. Ваші права та запити</h2>
+  <p>Нагадування можна вимкнути у «⏰ Розклад і рівень». Щоб попросити доступ, виправлення або видалення даних, натисніть «📩 Зв'язатися з нами» й надішліть <code>Delete my data</code> або <code>Видалити мої дані</code>. Для захисту даних ми можемо попросити підтвердити запит із того ж Telegram-акаунта.</p>
+
+  <h2>6. Безпека та зміни</h2>
+  <p>Бот використовує HTTPS і обмежує адміністративні дії налаштованим адміністратором. Не надсилайте боту паролі, дані картки або іншу чутливу інформацію. Політика може оновлюватися разом зі змінами функцій або практик обробки даних.</p>
+
+  <h2>7. Контакт</h2>
+  <p>З питань приватності використовуйте кнопку «📩 Зв'язатися з нами» у боті.</p>
+</main></body></html>`;
+}
+
 // Telegram webhook and scheduled delivery entry points. Callback actions are
 // validated in the router before any user-owned data is read or changed.
 export default {
     async fetch(request, env) {
+        const url = new URL(request.url);
+        if (request.method === "GET" && url.pathname === "/privacy") {
+            return new Response(privacyPolicyPage(), {
+                headers: {
+                    "content-type": "text/html; charset=UTF-8",
+                    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
+                    "x-content-type-options": "nosniff",
+                },
+            });
+        }
+
         if (request.method !== "POST") {
             return new Response("Vocabulary bot is running.");
         }
@@ -2323,6 +2381,16 @@ export default {
 
         if (text === "/help") {
             await sendHelp(env, chatId, userId);
+            return new Response("ok");
+        }
+
+        if (text === "/privacy") {
+            await sendMessage(
+                env,
+                chatId,
+                `🔒 Політика конфіденційності: ${PRIVACY_POLICY_URL}`,
+                mainKeyboard(isAdmin(env, userId))
+            );
             return new Response("ok");
         }
 
