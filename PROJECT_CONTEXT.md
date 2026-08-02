@@ -43,8 +43,10 @@ Welcomes the user and shows a persistent reply keyboard with:
 - `📚 Мої слова`
 - `🎓 Вивчені слова`
 - `📚 Щоденне слово`
-- `⚙️ Налаштувати`
-- `❓ Допомога`
+- `⚙️ Налаштувати щоденне слово`
+- `💬 Відгук`
+- `➡️ Далі` / `⬅️ Назад` split the persistent menu into two pages. The second
+  page has support, bonus, contact, help, and the admin entry point.
 
 The admin also sees `🛠 Адмін`, which opens an admin-only panel with a paginated
 user list, the `/grant <userId> <dailyLimit>` format, and a summary of
@@ -123,13 +125,14 @@ date.
   transaction ID is stored, so overlapping statement windows cannot notify or
   process the same payment twice.
 - A matching donation creates an admin-only Telegram review card. The bot
-  recommends 15 words/day for donations below ₴100, 25 for ₴100–₴200
-  (inclusive), and 40 for more than ₴200. The admin confirms or changes the
-  recommendation; nothing is granted automatically based on a payment amount.
-- An approved donation limit lasts one calendar month, then automatically
-  falls back to the normal limit.
-- Donors are told that the bonus will arrive shortly. A donation without a
-  matching code is still sent to the admin as an unmatched-payment alert.
+  recommends access level 1, 2, or 3 from the matched amount, but the admin
+  chooses the final level; nothing is granted automatically.
+- An approved donation grants an access level for one month. It never lowers a
+  higher permanent level. A donation without a matching code is still sent to
+  the admin as an unmatched-payment alert.
+- When a donation grant expires, the bot thanks the user, invites further
+  support, and offers the `💬 Відгук` flow. The user's next plain-text message
+  is sent to the admin and acknowledged.
 
 ## Important UX rules
 
@@ -156,9 +159,6 @@ date.
   words remain isolated by Telegram user ID.
 - Users other than the account identified by the Cloudflare secret
   `ADMIN_TELEGRAM_USER_ID` can add up to 10 words per local day.
-- An admin-approved support bonus can replace an individual user's daily limit
-  with 15, 25, or 40 words for one calendar month. The admin remains
-  unlimited.
 - The admin can manually grant any positive daily limit for one calendar month
   with `/grant <telegramUserId> <dailyLimit>`, for example
   `/grant 123456789 45`. The target user must have started the bot first.
@@ -169,10 +169,12 @@ date.
 - `daily_word_additions` stores only the user ID, local date, and count.
 - `daily_word_card_views` independently limits newly generated daily cards to
   five per local day; it does not reduce the ten-word learning-list quota.
-- `user_access_levels` stores a permanent donor level: 0→5, 1→10, 2→15, and
-  3→20 daily cards. A donation maps to 1 below 100 UAH, 2 from 100 through
-  200 UAH, and 3 above 200 UAH. The admin can only raise a level with
-  `/level <telegramUserId> <0-3>`.
+- `user_access_levels` stores a permanent manual/legacy level. Temporary
+  donation grants live in `user_temporary_access_grants`; the highest active
+  level determines the limit: 0→5, 1→10, 2→15, and 3→20 daily cards. The
+  admin can permanently raise a level with `/level <telegramUserId> <0-3>`.
+- `/testlevel <telegramUserId>` grants level 1 for one day to exercise the
+  temporary-access flow without creating a donation reminder.
 
 ## D1 binding
 
@@ -332,6 +334,10 @@ CREATE TABLE IF NOT EXISTS pending_daily_words (
   D1 database.
 - Then execute `migrations/0010_enforce_one_pending_daily_word.sql` against
   the remote D1 database before deploying the corresponding Worker code.
+- Then execute `migrations/0011_add_temporary_access_grants.sql` against the
+  remote D1 database before deploying the corresponding Worker code.
+- Then execute `migrations/0012_add_feedback_and_test_access.sql` against the
+  remote D1 database before deploying the corresponding Worker code.
 - Long-lived technical decisions are recorded in `docs/adr/`.
 
 ## Next product features

@@ -28,7 +28,6 @@ import {
 import {
     dailyWordCardLimitForLevel,
     donationAccessLevel,
-    donationDailyLimit,
     normalizeAccessLevel,
 } from "./policies.js";
 
@@ -49,7 +48,7 @@ const DAILY_LEVEL_OPTIONS = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
 const MAX_DAILY_WORD_ATTEMPTS = 3;
 const ADMIN_USER_LIST_LIMIT = 50;
 // Increment only when the persistent reply keyboard changes for users.
-const INTERFACE_VERSION = 1;
+const INTERFACE_VERSION = 3;
 const ADD_WORD_HINT =
     "Надішли англійське слово або фразу.\n\nЯкщо важливе конкретне значення, додай контекст після |:\ncharge | payment for a service\n\nПриклад без контексту: resilient";
 
@@ -303,22 +302,28 @@ async function saveAndSendWord(env, chatId, userId, word, context) {
 
 // User-facing reply/inline keyboards and the admin-only user directory.
 // Authorization itself stays in helpers.js so every entry path compares IDs consistently.
-function mainKeyboard(showAdmin = false) {
-    const keyboard = [
+function mainKeyboard(showAdmin = false, page = 1) {
+    const firstPage = [
         [{ text: "➕ Додати слово" }],
         [{ text: "📚 Мої слова" }, { text: "🎓 Вивчені слова" }],
-        [{ text: "📚 Щоденне слово" }, { text: "⚙️ Налаштувати" }],
+        [{ text: "📚 Щоденне слово" }, { text: "⚙️ Налаштувати щоденне слово" }],
+        [{ text: "💬 Відгук" }],
+        [{ text: "➡️ Далі" }],
+    ];
+    const secondPage = [
         [{ text: "☕ Підтримати бот" }, { text: "🎁 Отримати бонус" }],
+        [{ text: "📩 Зв’язатися з нами" }],
+        [{ text: "❓ Допомога" }],
     ];
 
     if (showAdmin) {
-        keyboard.push([{ text: "🛠 Адмін" }]);
+        secondPage.push([{ text: "🛠 Адмін" }]);
     }
 
-    keyboard.push([{ text: "❓ Допомога" }]);
+    secondPage.push([{ text: "⬅️ Назад" }]);
 
     return {
-        keyboard,
+        keyboard: page === 2 ? secondPage : firstPage,
         resize_keyboard: true,
         is_persistent: true,
     };
@@ -363,13 +368,14 @@ function adminKeyboard() {
             [{ text: "🔗 Посилання на бота", callback_data: "admin:link" }],
             [{ text: "🎁 Змінити ліміт", callback_data: "admin:grant" }],
             [{ text: "🎚 Змінити рівень", callback_data: "admin:level" }],
+            [{ text: "🧪 Тест рівня 1", callback_data: "admin:testlevel" }],
             [{ text: "❓ Команди адміна", callback_data: "admin:help" }],
         ],
     };
 }
 
 function adminHelpText() {
-    return "🛠 Адмін-панель\n\n• 👥 Список користувачів — усі користувачі, по 50 на сторінці, з ID, лімітами та кількістю активних слів.\n• 🔗 Посилання на бота — показує пряме посилання, яке можна скопіювати або переслати.\n• /grant <userId> <ліміт> — встановити ліміт додавання слів на 1 місяць.\n  Приклад: /grant 123456789 45\n• /level <userId> <0-3> — підвищити рівень доступу. Щоденні картки: 0→5, 1→10, 2→15, 3→20.\n  Приклад: /level 123456789 2\n• 🎁 Заявки на донати приходять окремими картками з кнопками підтвердження.";
+    return "🛠 Адмін-панель\n\n• 👥 Список користувачів — усі користувачі, по 50 на сторінці, з ID, лімітами та кількістю активних слів.\n• 🔗 Посилання на бота — показує пряме посилання, яке можна скопіювати або переслати.\n• /grant <userId> <ліміт> — встановити ліміт додавання слів на 1 місяць.\n  Приклад: /grant 123456789 45\n• /level <userId> <0-3> — постійно підвищити рівень доступу. Щоденні картки: 0→5, 1→10, 2→15, 3→20.\n  Приклад: /level 123456789 2\n• /testlevel <userId> — видати тестовий рівень 1 на 1 день.\n  Приклад: /testlevel 123456789\n• 🎁 Заявки на донати приходять окремими картками з кнопками підтвердження.";
 }
 
 function compactAdminNumber(value) {
@@ -415,7 +421,10 @@ async function sendAdminUserList(env, chatId, requestedPage = 0, messageId = nul
             u.telegram_user_id,
             (SELECT COUNT(*) FROM words w WHERE w.user_id = u.telegram_user_id AND w.is_active = 1) AS active_word_count,
             (SELECT daily_limit FROM user_daily_limits l WHERE l.user_id = u.telegram_user_id AND l.expires_at > CURRENT_TIMESTAMP) AS bonus_daily_limit
-            ,COALESCE((SELECT access_level FROM user_access_levels a WHERE a.user_id = u.telegram_user_id), 0) AS access_level
+            ,MAX(
+              COALESCE((SELECT access_level FROM user_access_levels a WHERE a.user_id = u.telegram_user_id), 0),
+              COALESCE((SELECT MAX(access_level) FROM user_temporary_access_grants g WHERE g.user_id = u.telegram_user_id AND g.expires_at > CURRENT_TIMESTAMP), 0)
+            ) AS access_level
           FROM users u
           ORDER BY u.created_at DESC
           LIMIT ? OFFSET ?
@@ -603,11 +612,21 @@ async function getAdminChatId(env) {
 async function getUserAccessLevel(env, userId) {
     if (isAdmin(env, userId)) return 3;
 
-    const access = await env.DB
-        .prepare("SELECT access_level FROM user_access_levels WHERE user_id = ?")
-        .bind(userId)
-        .first();
-    return normalizeAccessLevel(access?.access_level);
+    const [permanent, temporary] = await Promise.all([
+        env.DB
+            .prepare("SELECT access_level FROM user_access_levels WHERE user_id = ?")
+            .bind(userId)
+            .first(),
+        env.DB
+            .prepare("SELECT MAX(access_level) AS access_level FROM user_temporary_access_grants WHERE user_id = ? AND expires_at > CURRENT_TIMESTAMP")
+            .bind(userId)
+            .first(),
+    ]);
+
+    return Math.max(
+        normalizeAccessLevel(permanent?.access_level),
+        normalizeAccessLevel(temporary?.access_level)
+    );
 }
 
 async function grantAccessLevel(env, userId, accessLevel, source, donationRequestId = null) {
@@ -634,18 +653,53 @@ async function grantAccessLevel(env, userId, accessLevel, source, donationReques
     return { changed: level > previousLevel, accessLevel: Math.max(level, previousLevel) };
 }
 
-function adminDonationKeyboard(requestId, suggestedLimit) {
-    const suggestedButton = suggestedLimit
-        ? [{ text: `Видати ${suggestedLimit}/день на місяць`, callback_data: `bonus:${suggestedLimit}:${requestId}` }]
+/** Temporary access never changes a user's permanent base level. */
+async function grantTemporaryAccessLevel(env, userId, accessLevel, source, duration, donationRequestId = null) {
+    const previousLevel = await getUserAccessLevel(env, userId);
+
+    await env.DB
+        .prepare(`
+          INSERT INTO user_temporary_access_grants (
+            user_id, access_level, donation_request_id, source, expires_at
+          )
+          VALUES (?, ?, ?, ?, datetime('now', ?))
+        `)
+        .bind(userId, normalizeAccessLevel(accessLevel), donationRequestId, source, duration)
+        .run();
+
+    const currentLevel = await getUserAccessLevel(env, userId);
+    return { changed: currentLevel > previousLevel, accessLevel: currentLevel };
+}
+
+async function grantTestLevelOne(env, userId) {
+    const user = await env.DB
+        .prepare("SELECT chat_id FROM users WHERE telegram_user_id = ?")
+        .bind(userId)
+        .first();
+
+    if (!user?.chat_id) return null;
+
+    const access = await grantTemporaryAccessLevel(env, userId, 1, "admin_test", "+1 day");
+    await sendMessage(
+        env,
+        user.chat_id,
+        `🧪 Для тесту тобі увімкнено рівень ${access.accessLevel} на 1 день. Ліміт нових щоденних карток: ${dailyWordCardLimitForLevel(access.accessLevel)}.`
+    );
+    return access;
+}
+
+function adminDonationKeyboard(requestId, suggestedAccessLevel) {
+    const suggestedButton = suggestedAccessLevel
+        ? [{ text: `Рекомендований рівень ${suggestedAccessLevel}`, callback_data: `bonus:level:${suggestedAccessLevel}:${requestId}` }]
         : [];
 
     return {
         inline_keyboard: [
             suggestedButton,
             [
-                { text: "15/день", callback_data: `bonus:15:${requestId}` },
-                { text: "25/день", callback_data: `bonus:25:${requestId}` },
-                { text: "40/день", callback_data: `bonus:40:${requestId}` },
+                { text: "Рівень 1", callback_data: `bonus:level:1:${requestId}` },
+                { text: "Рівень 2", callback_data: `bonus:level:2:${requestId}` },
+                { text: "Рівень 3", callback_data: `bonus:level:3:${requestId}` },
             ],
             [
                 { text: "Відхилити", callback_data: `bonus:reject:${requestId}` },
@@ -681,9 +735,6 @@ async function notifyPendingDonationRequests(env) {
         const amount = transaction
             ? `\nДонат знайдено: ${formatHryvnias(transaction.amount_kopiykas)}.`
             : "\nПлатіж ще не знайдено автоматично — звір його у банці.";
-        const suggestedLimit = transaction
-            ? donationDailyLimit(transaction.amount_kopiykas)
-            : null;
         const suggestedAccessLevel = transaction
             ? donationAccessLevel(transaction.amount_kopiykas)
             : null;
@@ -691,8 +742,8 @@ async function notifyPendingDonationRequests(env) {
         await sendMessage(
             env,
             adminChatId,
-            `🎁 Заявка на бонус\nКористувач: ${request.user_id}\nКод: ${request.support_code}${amount}${suggestedLimit ? `\nРекомендація: ${suggestedLimit} слів/день на 1 місяць.` : ""}${suggestedAccessLevel ? `\nРівень доступу: ${suggestedAccessLevel} (${dailyWordCardLimitForLevel(suggestedAccessLevel)} щоденних карток).` : ""}`,
-            adminDonationKeyboard(request.id, suggestedLimit)
+            `🎁 Заявка на бонус\nКористувач: ${request.user_id}\nКод: ${request.support_code}${amount}${suggestedAccessLevel ? `\nРекомендований рівень: ${suggestedAccessLevel} (${dailyWordCardLimitForLevel(suggestedAccessLevel)} щоденних карток).` : ""}`,
+            adminDonationKeyboard(request.id, suggestedAccessLevel)
         );
 
         await env.DB
@@ -760,13 +811,13 @@ async function submitDonationBonusRequest(env, chatId, userId) {
     await sendMessage(
         env,
         chatId,
-        "🎁 Заявку на бонус прийнято. Я перевірю донат і надам бонус найближчим часом. Ліміт додавання на 1 місяць: менше 100 грн — 15 слів/день, від 100 до 200 грн включно — 25, понад 200 грн — 40. Рівні щоденних карток: 1→10, 2→15, 3→20 на день."
+        "🎁 Заявку на бонус прийнято! Ми постараємося підготувати для тебе щось цікаве найближчим часом."
     );
 
     await notifyPendingDonationRequests(env);
 }
 
-async function grantDonationBonus(env, requestId, dailyLimit) {
+async function grantDonationBonus(env, requestId, accessLevel) {
     const request = await env.DB
         .prepare(`
           SELECT id, user_id, status, matched_transaction_id
@@ -783,39 +834,24 @@ async function grantDonationBonus(env, requestId, dailyLimit) {
     const granted = await env.DB
         .prepare(`
           UPDATE donation_requests
-          SET status = 'granted', granted_daily_limit = ?, granted_at = CURRENT_TIMESTAMP
+          SET status = 'granted', granted_daily_limit = NULL, granted_at = CURRENT_TIMESTAMP
           WHERE id = ? AND status = 'awaiting_review'
         `)
-        .bind(dailyLimit, request.id)
+        .bind(request.id)
         .run();
 
     if (granted.meta.changes === 0) {
         return null;
     }
 
-    await env.DB
-        .prepare(`
-          INSERT INTO user_daily_limits (user_id, daily_limit, donation_request_id)
-          VALUES (?, ?, ?, datetime('now', '+1 month'))
-          ON CONFLICT(user_id) DO UPDATE SET
-            daily_limit = excluded.daily_limit,
-            donation_request_id = excluded.donation_request_id,
-            expires_at = excluded.expires_at,
-            granted_at = CURRENT_TIMESTAMP
-        `)
-        .bind(request.user_id, dailyLimit, request.id)
-        .run();
-
-    const transaction = request.matched_transaction_id
-        ? await env.DB
-              .prepare("SELECT amount_kopiykas FROM bank_transactions WHERE transaction_id = ?")
-              .bind(request.matched_transaction_id)
-              .first()
-        : null;
-    const accessLevel = transaction ? donationAccessLevel(transaction.amount_kopiykas) : 0;
-    const access = accessLevel > 0
-        ? await grantAccessLevel(env, request.user_id, accessLevel, "donation", request.id)
-        : { changed: false, accessLevel: await getUserAccessLevel(env, request.user_id) };
+    const access = await grantTemporaryAccessLevel(
+        env,
+        request.user_id,
+        accessLevel,
+        "donation",
+        "+1 month",
+        request.id
+    );
 
     const user = await env.DB
         .prepare("SELECT chat_id FROM users WHERE telegram_user_id = ?")
@@ -826,11 +862,79 @@ async function grantDonationBonus(env, requestId, dailyLimit) {
         await sendMessage(
             env,
             user.chat_id,
-            `🎁 Дякую за підтримку! Твій ліміт додавання — ${dailyLimit} ${wordCountLabel(dailyLimit)} на наступний місяць. Рівень доступу: ${access.accessLevel}; нових щоденних карток: ${dailyWordCardLimitForLevel(access.accessLevel)} на день.`
+            `🎁 Дякуємо за підтримку! Твій рівень доступу: ${access.accessLevel}. Наступний місяць можна відкривати до ${dailyWordCardLimitForLevel(access.accessLevel)} нових щоденних карток на день.`
         );
     }
 
-    return request;
+    return { request, access };
+}
+
+async function notifyExpiredDonationAccessGrants(env) {
+    const expired = await env.DB
+        .prepare(`
+          SELECT g.id, g.user_id, u.chat_id
+          FROM user_temporary_access_grants g
+          JOIN users u ON u.telegram_user_id = g.user_id
+          WHERE g.source = 'donation'
+            AND g.expires_at <= CURRENT_TIMESTAMP
+            AND g.expired_notified_at IS NULL
+          ORDER BY g.id ASC
+        `)
+        .all();
+
+    for (const grant of expired.results) {
+        const claimed = await env.DB
+            .prepare(`
+              UPDATE user_temporary_access_grants
+              SET expired_notified_at = CURRENT_TIMESTAMP
+              WHERE id = ? AND expired_notified_at IS NULL
+            `)
+            .bind(grant.id)
+            .run();
+
+        if (claimed.meta.changes === 0) continue;
+
+        try {
+            await sendMessage(
+                env,
+                grant.chat_id,
+                "🎁 Дякуємо, що користуєшся ботом! На жаль, твій бонусний період завершився.\n\nБудемо вдячні за подальшу підтримку: навіть одна кавуська мотивує нас робити бот кращим.\n\nЯкщо маєш зауваження, ідеї або просто хочеш поділитися враженням — натисни «💬 Відгук» і надішли нам повідомлення.",
+                mainKeyboard(isAdmin(env, grant.user_id))
+            );
+        } catch (error) {
+            await env.DB
+                .prepare("UPDATE user_temporary_access_grants SET expired_notified_at = NULL WHERE id = ?")
+                .bind(grant.id)
+                .run();
+            throw error;
+        }
+    }
+}
+
+async function startFeedback(env, chatId, userId, prompt = "💬 Напиши одним повідомленням свій відгук, ідею або зауваження. Я передам його команді.") {
+    await env.DB
+        .prepare("UPDATE users SET feedback_pending = 1 WHERE telegram_user_id = ?")
+        .bind(userId)
+        .run();
+    await sendMessage(env, chatId, prompt);
+}
+
+async function clearPendingFeedback(env, userId) {
+    await env.DB
+        .prepare("UPDATE users SET feedback_pending = 0 WHERE telegram_user_id = ? AND feedback_pending = 1")
+        .bind(userId)
+        .run();
+}
+
+async function submitFeedback(env, chatId, userId, feedback) {
+    const adminChatId = await getAdminChatId(env);
+    if (!adminChatId) {
+        throw new Error("Feedback admin chat is unavailable.");
+    }
+
+    await sendMessage(env, adminChatId, `💬 Новий відгук\nКористувач: ${userId}\n\n${feedback}`);
+    await clearPendingFeedback(env, userId);
+    await sendMessage(env, chatId, "Дякуємо за відгук! Завдяки таким повідомленням ми стаємо кращими.");
 }
 
 /** Admin-only upgrade. Levels are intentionally monotonic: support is never lost. */
@@ -1467,7 +1571,7 @@ async function sendHelp(env, chatId, userId) {
     await sendMessage(
         env,
         chatId,
-        "Як користуватися ботом:\n\n1. Натисни «➕ Додати слово» або просто надішли англійське слово чи фразу.\n2. Якщо знаєш потрібне значення, напиши його після |:\ncharge | payment for a service\n3. Обери потрібне значення, якщо бот його уточнить.\n4. Відкрий «📚 Мої слова», щоб переглянути свій каталог.\n5. Відкрий «🎓 Вивчені слова», щоб повернути слово до навчання.\n6. Натисни «📚 Щоденне слово», щоб показати сьогоднішню картку, або «⚙️ Налаштувати», щоб окремо вибрати час і рівень. У картці натисни «Знаю» або «Вчити».\n7. Щоб підтримати бот, натисни «☕ Підтримати бот», додай виданий код у коментар платежу, а потім — «🎁 Отримати бонус».\n\nНаприклад: resilient",
+        "Як користуватися ботом:\n\n1. Натисни «➕ Додати слово» або просто надішли англійське слово чи фразу.\n2. Якщо знаєш потрібне значення, напиши його після |:\ncharge | payment for a service\n3. Обери потрібне значення, якщо бот його уточнить.\n4. Відкрий «📚 Мої слова», щоб переглянути свій каталог.\n5. Відкрий «🎓 Вивчені слова», щоб повернути слово до навчання.\n6. Натисни «📚 Щоденне слово», щоб показати сьогоднішню картку, або «⚙️ Налаштувати щоденне слово», щоб окремо вибрати час і рівень. У картці натисни «Знаю» або «Вчити».\n7. На другій сторінці меню є підтримка, бонуси й зв’язок із нами.\n8. Хочеш власний Telegram-бот? Натисни «📩 Зв’язатися з нами» та напиши нам, щоб дізнатися більше.\n\nНаприклад: resilient",
         mainKeyboard(isAdmin(env, userId))
     );
 }
@@ -1566,6 +1670,16 @@ export default {
                     return new Response("ok");
                 }
 
+                if (callback.data === "admin:testlevel") {
+                    await answerCallbackQuery(env, callback.id, "Показую формат команди.");
+                    await sendMessage(
+                        env,
+                        chatId,
+                        "Щоб видати тестовий рівень 1 на 1 день, надішли:\n/testlevel userId\n\nНаприклад: /testlevel 123456789"
+                    );
+                    return new Response("ok");
+                }
+
                 if (callback.data === "admin:link") {
                     try {
                         const botLink = await getBotLink(env);
@@ -1602,16 +1716,18 @@ export default {
                     return new Response("ok");
                 }
 
-                // Keep pending admin cards sent before the tier update actionable.
-                const match = callback.data.match(/^bonus:(15|25|40|30|50|100|reject):(\d+)$/);
+                // Keep pending admin cards sent before the level update actionable.
+                const match = callback.data.match(/^bonus:(?:level:([1-3])|(15|25|40|30|50|100)|(reject)):(\d+)$/);
 
                 if (!match) {
                     await answerCallbackQuery(env, callback.id, "Невірна заявка.");
                     return new Response("ok");
                 }
 
-                const action = match[1];
-                const requestId = Number(match[2]);
+                const accessLevel = match[1]
+                    ? Number(match[1])
+                    : ({ 15: 1, 25: 2, 40: 3, 30: 1, 50: 2, 100: 3 }[match[2]] ?? null);
+                const requestId = Number(match[4]);
 
                 if (!Number.isInteger(requestId) || requestId <= 0) {
                     await answerCallbackQuery(env, callback.id, "Невірна заявка.");
@@ -1619,7 +1735,7 @@ export default {
                 }
 
                 try {
-                    if (action === "reject") {
+                    if (match[3] === "reject") {
                         const rejected = await rejectDonationBonus(env, requestId);
 
                         if (!rejected) {
@@ -1638,8 +1754,7 @@ export default {
                         return new Response("ok");
                     }
 
-                    const dailyLimit = Number(action);
-                    const granted = await grantDonationBonus(env, requestId, dailyLimit);
+                    const granted = await grantDonationBonus(env, requestId, accessLevel);
 
                     if (!granted) {
                         await answerCallbackQuery(env, callback.id, "Заявку вже оброблено.");
@@ -1651,7 +1766,7 @@ export default {
                         env,
                         chatId,
                         messageId,
-                        `✅ Заявка #${requestId}: ${dailyLimit} ${wordCountLabel(dailyLimit)} на день, діє 1 місяць.`,
+                        `✅ Заявка #${requestId}: надано рівень ${granted.access.accessLevel} на 1 місяць; щоденні картки: ${dailyWordCardLimitForLevel(granted.access.accessLevel)} на день.`,
                         { inline_keyboard: [] }
                     );
                 } catch (error) {
@@ -2022,6 +2137,17 @@ export default {
             await refreshInterfaceIfNeeded(env, chatId, userId);
         }
 
+        // Any command or menu action abandons a feedback draft, so a later
+        // vocabulary word cannot accidentally be forwarded as feedback.
+        if (text !== "💬 Відгук" && (text.startsWith("/") || [
+            "➕ Додати слово", "📚 Мої слова", "🎓 Вивчені слова",
+            "⚙️ Налаштувати", "⚙️ Налаштувати щоденне слово", "⏰ Щоденне слово", "📚 Щоденне слово",
+            "☕ Підтримати бот", "🎁 Отримати бонус", "📩 Зв’язатися з нами", "🛠 Адмін", "❓ Допомога",
+            "➡️ Далі", "⬅️ Назад",
+        ].includes(text))) {
+            await clearPendingFeedback(env, userId);
+        }
+
         if (text === "/start") {
             await sendMessage(
                 env,
@@ -2048,6 +2174,16 @@ export default {
             return new Response("ok");
         }
 
+        if (text === "➡️ Далі") {
+            await sendMessage(env, chatId, "Додаткові можливості:", mainKeyboard(isAdmin(env, userId), 2));
+            return new Response("ok");
+        }
+
+        if (text === "⬅️ Назад") {
+            await sendMessage(env, chatId, "Основне меню:", mainKeyboard(isAdmin(env, userId), 1));
+            return new Response("ok");
+        }
+
         if (text === "📚 Мої слова") {
             await sendActiveWordList(env, chatId, userId);
             return new Response("ok");
@@ -2058,7 +2194,7 @@ export default {
             return new Response("ok");
         }
 
-        if (text === "⚙️ Налаштувати" || text === "⏰ Щоденне слово") {
+        if (text === "⚙️ Налаштувати" || text === "⚙️ Налаштувати щоденне слово" || text === "⏰ Щоденне слово") {
             await sendDailySettings(env, chatId, userId);
             return new Response("ok");
         }
@@ -2111,6 +2247,21 @@ export default {
                     "Не вдалося надіслати заявку на бонус. Спробуй ще раз за хвилину."
                 );
             }
+            return new Response("ok");
+        }
+
+        if (text === "💬 Відгук") {
+            await startFeedback(env, chatId, userId);
+            return new Response("ok");
+        }
+
+        if (text === "📩 Зв’язатися з нами") {
+            await startFeedback(
+                env,
+                chatId,
+                userId,
+                "📩 Хочеш власний Telegram-бот або маєш запитання? Напиши одним повідомленням, і ми зв’яжемося з тобою."
+            );
             return new Response("ok");
         }
 
@@ -2245,6 +2396,51 @@ export default {
                 await sendMessage(env, chatId, "Не вдалося змінити рівень. Спробуй ще раз за хвилину.");
             }
 
+            return new Response("ok");
+        }
+
+        const testLevelMatch = text.match(/^\/testlevel(?:\s+(.+))?$/i);
+
+        if (testLevelMatch) {
+            if (!isAdmin(env, userId)) {
+                await sendMessage(env, chatId, "Ця команда доступна лише адміну.");
+                return new Response("ok");
+            }
+
+            const targetUserId = Number(testLevelMatch[1]?.trim());
+            if (!Number.isSafeInteger(targetUserId) || targetUserId <= 0) {
+                await sendMessage(env, chatId, "Використай: /testlevel userId\nНаприклад: /testlevel 123456789");
+                return new Response("ok");
+            }
+
+            try {
+                const access = await grantTestLevelOne(env, targetUserId);
+                await sendMessage(
+                    env,
+                    chatId,
+                    access
+                        ? `✅ Користувачу ${targetUserId} видано тестовий рівень ${access.accessLevel} на 1 день.`
+                        : "Користувача не знайдено. Він має спершу написати боту /start."
+                );
+            } catch (error) {
+                console.error({ event: "test_level_failed", message: error instanceof Error ? error.message : "Unknown error" });
+                await sendMessage(env, chatId, "Не вдалося видати тестовий рівень. Спробуй ще раз за хвилину.");
+            }
+            return new Response("ok");
+        }
+
+        const feedbackState = await env.DB
+            .prepare("SELECT feedback_pending FROM users WHERE telegram_user_id = ?")
+            .bind(userId)
+            .first();
+
+        if (feedbackState?.feedback_pending === 1 && !text.startsWith("/")) {
+            try {
+                await submitFeedback(env, chatId, userId, text.slice(0, 3500));
+            } catch (error) {
+                console.error({ event: "feedback_delivery_failed", message: error instanceof Error ? error.message : "Unknown error" });
+                await sendMessage(env, chatId, "Не вдалося передати відгук. Спробуй надіслати його ще раз за хвилину.");
+            }
             return new Response("ok");
         }
 
@@ -2645,6 +2841,15 @@ export default {
     },
 
     async scheduled(controller, env) {
+        try {
+            await notifyExpiredDonationAccessGrants(env);
+        } catch (error) {
+            console.error({
+                event: "expired_donation_access_notification_failed",
+                message: error instanceof Error ? error.message : "Unknown error",
+            });
+        }
+
         try {
             await sendDueDailyWords(env, controller.scheduledTime);
         } catch (error) {

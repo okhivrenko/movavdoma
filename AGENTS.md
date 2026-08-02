@@ -31,8 +31,10 @@
   bonuses are separate.
 - Daily-card quota is separate and uses access levels: `0→5`, `1→10`,
   `2→15`, `3→20` newly generated cards per local day.
-- Access levels only rise through donations or `/level`; do not downgrade a
-  user implicitly.
+- Base access levels only rise through `/level`. Donation levels are separate,
+  expire after one month, and never reduce a higher base level.
+- Feedback requires the explicit `💬 Відгук` flow; forward only that user's next
+  plain-text message to the admin and then clear the pending state.
 - The Telegram reply keyboard is versioned with `INTERFACE_VERSION`. Increment
   it only when persistent menu buttons change.
 
