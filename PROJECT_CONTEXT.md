@@ -44,9 +44,10 @@ Welcomes the user and shows a persistent reply keyboard with:
 - `🎓 Вивчені слова`
 - `📚 Щоденне слово`
 - `⏰ Нагадування`
+- `❓ Допомога`
 - `💬 Відгук`
 - `➡️ Далі` / `⬅️ Назад` split the persistent menu into two pages. The second
-  page has support, bonus, contact, help, and the admin entry point.
+  page has support, bonus, feedback, contact, and the admin entry point.
 
 The admin also sees `🛠 Адмін`, which opens an admin-only panel with a paginated
 user list, the `/grant <userId> <dailyLimit>` format, and a summary of

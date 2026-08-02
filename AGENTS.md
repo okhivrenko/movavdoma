@@ -21,6 +21,12 @@
 - Do not edit an existing migration after it has reached production. Add the
   next numbered migration instead.
 - Production D1 changes must be applied before code that reads them.
+- Use `wrangler d1 migrations apply <database> --remote` as the only way to
+  apply versioned production migrations. Never use `d1 execute --file` for a
+  file from `migrations/`, because it bypasses the `d1_migrations` journal.
+- Before and after every production migration, run `wrangler d1 migrations
+  list <database> --remote`; deployment may continue only when the final check
+  reports no pending migrations.
 - Do not deploy, push, tag, or change Cloudflare settings unless explicitly
   requested by the user.
 

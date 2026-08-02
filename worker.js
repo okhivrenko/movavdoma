@@ -49,7 +49,7 @@ const MAX_DAILY_WORD_ATTEMPTS = 3;
 const ADMIN_USER_LIST_LIMIT = 50;
 const LEARNED_WORD_RETENTION_DAYS = 30;
 // Increment only when the persistent reply keyboard changes for users.
-const INTERFACE_VERSION = 4;
+const INTERFACE_VERSION = 5;
 const ADD_WORD_HINT =
     "Надішли англійське слово або фразу.\n\nЯкщо важливе конкретне значення, додай контекст після |:\ncharge | payment for a service\n\nПриклад без контексту: resilient";
 
@@ -305,9 +305,10 @@ async function saveAndSendWord(env, chatId, userId, word, context) {
 // Authorization itself stays in helpers.js so every entry path compares IDs consistently.
 function mainKeyboard(showAdmin = false, page = 1) {
     const firstPage = [
-        [{ text: "➕ Додати слово" }, { text: "📚 Щоденне слово" }],
-        [{ text: "📚 Мої слова" }, { text: "🎓 Вивчені слова" }],
-        [{ text: "⏰ Нагадування" }, { text: "➡️ Далі" }],
+        [{ text: "➕ Додати слово" }, { text: "📚 Мої слова" }],
+        [{ text: "📚 Щоденне слово" }, { text: "⏰ Нагадування" }],
+        [{ text: "🎓 Вивчені слова" }],
+        [{ text: "❓ Допомога" }, { text: "➡️ Далі" }],
     ];
     const secondPage = [
         [{ text: "☕ Підтримати бот" }, { text: "🎁 Отримати бонус" }],
@@ -318,7 +319,7 @@ function mainKeyboard(showAdmin = false, page = 1) {
         secondPage.push([{ text: "🛠 Адмін" }]);
     }
 
-    secondPage.push([{ text: "❓ Допомога" }, { text: "⬅️ Назад" }]);
+    secondPage.push([{ text: "⬅️ Назад" }]);
 
     return {
         keyboard: page === 2 ? secondPage : firstPage,
@@ -1590,7 +1591,7 @@ async function sendHelp(env, chatId, userId) {
     await sendMessage(
         env,
         chatId,
-        "Як користуватися ботом:\n\n1. Натисни «➕ Додати слово» або просто надішли англійське слово чи фразу.\n2. Якщо знаєш потрібне значення, напиши його після |:\ncharge | payment for a service\n3. Обери потрібне значення, якщо бот його уточнить.\n4. Відкрий «📚 Мої слова», щоб переглянути свій каталог.\n5. Відкрий «🎓 Вивчені слова», щоб повернути слово до навчання.\n6. Натисни «📚 Щоденне слово», щоб показати сьогоднішню картку, або «⏰ Нагадування», щоб окремо вибрати час і рівень. У картці натисни «Знаю» або «Вчити».\n7. На другій сторінці меню є підтримка, бонуси й зв’язок із нами.\n8. Хочеш власний Telegram-бот? Натисни «📩 Зв’язатися з нами» та напиши нам, щоб дізнатися більше.\n\nНаприклад: resilient",
+        "Як користуватися ботом:\n\n1. Натисни «➕ Додати слово» або просто надішли англійське слово чи фразу.\n2. Якщо знаєш потрібне значення, напиши його після |:\ncharge | payment for a service\n3. Обери потрібне значення, якщо бот його уточнить.\n4. Відкрий «📚 Мої слова», щоб переглянути свій каталог.\n5. Відкрий «🎓 Вивчені слова», щоб повернути слово до навчання.\n6. Натисни «📚 Щоденне слово», щоб показати сьогоднішню картку, або «⏰ Нагадування», щоб окремо вибрати час і рівень. У картці натисни «Знаю» або «Вчити».\n7. На другій сторінці меню є підтримка, бонуси, відгук і зв’язок із нами.\n8. Є ідея, запитання чи хочеш створити власного бота? Натисни «📩 Зв’язатися з нами» та надішли повідомлення.\n\nНаприклад: resilient",
         mainKeyboard(isAdmin(env, userId))
     );
 }
@@ -2299,7 +2300,7 @@ export default {
                 env,
                 chatId,
                 userId,
-                "📩 Хочеш власний Telegram-бот або маєш запитання? Напиши одним повідомленням, і ми зв’яжемося з тобою."
+                "📩 Є ідея, запитання чи хочеш створити власного бота? Надішли повідомлення, і ми все обговоримо."
             );
             return new Response("ok");
         }

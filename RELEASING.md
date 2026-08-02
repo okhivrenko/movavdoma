@@ -10,9 +10,27 @@ This project uses semantic versioning and annotated Git tags.
 
 1. Update the `version` in `package.json`.
 2. Run `npm run build` and relevant syntax checks.
-3. Apply any pending D1 migrations to production.
-4. Deploy the Worker.
-5. Commit the release and create an annotated tag, for example:
+3. Check the production D1 migration journal:
+
+   ```bash
+   npx wrangler d1 migrations list vocab-words-db --remote
+   ```
+
+4. Apply pending migrations only through Wrangler:
+
+   ```bash
+   npx wrangler d1 migrations apply vocab-words-db --remote
+   ```
+
+   Do not run a versioned file from `migrations/` through `d1 execute --file`.
+   That bypasses the `d1_migrations` journal and makes later releases unsafe.
+
+5. Repeat the migration-list command. It must report `No migrations to apply`
+   before the Worker deploy.
+6. Deploy the Worker.
+7. Verify the public Worker returns HTTP 200 and the migration journal includes
+   the new migration.
+8. Commit the release and create an annotated tag, for example:
 
    ```bash
    git tag -a v1.1.0 -m "v1.1.0"
