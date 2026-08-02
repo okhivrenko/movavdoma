@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120" role="img" aria-labelledby="title description">
+  <title id="title">Workflow vocabulary Telegram bot</title>
+  <desc id="description">Product workflow: users add unlimited active words, mark them learned, revisit them for 30 days, and a daily cleanup removes expired learned words.</desc>
+  <defs>
+    <style>
+      .canvas { fill: #f7f9fc; }
+      .title { fill: #152238; font: 700 44px Arial, sans-serif; }
+      .subtitle { fill: #59677d; font: 24px Arial, sans-serif; }
+      .lane-title { fill: #152238; font: 700 23px Arial, sans-serif; }
+      .box-title { fill: #152238; font: 700 25px Arial, sans-serif; }
+      .box-body { fill: #415069; font: 21px Arial, sans-serif; }
+      .note { fill: #415069; font: 20px Arial, sans-serif; }
+      .tiny { fill: #66758b; font: 17px Arial, sans-serif; }
+      .arrow { stroke: #6c7d95; stroke-width: 5; fill: none; marker-end: url(#arrowhead); }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#6c7d95" />
+    </marker>
+  </defs>
+
+  <rect class="canvas" width="1600" height="1120"/>
+  <text class="title" x="100" y="105">Vocabulary Bot — продуктовий workflow</text>
+  <text class="subtitle" x="100" y="145">Простий шлях слова від додавання до очищення вивченого матеріалу</text>
+
+  <rect x="100" y="205" width="1400" height="470" rx="28" fill="#ffffff" stroke="#dce4ef" stroke-width="2"/>
+  <text class="lane-title" x="140" y="255">Шлях користувача</text>
+
+  <rect x="140" y="305" width="250" height="215" rx="22" fill="#e5efff"/>
+  <text class="box-title" x="175" y="360">1. Додати слово</text>
+  <text class="box-body" x="175" y="405">Користувач надсилає</text>
+  <text class="box-body" x="175" y="435">слово або фразу.</text>
+  <text class="box-body" x="175" y="475">Активні слова</text>
+  <text class="box-body" x="175" y="505">без загального ліміту.</text>
+
+  <path class="arrow" d="M390 412 H475"/>
+
+  <rect x="475" y="305" width="260" height="215" rx="22" fill="#e8f8ed"/>
+  <text class="box-title" x="510" y="360">2. Мої слова</text>
+  <text class="box-body" x="510" y="405">Слово доступне для</text>
+  <text class="box-body" x="510" y="435">навчання, прикладів</text>
+  <text class="box-body" x="510" y="465">і повторення.</text>
+  <text class="tiny" x="510" y="500">Зберігається, доки користувач</text>
+  <text class="tiny" x="510" y="522">сам не позначить його вивченим.</text>
+
+  <path class="arrow" d="M735 412 H820"/>
+
+  <rect x="820" y="305" width="280" height="215" rx="22" fill="#fff4d9"/>
+  <text class="box-title" x="855" y="360">3. Вивчив</text>
+  <text class="box-body" x="855" y="405">Натискання кнопки</text>
+  <text class="box-body" x="855" y="435">переносить слово у</text>
+  <text class="box-body" x="855" y="465">«Вивчені слова».</text>
+  <text class="tiny" x="855" y="505">Тут видно прогрес,</text>
+  <text class="tiny" x="855" y="527">можна повернути слово назад.</text>
+
+  <path class="arrow" d="M1100 412 H1185"/>
+
+  <rect x="1185" y="305" width="275" height="215" rx="22" fill="#f2eaff"/>
+  <text class="box-title" x="1220" y="360">4. 30 днів</text>
+  <text class="box-body" x="1220" y="405">Вивчене слово</text>
+  <text class="box-body" x="1220" y="435">зберігається 30 днів</text>
+  <text class="box-body" x="1220" y="465">від дати «Вивчив».</text>
+  <text class="tiny" x="1220" y="505">За цей час його можна</text>
+  <text class="tiny" x="1220" y="527">повернути до навчання.</text>
+
+  <rect x="100" y="735" width="1400" height="245" rx="28" fill="#ffffff" stroke="#dce4ef" stroke-width="2"/>
+  <text class="lane-title" x="140" y="785">Автоматизація</text>
+  <rect x="140" y="825" width="430" height="105" rx="18" fill="#ffe9e6"/>
+  <text class="box-title" x="175" y="870">Щоденний scheduled job</text>
+  <text class="box-body" x="175" y="907">Запускається один раз на день.</text>
+  <path class="arrow" d="M570 877 H690"/>
+  <rect x="690" y="825" width="365" height="105" rx="18" fill="#ffe9e6"/>
+  <text class="box-title" x="725" y="870">Перевірка 30 днів</text>
+  <text class="box-body" x="725" y="907">Лише для вивчених слів.</text>
+  <path class="arrow" d="M1055 877 H1175"/>
+  <rect x="1175" y="825" width="285" height="105" rx="18" fill="#ffe9e6"/>
+  <text class="box-title" x="1210" y="870">Очищення</text>
+  <text class="box-body" x="1210" y="907">Слово та приклади.</text>
+
+  <rect x="100" y="1020" width="1400" height="1" fill="#dce4ef"/>
+  <text class="note" x="100" y="1070">Ключове продуктовe правило: «Мої слова» не мають ліміту і ніколи не очищуються автоматично.</text>
+</svg>

@@ -1,6 +1,7 @@
 import { editMessage, sendMessage } from "./telegram.js";
 
 export const LIST_LIMIT = 10;
+const LEARNED_WORDS_PER_PAGE = 10;
 
 /** Read-model and Telegram presentation for active and learned vocabulary. */
 export async function getRecentActiveWords(env, userId) {
@@ -11,12 +12,20 @@ export async function getRecentActiveWords(env, userId) {
     return result.results;
 }
 
-export async function getRecentArchivedWords(env, userId) {
+export async function getRecentArchivedWords(env, userId, page = 0) {
     const result = await env.DB.prepare(`
       SELECT id, source_text, translation_uk FROM words
-      WHERE user_id = ? AND is_active = 0 ORDER BY id DESC LIMIT ?
-    `).bind(userId, LIST_LIMIT).all();
+      WHERE user_id = ? AND is_active = 0 ORDER BY id DESC LIMIT ? OFFSET ?
+    `).bind(userId, LEARNED_WORDS_PER_PAGE, page * LEARNED_WORDS_PER_PAGE).all();
     return result.results;
+}
+
+async function learnedWordPageCount(env, userId) {
+    const result = await env.DB.prepare(`
+      SELECT COUNT(*) AS total FROM words
+      WHERE user_id = ? AND is_active = 0
+    `).bind(userId).first();
+    return Math.max(1, Math.ceil(Number(result?.total ?? 0) / LEARNED_WORDS_PER_PAGE));
 }
 
 function listText(words) {
@@ -57,22 +66,37 @@ export async function sendWordExamples(env, chatId, userId, wordId) {
     return true;
 }
 
-function archivedText(words) {
+function archivedText(words, page, totalPages) {
     if (words.length === 0) return "Вивчених слів поки немає.";
-    return `Вивчені слова:\n${words.map((word, index) => `${index + 1}. ${word.source_text} — ${word.translation_uk}`).join("\n")}\n\nНатисни «Вивчати» під словом, щоб повернути його до навчання.`;
+    return `Вивчені слова · сторінка ${page + 1} з ${totalPages}:\n${words.map((word, index) => `${index + 1}. ${word.source_text} — ${word.translation_uk}`).join("\n")}\n\nНатисни номер слова, щоб повернути його до навчання.`;
 }
 
-function archivedKeyboard(words) {
+function archivedKeyboard(words, page, totalPages) {
     if (words.length === 0) return undefined;
-    return { inline_keyboard: words.map((word, index) => [
-        { text: `📖 Вивчати №${index + 1}`, callback_data: `restore:${word.id}` },
-    ]) };
+    const numberButtons = words.map((word, index) => ({
+        text: String(index + 1),
+        callback_data: `restore:${word.id}:${page}`,
+    }));
+    const rows = [];
+
+    for (let index = 0; index < numberButtons.length; index += 5) {
+        rows.push(numberButtons.slice(index, index + 5));
+    }
+
+    const navigation = [];
+    if (page > 0) navigation.push({ text: "⬅️ Назад", callback_data: `learned-page:${page - 1}` });
+    if (page < totalPages - 1) navigation.push({ text: "➡️ Далі", callback_data: `learned-page:${page + 1}` });
+    if (navigation.length > 0) rows.push(navigation);
+
+    return { inline_keyboard: rows };
 }
 
 /** Sends the learned-vocabulary list with controls to restore each word. */
-export async function sendLearnedWordList(env, chatId, userId) {
-    const words = await getRecentArchivedWords(env, userId);
-    await sendMessage(env, chatId, archivedText(words), archivedKeyboard(words));
+export async function sendLearnedWordList(env, chatId, userId, requestedPage = 0) {
+    const totalPages = await learnedWordPageCount(env, userId);
+    const page = Math.min(Math.max(0, requestedPage), totalPages - 1);
+    const words = await getRecentArchivedWords(env, userId, page);
+    await sendMessage(env, chatId, archivedText(words, page, totalPages), archivedKeyboard(words, page, totalPages));
 }
 
 export async function refreshListMessage(env, chatId, messageId, userId) {
@@ -83,10 +107,12 @@ export async function refreshListMessage(env, chatId, messageId, userId) {
     catch { await sendMessage(env, chatId, text, keyboard); }
 }
 
-export async function refreshArchivedMessage(env, chatId, messageId, userId) {
-    const words = await getRecentArchivedWords(env, userId);
-    const text = archivedText(words);
-    const keyboard = archivedKeyboard(words);
+export async function refreshArchivedMessage(env, chatId, messageId, userId, requestedPage = 0) {
+    const totalPages = await learnedWordPageCount(env, userId);
+    const page = Math.min(Math.max(0, requestedPage), totalPages - 1);
+    const words = await getRecentArchivedWords(env, userId, page);
+    const text = archivedText(words, page, totalPages);
+    const keyboard = archivedKeyboard(words, page, totalPages);
     try { await editMessage(env, chatId, messageId, text, keyboard); }
     catch { await sendMessage(env, chatId, text, keyboard); }
 }

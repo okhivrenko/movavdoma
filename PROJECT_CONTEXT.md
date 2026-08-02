@@ -43,7 +43,7 @@ Welcomes the user and shows a persistent reply keyboard with:
 - `📚 Мої слова`
 - `🎓 Вивчені слова`
 - `📚 Щоденне слово`
-- `⚙️ Налаштувати щоденне слово`
+- `⏰ Нагадування`
 - `💬 Відгук`
 - `➡️ Далі` / `⬅️ Назад` split the persistent menu into two pages. The second
   page has support, bonus, contact, help, and the admin entry point.
@@ -94,17 +94,22 @@ all active words as learned. `/archive` remains a backwards-compatible alias.
 
 ### `🎓 Вивчені слова`, `/learned`, and `/restore`
 
-The menu button and `/learned` show up to ten learned words with inline
-`Вивчати` buttons. Selecting one returns it to the active learning catalog.
+The menu button and `/learned` show up to ten learned words per page with
+numbered restore buttons. Selecting one returns it to the active learning
+catalog. Learned words are retained for 30 days after being marked learned,
+then a daily cleanup permanently removes them with their examples and review
+history. Active words have no total cap and are never removed by this cleanup.
 `/restore 1`, `/restore 5-10`, and `/restore all` remain supported for bulk
-restoration. Learned words remain in D1 with `is_active = 0`.
+restoration. The learned-word view shows up to 10 words per page, with numbered
+restore buttons and next/previous navigation. Learned words remain in D1 with
+`is_active = 0`.
 
 ### Daily word
 
 `📚 Щоденне слово` shows the current pending card or generates a new one.
 After `Знаю` or `Вчити`, the user can open another card on the same day. The
 number of newly generated cards depends on access level: 5, 10, 15, or 20.
-`⚙️ Налаштувати` opens a two-step settings flow: choose
+`⏰ Нагадування` opens a two-step settings flow: choose
 whether to change the delivery time or CEFR level (A0–C2), then choose its
 value. It can also turn reminders on or off. The card has `Знаю` and `Вчити`
 buttons: `Знаю` discards it, while `Вчити` adds the card and examples to the

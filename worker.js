@@ -47,8 +47,9 @@ const DAILY_TIME_OPTIONS = Array.from(
 const DAILY_LEVEL_OPTIONS = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
 const MAX_DAILY_WORD_ATTEMPTS = 3;
 const ADMIN_USER_LIST_LIMIT = 50;
+const LEARNED_WORD_RETENTION_DAYS = 30;
 // Increment only when the persistent reply keyboard changes for users.
-const INTERFACE_VERSION = 3;
+const INTERFACE_VERSION = 4;
 const ADD_WORD_HINT =
     "Надішли англійське слово або фразу.\n\nЯкщо важливе конкретне значення, додай контекст після |:\ncharge | payment for a service\n\nПриклад без контексту: resilient";
 
@@ -304,23 +305,20 @@ async function saveAndSendWord(env, chatId, userId, word, context) {
 // Authorization itself stays in helpers.js so every entry path compares IDs consistently.
 function mainKeyboard(showAdmin = false, page = 1) {
     const firstPage = [
-        [{ text: "➕ Додати слово" }],
+        [{ text: "➕ Додати слово" }, { text: "📚 Щоденне слово" }],
         [{ text: "📚 Мої слова" }, { text: "🎓 Вивчені слова" }],
-        [{ text: "📚 Щоденне слово" }, { text: "⚙️ Налаштувати щоденне слово" }],
-        [{ text: "💬 Відгук" }],
-        [{ text: "➡️ Далі" }],
+        [{ text: "⏰ Нагадування" }, { text: "➡️ Далі" }],
     ];
     const secondPage = [
         [{ text: "☕ Підтримати бот" }, { text: "🎁 Отримати бонус" }],
-        [{ text: "📩 Зв’язатися з нами" }],
-        [{ text: "❓ Допомога" }],
+        [{ text: "💬 Відгук" }, { text: "📩 Зв’язатися з нами" }],
     ];
 
     if (showAdmin) {
         secondPage.push([{ text: "🛠 Адмін" }]);
     }
 
-    secondPage.push([{ text: "⬅️ Назад" }]);
+    secondPage.push([{ text: "❓ Допомога" }, { text: "⬅️ Назад" }]);
 
     return {
         keyboard: page === 2 ? secondPage : firstPage,
@@ -898,7 +896,7 @@ async function notifyExpiredDonationAccessGrants(env) {
             await sendMessage(
                 env,
                 grant.chat_id,
-                "🎁 Дякуємо, що користуєшся ботом! На жаль, твій бонусний період завершився.\n\nБудемо вдячні за подальшу підтримку: навіть одна кавуська мотивує нас робити бот кращим.\n\nЯкщо маєш зауваження, ідеї або просто хочеш поділитися враженням — натисни «💬 Відгук» і надішли нам повідомлення.",
+                "🎁 Дякуємо, що користуєшся ботом! На жаль, твій бонусний період завершився.\n\nБудемо вдячні за подальшу підтримку: навіть одна кавуська мотивує нас робити бот кращим.\n\nЯкщо маєш зауваження, ідеї або просто хочеш поділитися враженням — натисни «➡️ Далі», а потім «💬 Відгук». Це допомагає нам ставати кращими.",
                 mainKeyboard(isAdmin(env, grant.user_id))
             );
         } catch (error) {
@@ -908,6 +906,27 @@ async function notifyExpiredDonationAccessGrants(env) {
                 .run();
             throw error;
         }
+    }
+}
+
+// Remove only already learned vocabulary after its retention period. Child rows
+// are deleted first because examples and reviews reference the vocabulary word.
+async function removeExpiredLearnedWords(env) {
+    const cutoff = `-${LEARNED_WORD_RETENTION_DAYS} days`;
+    const expiredWordIds = `
+      SELECT id FROM words
+      WHERE is_active = 0 AND learned_at IS NOT NULL
+        AND learned_at < datetime('now', ?)
+    `;
+    const results = await env.DB.batch([
+        env.DB.prepare(`DELETE FROM examples WHERE word_id IN (${expiredWordIds})`).bind(cutoff),
+        env.DB.prepare(`DELETE FROM reviews WHERE word_id IN (${expiredWordIds})`).bind(cutoff),
+        env.DB.prepare(`DELETE FROM words WHERE id IN (${expiredWordIds})`).bind(cutoff),
+    ]);
+
+    const deleted = results[2]?.meta?.changes ?? 0;
+    if (deleted > 0) {
+        console.log({ event: "expired_learned_words_removed", deleted });
     }
 }
 
@@ -1571,7 +1590,7 @@ async function sendHelp(env, chatId, userId) {
     await sendMessage(
         env,
         chatId,
-        "Як користуватися ботом:\n\n1. Натисни «➕ Додати слово» або просто надішли англійське слово чи фразу.\n2. Якщо знаєш потрібне значення, напиши його після |:\ncharge | payment for a service\n3. Обери потрібне значення, якщо бот його уточнить.\n4. Відкрий «📚 Мої слова», щоб переглянути свій каталог.\n5. Відкрий «🎓 Вивчені слова», щоб повернути слово до навчання.\n6. Натисни «📚 Щоденне слово», щоб показати сьогоднішню картку, або «⚙️ Налаштувати щоденне слово», щоб окремо вибрати час і рівень. У картці натисни «Знаю» або «Вчити».\n7. На другій сторінці меню є підтримка, бонуси й зв’язок із нами.\n8. Хочеш власний Telegram-бот? Натисни «📩 Зв’язатися з нами» та напиши нам, щоб дізнатися більше.\n\nНаприклад: resilient",
+        "Як користуватися ботом:\n\n1. Натисни «➕ Додати слово» або просто надішли англійське слово чи фразу.\n2. Якщо знаєш потрібне значення, напиши його після |:\ncharge | payment for a service\n3. Обери потрібне значення, якщо бот його уточнить.\n4. Відкрий «📚 Мої слова», щоб переглянути свій каталог.\n5. Відкрий «🎓 Вивчені слова», щоб повернути слово до навчання.\n6. Натисни «📚 Щоденне слово», щоб показати сьогоднішню картку, або «⏰ Нагадування», щоб окремо вибрати час і рівень. У картці натисни «Знаю» або «Вчити».\n7. На другій сторінці меню є підтримка, бонуси й зв’язок із нами.\n8. Хочеш власний Telegram-бот? Натисни «📩 Зв’язатися з нами» та напиши нам, щоб дізнатися більше.\n\nНаприклад: resilient",
         mainKeyboard(isAdmin(env, userId))
     );
 }
@@ -1970,7 +1989,7 @@ export default {
                 const archived = await env.DB
                     .prepare(`
               UPDATE words
-              SET is_active = 0
+              SET is_active = 0, learned_at = CURRENT_TIMESTAMP
               WHERE id = ? AND user_id = ? AND is_active = 1
             `)
                     .bind(wordId, userId)
@@ -1988,10 +2007,25 @@ export default {
                 return new Response("ok");
             }
 
-            if (callback.data.startsWith("restore:")) {
-                const wordId = Number(callback.data.replace("restore:", ""));
+            if (callback.data.startsWith("learned-page:")) {
+                const page = Number(callback.data.replace("learned-page:", ""));
 
-                if (!Number.isInteger(wordId) || wordId <= 0) {
+                if (!Number.isInteger(page) || page < 0) {
+                    await answerCallbackQuery(env, callback.id, "Невірна сторінка.");
+                    return new Response("ok");
+                }
+
+                await answerCallbackQuery(env, callback.id);
+                await refreshArchivedMessage(env, chatId, messageId, userId, page);
+                return new Response("ok");
+            }
+
+            if (callback.data.startsWith("restore:")) {
+                const restoreMatch = callback.data.match(/^restore:(\d+)(?::(\d+))?$/);
+                const wordId = Number(restoreMatch?.[1]);
+                const page = Number(restoreMatch?.[2] ?? 0);
+
+                if (!Number.isInteger(wordId) || wordId <= 0 || !Number.isInteger(page) || page < 0) {
                     await answerCallbackQuery(env, callback.id, "Невірний вибір.");
                     return new Response("ok");
                 }
@@ -1999,7 +2033,7 @@ export default {
                 const restored = await env.DB
                     .prepare(`
               UPDATE words
-              SET is_active = 1
+              SET is_active = 1, learned_at = NULL
               WHERE id = ? AND user_id = ? AND is_active = 0
             `)
                     .bind(wordId, userId)
@@ -2013,7 +2047,7 @@ export default {
                         : "Це слово вже у списку для навчання."
                 );
 
-                await refreshArchivedMessage(env, chatId, messageId, userId);
+                await refreshArchivedMessage(env, chatId, messageId, userId, page);
                 return new Response("ok");
             }
 
@@ -2141,7 +2175,7 @@ export default {
         // vocabulary word cannot accidentally be forwarded as feedback.
         if (text !== "💬 Відгук" && (text.startsWith("/") || [
             "➕ Додати слово", "📚 Мої слова", "🎓 Вивчені слова",
-            "⚙️ Налаштувати", "⚙️ Налаштувати щоденне слово", "⏰ Щоденне слово", "📚 Щоденне слово",
+            "⚙️ Налаштувати", "⚙️ Налаштувати щоденне слово", "⏰ Нагадування", "⏰ Щоденне слово", "📚 Щоденне слово",
             "☕ Підтримати бот", "🎁 Отримати бонус", "📩 Зв’язатися з нами", "🛠 Адмін", "❓ Допомога",
             "➡️ Далі", "⬅️ Назад",
         ].includes(text))) {
@@ -2194,7 +2228,12 @@ export default {
             return new Response("ok");
         }
 
-        if (text === "⚙️ Налаштувати" || text === "⚙️ Налаштувати щоденне слово" || text === "⏰ Щоденне слово") {
+        if (
+            text === "⚙️ Налаштувати" ||
+            text === "⚙️ Налаштувати щоденне слово" ||
+            text === "⏰ Нагадування" ||
+            text === "⏰ Щоденне слово"
+        ) {
             await sendDailySettings(env, chatId, userId);
             return new Response("ok");
         }
@@ -2604,7 +2643,7 @@ export default {
                 const archived = await env.DB
                     .prepare(`
               UPDATE words
-              SET is_active = 0
+              SET is_active = 0, learned_at = CURRENT_TIMESTAMP
               WHERE user_id = ? AND is_active = 1
             `)
                     .bind(userId)
@@ -2678,7 +2717,7 @@ export default {
             const archived = await env.DB
                 .prepare(`
               UPDATE words
-              SET is_active = 0
+              SET is_active = 0, learned_at = CURRENT_TIMESTAMP
               WHERE user_id = ? AND is_active = 1 AND id IN (${placeholders})
             `)
                 .bind(userId, ...wordIds)
@@ -2721,7 +2760,7 @@ export default {
                 const restored = await env.DB
                     .prepare(`
               UPDATE words
-              SET is_active = 1
+              SET is_active = 1, learned_at = NULL
               WHERE user_id = ? AND is_active = 0
             `)
                     .bind(userId)
@@ -2795,7 +2834,7 @@ export default {
             const restored = await env.DB
                 .prepare(`
               UPDATE words
-              SET is_active = 1
+              SET is_active = 1, learned_at = NULL
               WHERE user_id = ? AND is_active = 0 AND id IN (${placeholders})
             `)
                 .bind(userId, ...wordIds)
@@ -2841,6 +2880,17 @@ export default {
     },
 
     async scheduled(controller, env) {
+        if (controller.cron === "0 3 * * *") {
+            try {
+                await removeExpiredLearnedWords(env);
+            } catch (error) {
+                console.error({
+                    event: "learned_word_cleanup_failed",
+                    message: error instanceof Error ? error.message : "Unknown error",
+                });
+            }
+        }
+
         try {
             await notifyExpiredDonationAccessGrants(env);
         } catch (error) {

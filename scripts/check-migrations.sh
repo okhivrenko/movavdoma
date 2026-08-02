@@ -17,10 +17,11 @@ EXPECTED_SCHEMA_COUNT="$(sqlite3 "$CHECK_DB" "
     (SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'daily_word_card_views') +
     (SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'user_access_levels') +
     (SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'user_temporary_access_grants') +
-    (SELECT COUNT(*) FROM pragma_table_info('users') WHERE name = 'feedback_pending');
+    (SELECT COUNT(*) FROM pragma_table_info('users') WHERE name = 'feedback_pending') +
+    (SELECT COUNT(*) FROM pragma_table_info('words') WHERE name = 'learned_at');
 ")"
 
-[ "$EXPECTED_SCHEMA_COUNT" = "5" ] || {
+[ "$EXPECTED_SCHEMA_COUNT" = "6" ] || {
   echo "Expected release schema is missing" >&2
   exit 1
 }
@@ -42,5 +43,6 @@ if sqlite3 "$CHECK_DB" "
   echo "A duplicate pending daily card was accepted" >&2
   exit 1
 fi
+
 
 echo "Migrations: OK"
