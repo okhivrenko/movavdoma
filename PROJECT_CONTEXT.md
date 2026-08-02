@@ -43,7 +43,7 @@ Welcomes the user and shows a persistent reply keyboard with:
 - `📚 Мої слова`
 - `🎓 Вивчені слова`
 - `📚 Щоденне слово`
-- `⏰ Нагадування`
+- `⏰ Розклад і рівень`
 - `❓ Допомога`
 - `💬 Відгук`
 - `➡️ Далі` / `⬅️ Назад` split the persistent menu into two pages. The second
@@ -110,7 +110,7 @@ restore buttons and next/previous navigation. Learned words remain in D1 with
 `📚 Щоденне слово` shows the current pending card or generates a new one.
 After `Знаю` or `Вчити`, the user can open another card on the same day. The
 number of newly generated cards depends on access level: 5, 10, 15, or 20.
-`⏰ Нагадування` opens a two-step settings flow: choose
+`⏰ Розклад і рівень` opens a two-step settings flow: choose
 whether to change the delivery time or CEFR level (A0–C2), then choose its
 value. It can also turn reminders on or off. The card has `Знаю` and `Вчити`
 buttons: `Знаю` discards it, while `Вчити` adds the card and examples to the
