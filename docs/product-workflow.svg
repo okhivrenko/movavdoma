@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120" role="img" aria-labelledby="title description">
-  <title id="title">Workflow vocabulary Telegram bot</title>
+  <title id="title">MovaVDoma product workflow</title>
   <desc id="description">Product workflow: users add unlimited active words, mark them learned, revisit them for 30 days, and a daily cleanup removes expired learned words.</desc>
   <defs>
     <style>
@@ -19,7 +19,7 @@
   </defs>
 
   <rect class="canvas" width="1600" height="1120"/>
-  <text class="title" x="100" y="105">Vocabulary Bot — продуктовий workflow</text>
+  <text class="title" x="100" y="105">MovaVDoma — продуктовий workflow</text>
   <text class="subtitle" x="100" y="145">Простий шлях слова від додавання до очищення вивченого матеріалу</text>
 
   <rect x="100" y="205" width="1400" height="470" rx="28" fill="#ffffff" stroke="#dce4ef" stroke-width="2"/>

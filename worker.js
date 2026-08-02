@@ -1,4 +1,4 @@
-// Vocabulary Telegram Bot — Copyright (c) 2026 Oleksii Khivrenko.
+// MovaVDoma Telegram Bot — Copyright (c) 2026 Oleksii Khivrenko.
 // Publicly viewable under the proprietary terms in LICENSE.
 
 import {
@@ -40,6 +40,7 @@ const MONOBANK_JAR_URL = "https://send.monobank.ua/jar/8sko6A3Cma";
 const MONOBANK_JAR_SEND_ID = "8sko6A3Cma";
 const MONOBANK_MIN_SYNC_INTERVAL_SECONDS = 60;
 const MONOBANK_STATEMENT_OVERLAP_SECONDS = 5 * 60;
+const BOT_BRAND_NAME = "MovaVDoma";
 const PRIVACY_POLICY_URL = "https://vocab-telegram-bot.alexeykhivrenko.workers.dev/privacy";
 const DAILY_TIME_OPTIONS = Array.from(
     { length: 24 },
@@ -1605,7 +1606,7 @@ function privacyPolicyPage() {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Privacy Policy - LingoPath</title>
+  <title>Privacy Policy - ${BOT_BRAND_NAME}</title>
   <style>
     :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #16243a; background: #f6f8fb; }
     body { margin: 0; padding: 32px 16px; }
@@ -1614,9 +1615,9 @@ function privacyPolicyPage() {
   </style>
 </head>
 <body><main>
-  <h1>Privacy Policy for LingoPath</h1>
+  <h1>Privacy Policy for ${BOT_BRAND_NAME}</h1>
   <p class="date">Дата набуття чинності: 2 серпня 2026 року</p>
-  <p>LingoPath - Telegram-бот для вивчення лексики. Нижче описано, які дані бот обробляє, навіщо це потрібно та як із нами зв'язатися.</p>
+  <p>${BOT_BRAND_NAME} - Telegram-бот для вивчення лексики. Нижче описано, які дані бот обробляє, навіщо це потрібно та як із нами зв'язатися.</p>
 
   <h2>1. Які дані обробляються</h2>
   <ul><li>Telegram user ID і chat ID;</li><li>слова, фрази, необов'язковий контекст і повідомлення feedback;</li><li>налаштування навчання: рівень, час нагадування, статуси слів і ліміти;</li><li>створені переклади, приклади та прогрес навчання;</li><li>технічні записи для захисту від повторних Telegram-оновлень і роботи нагадувань;</li><li>для заявки на бонус: код підтримки, статус заявки й відомості з виписки банки Monobank - сума, час і коментар до платежу.</li></ul>
@@ -1659,7 +1660,7 @@ export default {
         }
 
         if (request.method !== "POST") {
-            return new Response("Vocabulary bot is running.");
+            return new Response(`${BOT_BRAND_NAME} is running.`);
         }
 
         const webhookSecret = request.headers.get(

@@ -1,4 +1,4 @@
-# Vocabulary Telegram Bot — project context
+# MovaVDoma — project context
 
 ## Purpose
 

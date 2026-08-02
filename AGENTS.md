@@ -1,4 +1,4 @@
-# Vocabulary Bot — agent guide
+# MovaVDoma — agent guide
 
 ## Fast orientation
 

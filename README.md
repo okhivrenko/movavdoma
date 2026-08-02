@@ -1,4 +1,4 @@
-# Vocabulary Telegram Bot
+# MovaVDoma
 
 [Privacy Policy](./PRIVACY_POLICY.md)
 
