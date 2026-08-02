@@ -1,7 +1,28 @@
+import {
+    answerCallbackQuery,
+    editMessage,
+    getBotLink,
+    sendMessage,
+} from "./telegram.js";
+import { openAIJson } from "./openai.js";
+import {
+    getRecentActiveWords,
+    LIST_LIMIT,
+    refreshArchivedMessage,
+    refreshListMessage,
+    sendWordExamples,
+} from "./word-list.js";
+import {
+    createSupportCode,
+    dailyLimitReachedText,
+    formatHryvnias,
+    isAdmin,
+    localDateAndTime,
+    wordCountLabel,
+} from "./helpers.js";
+
 const SENSES_PER_PAGE = 3;
 const MAX_SENSES = 9;
-const LIST_LIMIT = 10;
-const MAX_OPENAI_ATTEMPTS = 3;
 const DAILY_ADD_LIMIT = 10;
 const DONATION_TIER_50_KOPIYKAS = 10_000;
 const DONATION_TIER_100_KOPIYKAS = 20_000;
@@ -19,150 +40,7 @@ const ADMIN_USER_LIST_LIMIT = 50;
 const ADD_WORD_HINT =
     "Надішли англійське слово або фразу.\n\nЯкщо важливе конкретне значення, додай контекст після |:\ncharge | payment for a service\n\nПриклад без контексту: resilient";
 
-async function telegramApi(env, method, payload) {
-    const response = await fetch(
-        `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${method}`,
-        {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(payload),
-        }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok || !data.ok) {
-        throw new Error(`Telegram ${method} failed`);
-    }
-
-    return data.result;
-}
-
-async function sendMessage(env, chatId, text, replyMarkup) {
-    return telegramApi(env, "sendMessage", {
-        chat_id: chatId,
-        text,
-        reply_markup: replyMarkup,
-    });
-}
-
-async function editMessage(env, chatId, messageId, text, replyMarkup) {
-    return telegramApi(env, "editMessageText", {
-        chat_id: chatId,
-        message_id: messageId,
-        text,
-        reply_markup: replyMarkup,
-    });
-}
-
-async function answerCallbackQuery(env, callbackQueryId, text) {
-    return telegramApi(env, "answerCallbackQuery", {
-        callback_query_id: callbackQueryId,
-        text,
-    });
-}
-
-async function getBotLink(env) {
-    const bot = await telegramApi(env, "getMe", {});
-    const username = bot?.username;
-
-    if (!/^[A-Za-z0-9_]{5,32}$/.test(username ?? "")) {
-        throw new Error("Telegram bot username is unavailable.");
-    }
-
-    return `https://t.me/${username}`;
-}
-
-function wait(milliseconds) {
-    return new Promise((resolve) => setTimeout(resolve, milliseconds));
-}
-
-function isRetryableOpenAIStatus(status) {
-    return status === 429 || status >= 500;
-}
-
-function openAIRetryDelay(response, attempt) {
-    const retryAfterSeconds = Number(response.headers.get("retry-after"));
-
-    if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
-        return Math.min(retryAfterSeconds * 1000, 2_000);
-    }
-
-    return 250 * 2 ** attempt;
-}
-
-async function openAIJson(env, name, schema, instructions, input) {
-    for (let attempt = 0; attempt < MAX_OPENAI_ATTEMPTS; attempt += 1) {
-        let response;
-
-        try {
-            response = await fetch(
-                "https://api.openai.com/v1/chat/completions",
-                {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-                        "content-type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        model: "gpt-5.4-nano",
-                        reasoning_effort: "none",
-                        max_completion_tokens: 400,
-                        response_format: {
-                            type: "json_schema",
-                            json_schema: { name, strict: true, schema },
-                        },
-                        messages: [
-                            { role: "developer", content: instructions },
-                            { role: "user", content: input },
-                        ],
-                    }),
-                },
-            );
-        } catch (error) {
-            if (attempt === MAX_OPENAI_ATTEMPTS - 1) {
-                throw error;
-            }
-
-            console.warn({
-                event: "openai_retry",
-                attempt: attempt + 1,
-                reason: "network_error",
-            });
-            await wait(250 * 2 ** attempt);
-            continue;
-        }
-
-        if (!response.ok) {
-            if (
-                !isRetryableOpenAIStatus(response.status) ||
-                attempt === MAX_OPENAI_ATTEMPTS - 1
-            ) {
-                throw new Error(`OpenAI ${response.status}`);
-            }
-
-            console.warn({
-                event: "openai_retry",
-                attempt: attempt + 1,
-                status: response.status,
-            });
-            await wait(openAIRetryDelay(response, attempt));
-            continue;
-        }
-
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
-
-        if (!content) {
-            throw new Error("OpenAI returned an empty response.");
-        }
-
-        return JSON.parse(content);
-    }
-
-    throw new Error("OpenAI retry attempts exhausted.");
-}
-
+// Vocabulary card creation and a short-lived meaning-selection flow.
 async function suggestSenses(env, word) {
     const schema = {
         type: "object",
@@ -410,188 +288,8 @@ async function saveAndSendWord(env, chatId, userId, word, context) {
     );
 }
 
-async function getRecentActiveWords(env, userId) {
-    const result = await env.DB
-        .prepare(`
-      SELECT id, source_text, translation_uk
-      FROM words
-      WHERE user_id = ? AND is_active = 1
-      ORDER BY id DESC
-      LIMIT ?
-    `)
-        .bind(userId, LIST_LIMIT)
-        .all();
-
-    return result.results;
-}
-
-async function getRecentArchivedWords(env, userId) {
-    const result = await env.DB
-        .prepare(`
-      SELECT id, source_text, translation_uk
-      FROM words
-      WHERE user_id = ? AND is_active = 0
-      ORDER BY id DESC
-      LIMIT ?
-    `)
-        .bind(userId, LIST_LIMIT)
-        .all();
-
-    return result.results;
-}
-
-function listText(words) {
-    if (words.length === 0) {
-        return "У словнику поки немає активних слів.";
-    }
-
-    return `Останні слова:\n${words
-        .map(
-            (word, index) =>
-                `${index + 1}. ${word.source_text} — ${word.translation_uk}`
-        )
-        .join("\n")}\n\nНатисни «Вивчив» під словом, яке вже добре знаєш.`;
-}
-
-function listKeyboard(words) {
-    if (words.length === 0) {
-        return undefined;
-    }
-
-    return {
-        inline_keyboard: words.map((word, index) => [
-            {
-                text: `💬 Приклади №${index + 1}`,
-                callback_data: `examples:${word.id}`,
-            },
-            {
-                text: `✅ Вивчив №${index + 1}`,
-                callback_data: `delete:${word.id}`,
-            },
-        ]),
-    };
-}
-
-function examplesText(word, examples) {
-    const heading = word.translation_uk
-        ? `${word.source_text} — ${word.translation_uk}`
-        : word.source_text;
-
-    if (examples.length === 0) {
-        return `📘 ${heading}\n\nДля цього слова поки немає прикладів.`;
-    }
-
-    return `📘 ${heading}\n\n${examples
-        .map(
-            (example, index) =>
-                `${index + 1}. ${example.sentence_source}\n${example.sentence_uk}`
-        )
-        .join("\n\n")}`;
-}
-
-async function sendWordExamples(env, chatId, userId, wordId) {
-    const word = await env.DB
-        .prepare(`
-      SELECT source_text, translation_uk
-      FROM words
-      WHERE id = ? AND user_id = ? AND is_active = 1
-    `)
-        .bind(wordId, userId)
-        .first();
-
-    if (!word) {
-        return false;
-    }
-
-    const result = await env.DB
-        .prepare(`
-      SELECT sentence_source, sentence_uk
-      FROM examples
-      WHERE word_id = ?
-      ORDER BY position ASC
-    `)
-        .bind(wordId)
-        .all();
-
-    await sendMessage(env, chatId, examplesText(word, result.results));
-    return true;
-}
-
-function archivedText(words) {
-    if (words.length === 0) {
-        return "Вивчених слів поки немає.";
-    }
-
-    return `Вивчені слова:\n${words
-        .map(
-            (word, index) =>
-                `${index + 1}. ${word.source_text} — ${word.translation_uk}`
-        )
-        .join("\n")}\n\nНатисни «Вивчати» під словом, щоб повернути його до навчання.`;
-}
-
-function archivedKeyboard(words) {
-    if (words.length === 0) {
-        return undefined;
-    }
-
-    return {
-        inline_keyboard: words.map((word, index) => [
-            {
-                text: `📖 Вивчати №${index + 1}`,
-                callback_data: `restore:${word.id}`,
-            },
-        ]),
-    };
-}
-
-async function refreshListMessage(env, chatId, messageId, userId) {
-    const words = await getRecentActiveWords(env, userId);
-    const text = listText(words);
-    const keyboard = listKeyboard(words);
-
-    try {
-        await editMessage(env, chatId, messageId, text, keyboard);
-    } catch {
-        await sendMessage(env, chatId, text, keyboard);
-    }
-}
-
-async function refreshArchivedMessage(env, chatId, messageId, userId) {
-    const words = await getRecentArchivedWords(env, userId);
-    const text = archivedText(words);
-    const keyboard = archivedKeyboard(words);
-
-    try {
-        await editMessage(env, chatId, messageId, text, keyboard);
-    } catch {
-        await sendMessage(env, chatId, text, keyboard);
-    }
-}
-
-function wordCountLabel(count) {
-    const lastTwoDigits = count % 100;
-    const lastDigit = count % 10;
-
-    if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
-        return "слів";
-    }
-
-    if (lastDigit === 1) {
-        return "слово";
-    }
-
-    if (lastDigit >= 2 && lastDigit <= 4) {
-        return "слова";
-    }
-
-    return "слів";
-}
-
-function dailyLimitReachedText(limit) {
-    return `На сьогодні ліміт — ${limit} ${wordCountLabel(limit)} — уже використано. Нові слова можна буде додати завтра.\n\nЯкщо бот корисний, підтримка допомагає його розвивати й може збільшити персональний ліміт.`;
-}
-
+// User-facing reply/inline keyboards and the admin-only user directory.
+// Authorization itself stays in helpers.js so every entry path compares IDs consistently.
 function mainKeyboard(showAdmin = false) {
     const keyboard = [
         [{ text: "➕ Додати слово" }],
@@ -699,6 +397,8 @@ async function sendAdminUserList(env, chatId, requestedPage = 0, messageId = nul
     await sendMessage(env, chatId, listText, keyboard);
 }
 
+// Daily-word settings are split into two consecutive choices: time and level.
+// The UI only changes user preferences; scheduled delivery consumes them later.
 function dailySettingsMenuKeyboard(user) {
     return {
         inline_keyboard: [
@@ -781,53 +481,8 @@ async function refreshDailySettings(env, chatId, messageId, userId) {
     );
 }
 
-function localDateAndTime(timezone, timestamp) {
-    try {
-        const parts = new Intl.DateTimeFormat("en-CA", {
-            timeZone: timezone,
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-            hourCycle: "h23",
-        }).formatToParts(new Date(timestamp));
-        const values = Object.fromEntries(
-            parts
-                .filter((part) => part.type !== "literal")
-                .map((part) => [part.type, part.value])
-        );
-
-        return {
-            date: `${values.year}-${values.month}-${values.day}`,
-            time: `${values.hour}:${values.minute}`,
-        };
-    } catch {
-        return null;
-    }
-}
-
-function isAdmin(env, userId) {
-    return String(userId) === env.ADMIN_TELEGRAM_USER_ID;
-}
-
-function formatHryvnias(amountKopiykas) {
-    return new Intl.NumberFormat("uk-UA", {
-        style: "currency",
-        currency: "UAH",
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 2,
-    }).format(amountKopiykas / 100);
-}
-
-function createSupportCode() {
-    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    const values = new Uint32Array(5);
-    crypto.getRandomValues(values);
-
-    return `V-${Array.from(values, (value) => alphabet[value % alphabet.length]).join("")}`;
-}
-
+// Donation requests are reviewed by the admin before any personal limit changes.
+// The unique support code links a payment comment to a single user request.
 async function getOrCreateDonationRequest(env, userId) {
     const existing = await getOpenDonationRequest(env, userId);
 
@@ -1166,6 +821,8 @@ async function rejectDonationBonus(env, requestId) {
     return request;
 }
 
+// This UPSERT is the quota enforcement point: it atomically claims a daily slot
+// before a new word is generated or saved, preventing normal double additions.
 async function claimDailyWordAddition(env, userId) {
     if (isAdmin(env, userId)) {
         return true;
@@ -1374,6 +1031,8 @@ async function syncMonobankDonations(env, scheduledTime) {
     await notifyUnmatchedDonations(env);
 }
 
+// Daily cards remain pending until the user explicitly knows or saves the word.
+// local_date prevents an old pending card from being reused on a later day.
 function dailyWordKeyboard(pendingId) {
     return {
         inline_keyboard: [[
@@ -1686,6 +1345,7 @@ async function sendDueDailyWords(env, scheduledTime) {
     }
 }
 
+// Small command-level wrappers keep the webhook router below readable.
 async function sendActiveWordList(env, chatId, userId) {
     const words = await getRecentActiveWords(env, userId);
     await sendMessage(env, chatId, listText(words), listKeyboard(words));
@@ -1705,6 +1365,8 @@ async function sendHelp(env, chatId, userId) {
     );
 }
 
+// Telegram webhook and scheduled delivery entry points. Callback actions are
+// validated in the router before any user-owned data is read or changed.
 export default {
     async fetch(request, env) {
         if (request.method !== "POST") {

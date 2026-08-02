@@ -1,0 +1,31 @@
+/** Telegram Bot API client shared by feature modules. */
+export async function telegramApi(env, method, payload) {
+    const response = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(`Telegram ${method} failed`);
+    return data.result;
+}
+
+export function sendMessage(env, chatId, text, replyMarkup) {
+    return telegramApi(env, "sendMessage", { chat_id: chatId, text, reply_markup: replyMarkup });
+}
+
+export function editMessage(env, chatId, messageId, text, replyMarkup) {
+    return telegramApi(env, "editMessageText", {
+        chat_id: chatId, message_id: messageId, text, reply_markup: replyMarkup,
+    });
+}
+
+export function answerCallbackQuery(env, callbackQueryId, text) {
+    return telegramApi(env, "answerCallbackQuery", { callback_query_id: callbackQueryId, text });
+}
+
+export async function getBotLink(env) {
+    const username = (await telegramApi(env, "getMe", {}))?.username;
+    if (!/^[A-Za-z0-9_]{5,32}$/.test(username ?? "")) throw new Error("Telegram bot username is unavailable.");
+    return `https://t.me/${username}`;
+}
