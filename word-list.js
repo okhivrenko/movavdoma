@@ -32,6 +32,12 @@ function listKeyboard(words) {
     ]) };
 }
 
+/** Sends the active vocabulary list with its matching inline controls. */
+export async function sendActiveWordList(env, chatId, userId) {
+    const words = await getRecentActiveWords(env, userId);
+    await sendMessage(env, chatId, listText(words), listKeyboard(words));
+}
+
 function examplesText(word, examples) {
     const heading = word.translation_uk ? `${word.source_text} — ${word.translation_uk}` : word.source_text;
     if (examples.length === 0) return `📘 ${heading}\n\nДля цього слова поки немає прикладів.`;
@@ -61,6 +67,12 @@ function archivedKeyboard(words) {
     return { inline_keyboard: words.map((word, index) => [
         { text: `📖 Вивчати №${index + 1}`, callback_data: `restore:${word.id}` },
     ]) };
+}
+
+/** Sends the learned-vocabulary list with controls to restore each word. */
+export async function sendLearnedWordList(env, chatId, userId) {
+    const words = await getRecentArchivedWords(env, userId);
+    await sendMessage(env, chatId, archivedText(words), archivedKeyboard(words));
 }
 
 export async function refreshListMessage(env, chatId, messageId, userId) {

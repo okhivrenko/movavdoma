@@ -13,6 +13,8 @@ import {
     LIST_LIMIT,
     refreshArchivedMessage,
     refreshListMessage,
+    sendActiveWordList,
+    sendLearnedWordList,
     sendWordExamples,
 } from "./word-list.js";
 import {
@@ -1459,17 +1461,6 @@ async function sendDueDailyWords(env, scheduledTime) {
             }
         }
     }
-}
-
-// Small command-level wrappers keep the webhook router below readable.
-async function sendActiveWordList(env, chatId, userId) {
-    const words = await getRecentActiveWords(env, userId);
-    await sendMessage(env, chatId, listText(words), listKeyboard(words));
-}
-
-async function sendLearnedWordList(env, chatId, userId) {
-    const words = await getRecentArchivedWords(env, userId);
-    await sendMessage(env, chatId, archivedText(words), archivedKeyboard(words));
 }
 
 async function sendHelp(env, chatId, userId) {
