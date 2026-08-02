@@ -2,7 +2,7 @@ const SENSES_PER_PAGE = 3;
 const MAX_SENSES = 9;
 const LIST_LIMIT = 10;
 const MAX_OPENAI_ATTEMPTS = 3;
-const DAILY_ADD_LIMIT = 20;
+const DAILY_ADD_LIMIT = 10;
 const DONATION_TIER_50_KOPIYKAS = 10_000;
 const DONATION_TIER_100_KOPIYKAS = 20_000;
 const MONOBANK_JAR_URL = "https://send.monobank.ua/jar/8sko6A3Cma";
@@ -13,6 +13,8 @@ const DAILY_TIME_OPTIONS = Array.from(
     { length: 24 },
     (_, hour) => `${String(hour).padStart(2, "0")}:00`
 );
+const DAILY_LEVEL_OPTIONS = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
+const MAX_DAILY_WORD_ATTEMPTS = 3;
 const ADD_WORD_HINT =
     "Надішли англійське слово або фразу.\n\nЯкщо важливе конкретне значення, додай контекст після |:\ncharge | payment for a service\n\nПриклад без контексту: resilient";
 
@@ -213,6 +215,45 @@ async function generateWordCard(env, word, context) {
 
     if (!Array.isArray(result.examples) || result.examples.length !== 2) {
         throw new Error("Invalid examples response.");
+    }
+
+    return result;
+}
+
+async function generateDailyWordCard(env, level) {
+    const schema = {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+            word: { type: "string" },
+            context_en: { type: "string" },
+            translation_uk: { type: "string" },
+            examples: {
+                type: "array",
+                items: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                        source: { type: "string" },
+                        uk: { type: "string" },
+                    },
+                    required: ["source", "uk"],
+                },
+            },
+        },
+        required: ["word", "context_en", "translation_uk", "examples"],
+    };
+
+    const result = await openAIJson(
+        env,
+        "daily_word_card",
+        schema,
+        "Create one useful English vocabulary card for a learner at the requested CEFR level. word must be a single English word or a short common phrase, not a proper noun. context_en must precisely state its meaning. Give a short Ukrainian translation and exactly two natural English example sentences, each 8–18 words, with fluent Ukrainian translations. Both examples must use exactly the stated meaning.",
+        `CEFR level: ${level}`
+    );
+
+    if (!Array.isArray(result.examples) || result.examples.length !== 2) {
+        throw new Error("Invalid daily word examples response.");
     }
 
     return result;
@@ -561,20 +602,46 @@ function dailyTimeKeyboard() {
         );
     }
 
+    rows.push([{ text: "🔕 Вимкнути нагадування", callback_data: "daily:off" }]);
     return { inline_keyboard: rows };
+}
+
+function dailyLevelKeyboard() {
+    return {
+        inline_keyboard: [
+            DAILY_LEVEL_OPTIONS.slice(0, 4).map((level) => ({
+                text: level,
+                callback_data: `dailylevel:${level}`,
+            })),
+            DAILY_LEVEL_OPTIONS.slice(4).map((level) => ({
+                text: level,
+                callback_data: `dailylevel:${level}`,
+            })),
+        ],
+    };
 }
 
 async function sendDailySettings(env, chatId, userId) {
     const user = await env.DB
-        .prepare("SELECT daily_time FROM users WHERE telegram_user_id = ?")
+        .prepare("SELECT daily_time, daily_enabled, daily_level FROM users WHERE telegram_user_id = ?")
         .bind(userId)
         .first();
+
+    const status = user?.daily_enabled
+        ? `увімкнене о ${user.daily_time}`
+        : "вимкнене";
 
     await sendMessage(
         env,
         chatId,
-        `Щоденне слово зараз приходитиме о ${user?.daily_time ?? "09:00"}.\n\nОбери зручну годину:`,
+        `Щоденне слово зараз ${status}. Рівень: ${user?.daily_level ?? "B1"}.\n\nОбери годину або вимкни нагадування:`,
         dailyTimeKeyboard()
+    );
+
+    await sendMessage(
+        env,
+        "Обери рівень для нових слів:",
+        dailyLevelKeyboard()
     );
 }
 
@@ -697,14 +764,14 @@ async function getAdminChatId(env) {
 
 function donationDailyLimit(amountKopiykas) {
     if (amountKopiykas > DONATION_TIER_100_KOPIYKAS) {
-        return 100;
+        return 40;
     }
 
     if (amountKopiykas >= DONATION_TIER_50_KOPIYKAS) {
-        return 50;
+        return 25;
     }
 
-    return 30;
+    return 15;
 }
 
 function adminDonationKeyboard(requestId, suggestedLimit) {
@@ -716,9 +783,9 @@ function adminDonationKeyboard(requestId, suggestedLimit) {
         inline_keyboard: [
             suggestedButton,
             [
-                { text: "30/день", callback_data: `bonus:30:${requestId}` },
-                { text: "50/день", callback_data: `bonus:50:${requestId}` },
-                { text: "100/день", callback_data: `bonus:100:${requestId}` },
+                { text: "15/день", callback_data: `bonus:15:${requestId}` },
+                { text: "25/день", callback_data: `bonus:25:${requestId}` },
+                { text: "40/день", callback_data: `bonus:40:${requestId}` },
             ],
             [
                 { text: "Відхилити", callback_data: `bonus:reject:${requestId}` },
@@ -830,7 +897,7 @@ async function submitDonationBonusRequest(env, chatId, userId) {
     await sendMessage(
         env,
         chatId,
-        "🎁 Заявку на бонус прийнято. Я перевірю донат і надам бонус найближчим часом. Бонус діє 1 місяць: менше 100 грн — 30 слів/день, від 100 до 200 грн включно — 50 слів/день, понад 200 грн — 100 слів/день."
+        "🎁 Заявку на бонус прийнято. Я перевірю донат і надам бонус найближчим часом. Бонус діє 1 місяць: менше 100 грн — 15 слів/день, від 100 до 200 грн включно — 25 слів/день, понад 200 грн — 40 слів/день."
     );
 
     await notifyPendingDonationRequests(env);
@@ -1171,39 +1238,111 @@ async function syncMonobankDonations(env, scheduledTime) {
     await notifyUnmatchedDonations(env);
 }
 
-async function getRandomActiveWord(env, userId) {
-    return env.DB
-        .prepare(`
-          SELECT id, source_text, translation_uk
-          FROM words
-          WHERE user_id = ? AND is_active = 1
-          ORDER BY RANDOM()
-          LIMIT 1
-        `)
-        .bind(userId)
-        .first();
+function dailyWordKeyboard(pendingId) {
+    return {
+        inline_keyboard: [[
+            { text: "✅ Знаю", callback_data: `daily:know:${pendingId}` },
+            { text: "📖 Вчити", callback_data: `daily:learn:${pendingId}` },
+        ]],
+    };
 }
 
-async function getWordExamples(env, wordId) {
-    const result = await env.DB
-        .prepare(`
-          SELECT sentence_source, sentence_uk
-          FROM examples
-          WHERE word_id = ?
-          ORDER BY position ASC
-        `)
-        .bind(wordId)
-        .all();
+function dailyWordText(card, level) {
+    return `📚 Нове слово дня · ${level}\n\n${card.word} — ${card.translation_uk}\n\n1. ${card.examples[0].source}\n${card.examples[0].uk}\n\n2. ${card.examples[1].source}\n${card.examples[1].uk}\n\nЯкщо хочеш додати його до свого списку, натисни «Вчити».`;
+}
 
-    return result.results;
+async function generateNewDailyWord(env, userId, level) {
+    for (let attempt = 0; attempt < MAX_DAILY_WORD_ATTEMPTS; attempt += 1) {
+        const card = await generateDailyWordCard(env, level);
+        const existing = await env.DB
+            .prepare(`
+              SELECT 1 FROM words WHERE user_id = ? AND lower(source_text) = lower(?)
+              UNION ALL
+              SELECT 1 FROM pending_daily_words WHERE user_id = ? AND lower(source_text) = lower(?)
+              LIMIT 1
+            `)
+            .bind(userId, card.word.trim(), userId, card.word.trim())
+            .first();
+
+        if (!existing) {
+            return card;
+        }
+    }
+
+    throw new Error("Could not generate a new daily word.");
+}
+
+async function savePendingDailyWord(env, userId, card) {
+    const inserted = await env.DB
+        .prepare(`
+          INSERT INTO pending_daily_words (
+            user_id, source_text, translation_uk, context_note, examples_json
+          )
+          VALUES (?, ?, ?, ?, ?)
+        `)
+        .bind(
+            userId,
+            card.word.trim(),
+            card.translation_uk,
+            card.context_en,
+            JSON.stringify(card.examples)
+        )
+        .run();
+
+    return inserted.meta.last_row_id;
+}
+
+async function savePendingDailyWordToLearning(env, userId, pendingId) {
+    const pending = await env.DB
+        .prepare(`
+          SELECT source_text, translation_uk, context_note, examples_json
+          FROM pending_daily_words
+          WHERE id = ? AND user_id = ?
+        `)
+        .bind(pendingId, userId)
+        .first();
+
+    if (!pending) {
+        return false;
+    }
+
+    const examples = JSON.parse(pending.examples_json);
+    if (!Array.isArray(examples) || examples.length !== 2) {
+        throw new Error("Invalid pending daily word.");
+    }
+
+    const insertedWord = await env.DB
+        .prepare(`
+          INSERT INTO words (user_id, source_text, source_language, translation_uk, context_note)
+          VALUES (?, ?, 'en', ?, ?)
+        `)
+        .bind(userId, pending.source_text, pending.translation_uk, pending.context_note)
+        .run();
+
+    for (let index = 0; index < examples.length; index += 1) {
+        await env.DB
+            .prepare(`
+              INSERT INTO examples (word_id, sentence_source, sentence_uk, position)
+              VALUES (?, ?, ?, ?)
+            `)
+            .bind(insertedWord.meta.last_row_id, examples[index].source, examples[index].uk, index + 1)
+            .run();
+    }
+
+    await env.DB
+        .prepare("DELETE FROM pending_daily_words WHERE id = ? AND user_id = ?")
+        .bind(pendingId, userId)
+        .run();
+
+    return true;
 }
 
 async function sendDueDailyWords(env, scheduledTime) {
     const users = await env.DB
         .prepare(`
-          SELECT telegram_user_id, chat_id, timezone, daily_time
+          SELECT telegram_user_id, chat_id, timezone, daily_time, daily_level
           FROM users
-          WHERE is_active = 1
+          WHERE is_active = 1 AND daily_enabled = 1
         `)
         .all();
 
@@ -1215,13 +1354,14 @@ async function sendDueDailyWords(env, scheduledTime) {
         }
 
         let claimedDelivery = false;
+        let pendingId = null;
 
         try {
-            const word = await getRandomActiveWord(env, user.telegram_user_id);
-
-            if (!word) {
-                continue;
-            }
+            const card = await generateNewDailyWord(
+                env,
+                user.telegram_user_id,
+                user.daily_level
+            );
 
             const claimed = await env.DB
                 .prepare(`
@@ -1239,11 +1379,16 @@ async function sendDueDailyWords(env, scheduledTime) {
 
             claimedDelivery = true;
 
-            const examples = await getWordExamples(env, word.id);
+            pendingId = await savePendingDailyWord(
+                env,
+                user.telegram_user_id,
+                card
+            );
             await sendMessage(
                 env,
                 user.chat_id,
-                `📚 Слово дня\n\n${examplesText(word, examples)}`
+                dailyWordText(card, user.daily_level),
+                dailyWordKeyboard(pendingId)
             );
         } catch (error) {
             console.error({
@@ -1260,6 +1405,13 @@ async function sendDueDailyWords(env, scheduledTime) {
                       WHERE telegram_user_id = ? AND last_delivery_local_date = ?
                     `)
                     .bind(user.telegram_user_id, localTime.date)
+                    .run();
+            }
+
+            if (pendingId) {
+                await env.DB
+                    .prepare("DELETE FROM pending_daily_words WHERE id = ? AND user_id = ?")
+                    .bind(pendingId, user.telegram_user_id)
                     .run();
             }
         }
@@ -1280,7 +1432,7 @@ async function sendHelp(env, chatId) {
     await sendMessage(
         env,
         chatId,
-        "Як користуватися ботом:\n\n1. Натисни «➕ Додати слово» або просто надішли англійське слово чи фразу.\n2. Якщо знаєш потрібне значення, напиши його після |:\ncharge | payment for a service\n3. Обери потрібне значення, якщо бот його уточнить.\n4. Відкрий «📚 Мої слова», щоб переглянути свій каталог.\n5. Відкрий «🎓 Вивчені слова», щоб повернути слово до навчання.\n6. Щоб підтримати бот, натисни «☕ Підтримати бот», додай виданий код у коментар платежу, а потім — «🎁 Отримати бонус».\n\nНаприклад: resilient",
+        "Як користуватися ботом:\n\n1. Натисни «➕ Додати слово» або просто надішли англійське слово чи фразу.\n2. Якщо знаєш потрібне значення, напиши його після |:\ncharge | payment for a service\n3. Обери потрібне значення, якщо бот його уточнить.\n4. Відкрий «📚 Мої слова», щоб переглянути свій каталог.\n5. Відкрий «🎓 Вивчені слова», щоб повернути слово до навчання.\n6. У «⏰ Щоденне слово» обери час і рівень. У картці натисни «Знаю» або «Вчити» — другий варіант додасть слово до каталогу.\n7. Щоб підтримати бот, натисни «☕ Підтримати бот», додай виданий код у коментар платежу, а потім — «🎁 Отримати бонус».\n\nНаприклад: resilient",
         mainKeyboard()
     );
 }
@@ -1334,7 +1486,8 @@ export default {
                     return new Response("ok");
                 }
 
-                const match = callback.data.match(/^bonus:(30|50|100|reject):(\d+)$/);
+                // Keep pending admin cards sent before the tier update actionable.
+                const match = callback.data.match(/^bonus:(15|25|40|30|50|100|reject):(\d+)$/);
 
                 if (!match) {
                     await answerCallbackQuery(env, callback.id, "Невірна заявка.");
@@ -1434,6 +1587,94 @@ export default {
                 return new Response("ok");
             }
 
+            if (callback.data === "daily:off") {
+                await env.DB
+                    .prepare("UPDATE users SET daily_enabled = 0 WHERE telegram_user_id = ?")
+                    .bind(userId)
+                    .run();
+                await answerCallbackQuery(env, callback.id, "Нагадування вимкнено.");
+                await editMessage(
+                    env,
+                    chatId,
+                    messageId,
+                    "🔕 Щоденні нагадування вимкнено. У будь-який момент увімкни їх з меню «⏰ Щоденне слово».",
+                    { inline_keyboard: [] }
+                );
+                return new Response("ok");
+            }
+
+            if (callback.data.startsWith("dailylevel:")) {
+                const level = callback.data.replace("dailylevel:", "");
+
+                if (!DAILY_LEVEL_OPTIONS.includes(level)) {
+                    await answerCallbackQuery(env, callback.id, "Невірний рівень.");
+                    return new Response("ok");
+                }
+
+                await env.DB
+                    .prepare("UPDATE users SET daily_level = ? WHERE telegram_user_id = ?")
+                    .bind(level, userId)
+                    .run();
+                await answerCallbackQuery(env, callback.id, "Рівень збережено.");
+                await editMessage(
+                    env,
+                    chatId,
+                    messageId,
+                    `✅ Рівень нових слів: ${level}.`,
+                    { inline_keyboard: [] }
+                );
+                return new Response("ok");
+            }
+
+            if (callback.data.startsWith("daily:know:") || callback.data.startsWith("daily:learn:")) {
+                const match = callback.data.match(/^daily:(know|learn):(\d+)$/);
+
+                if (!match) {
+                    await answerCallbackQuery(env, callback.id, "Невірний вибір.");
+                    return new Response("ok");
+                }
+
+                const action = match[1];
+                const pendingId = Number(match[2]);
+
+                try {
+                    const changed = action === "learn"
+                        ? await savePendingDailyWordToLearning(env, userId, pendingId)
+                        : (await env.DB
+                            .prepare("DELETE FROM pending_daily_words WHERE id = ? AND user_id = ?")
+                            .bind(pendingId, userId)
+                            .run()).meta.changes > 0;
+
+                    if (!changed) {
+                        await answerCallbackQuery(env, callback.id, "Ця картка вже оброблена.");
+                        return new Response("ok");
+                    }
+
+                    await answerCallbackQuery(
+                        env,
+                        callback.id,
+                        action === "learn" ? "Додано до списку для вивчення." : "Чудово, не додаю до списку."
+                    );
+                    await editMessage(
+                        env,
+                        chatId,
+                        messageId,
+                        action === "learn"
+                            ? "📖 Слово додано до «📚 Мої слова»."
+                            : "✅ Чудово! Це слово не додано до твого списку.",
+                        { inline_keyboard: [] }
+                    );
+                } catch (error) {
+                    console.error({
+                        event: "daily_word_action_failed",
+                        message: error instanceof Error ? error.message : "Unknown error",
+                    });
+                    await answerCallbackQuery(env, callback.id, "Не вдалося зберегти вибір.");
+                }
+
+                return new Response("ok");
+            }
+
             if (callback.data.startsWith("dailytime:")) {
                 const dailyTime = callback.data.replace("dailytime:", "");
 
@@ -1445,7 +1686,7 @@ export default {
                 await env.DB
                     .prepare(`
                       UPDATE users
-                      SET daily_time = ?
+                      SET daily_time = ?, daily_enabled = 1
                       WHERE telegram_user_id = ?
                     `)
                     .bind(dailyTime, userId)
@@ -1456,7 +1697,7 @@ export default {
                     env,
                     chatId,
                     messageId,
-                    `✅ Готово! Щоденне слово приходитиме о ${dailyTime}.`,
+                    `✅ Готово! Нове слово приходитиме о ${dailyTime}.`,
                     { inline_keyboard: [] }
                 );
                 return new Response("ok");

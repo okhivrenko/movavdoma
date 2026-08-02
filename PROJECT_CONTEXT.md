@@ -93,8 +93,10 @@ restoration. Learned words remain in D1 with `is_active = 0`.
 
 ### Daily word
 
-`⏰ Щоденне слово` lets a user choose a daily delivery hour without typing a
-command. The bot sends one random active word and its examples at that hour.
+`⏰ Щоденне слово` lets a user choose a daily delivery hour, turn reminders off,
+and select a CEFR level (A0–C2). The bot generates a new word at that level at
+the selected hour. The card has `Знаю` and `Вчити` buttons: `Знаю` discards it,
+while `Вчити` adds the card and examples to the user's active vocabulary.
 The default timezone is `Europe/Warsaw`; Telegram does not provide a user's
 timezone to a bot. A Cloudflare Cron Trigger runs every minute in UTC, while
 the Worker compares each user's configured hour in their stored timezone. It
@@ -111,8 +113,8 @@ date.
   transaction ID is stored, so overlapping statement windows cannot notify or
   process the same payment twice.
 - A matching donation creates an admin-only Telegram review card. The bot
-  recommends 30 words/day for donations below ₴100, 50 for ₴100–₴200
-  (inclusive), and 100 for more than ₴200. The admin confirms or changes the
+  recommends 15 words/day for donations below ₴100, 25 for ₴100–₴200
+  (inclusive), and 40 for more than ₴200. The admin confirms or changes the
   recommendation; nothing is granted automatically based on a payment amount.
 - An approved donation limit lasts one calendar month, then automatically
   falls back to the normal limit.
@@ -143,9 +145,9 @@ date.
 - The bot accepts private chats from multiple Telegram users; every user's
   words remain isolated by Telegram user ID.
 - Users other than the account identified by the Cloudflare secret
-  `ADMIN_TELEGRAM_USER_ID` can add up to 20 words per local day.
+  `ADMIN_TELEGRAM_USER_ID` can add up to 10 words per local day.
 - An admin-approved support bonus can replace an individual user's daily limit
-  with 30, 50, or 100 words for one calendar month. The admin remains
+  with 15, 25, or 40 words for one calendar month. The admin remains
   unlimited.
 - The admin can manually grant any positive daily limit for one calendar month
   with `/grant <telegramUserId> <dailyLimit>`, for example
@@ -170,6 +172,8 @@ CREATE TABLE IF NOT EXISTS users (
   chat_id INTEGER NOT NULL,
   timezone TEXT NOT NULL DEFAULT 'Europe/Warsaw',
   daily_time TEXT NOT NULL DEFAULT '09:00',
+  daily_enabled INTEGER NOT NULL DEFAULT 1,
+  daily_level TEXT NOT NULL DEFAULT 'B1',
   is_active INTEGER NOT NULL DEFAULT 1,
   last_delivery_local_date TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -270,6 +274,16 @@ CREATE TABLE IF NOT EXISTS pending_words (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(telegram_user_id)
 );
+
+CREATE TABLE IF NOT EXISTS pending_daily_words (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  source_text TEXT NOT NULL,
+  translation_uk TEXT NOT NULL,
+  context_note TEXT NOT NULL,
+  examples_json TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
 ## Local development requirements
@@ -288,6 +302,8 @@ CREATE TABLE IF NOT EXISTS pending_words (
   do not run the whole migration history.
 - Then execute only `migrations/0004_add_bonus_expiration.sql` against the
   remote D1 database.
+- Then execute only `migrations/0005_add_daily_word_preferences.sql` against
+  the remote D1 database.
 
 ## Next product features
 
