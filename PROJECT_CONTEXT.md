@@ -42,13 +42,14 @@ Welcomes the user and shows a persistent reply keyboard with:
 - `➕ Додати слово`
 - `📚 Мої слова`
 - `🎓 Вивчені слова`
-- `⏰ Щоденне слово`
+- `📚 Щоденне слово`
+- `⚙️ Налаштувати`
 - `❓ Допомога`
 
 The admin also sees `🛠 Адмін`, which opens an admin-only panel with a paginated
 user list, the `/grant <userId> <dailyLimit>` format, and a summary of
-admin-only commands. The user list includes Telegram IDs, active-word count,
-and the current daily limit.
+admin-only commands. It can also show a copyable direct bot link. The user
+list includes Telegram IDs, active-word count, and the current daily limit.
 
 Users can simply send an English word or phrase; `/add` remains supported.
 `/menu` shows the keyboard again if it was hidden.
@@ -98,10 +99,12 @@ restoration. Learned words remain in D1 with `is_active = 0`.
 
 ### Daily word
 
-`⏰ Щоденне слово` lets a user choose a daily delivery hour, turn reminders off,
-and select a CEFR level (A0–C2). The bot generates a new word at that level at
-the selected hour. The card has `Знаю` and `Вчити` buttons: `Знаю` discards it,
-while `Вчити` adds the card and examples to the user's active vocabulary.
+`📚 Щоденне слово` shows the current daily card or generates it once for the
+current local day. `⚙️ Налаштувати` opens a two-step settings flow: choose
+whether to change the delivery time or CEFR level (A0–C2), then choose its
+value. It can also turn reminders on or off. The card has `Знаю` and `Вчити`
+buttons: `Знаю` discards it, while `Вчити` adds the card and examples to the
+user's active vocabulary.
 The default timezone is `Europe/Warsaw`; Telegram does not provide a user's
 timezone to a bot. A Cloudflare Cron Trigger runs every minute in UTC, while
 the Worker compares each user's configured hour in their stored timezone. It
@@ -159,6 +162,8 @@ date.
   `/grant 123456789 45`. The target user must have started the bot first.
 - The quota is atomically claimed before any OpenAI call. Failed OpenAI calls
   still count because they may already have consumed API tokens.
+- Choosing `Вчити` for a daily card also uses one addition from that day's
+  limit; choosing `Знаю` does not.
 - `daily_word_additions` stores only the user ID, local date, and count.
 
 ## D1 binding
@@ -287,6 +292,7 @@ CREATE TABLE IF NOT EXISTS pending_daily_words (
   translation_uk TEXT NOT NULL,
   context_note TEXT NOT NULL,
   examples_json TEXT NOT NULL,
+  local_date TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
@@ -308,6 +314,8 @@ CREATE TABLE IF NOT EXISTS pending_daily_words (
 - Then execute only `migrations/0004_add_bonus_expiration.sql` against the
   remote D1 database.
 - Then execute only `migrations/0005_add_daily_word_preferences.sql` against
+  the remote D1 database.
+- Then execute only `migrations/0006_add_pending_daily_word_date.sql` against
   the remote D1 database.
 
 ## Next product features

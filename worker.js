@@ -62,6 +62,17 @@ async function answerCallbackQuery(env, callbackQueryId, text) {
     });
 }
 
+async function getBotLink(env) {
+    const bot = await telegramApi(env, "getMe", {});
+    const username = bot?.username;
+
+    if (!/^[A-Za-z0-9_]{5,32}$/.test(username ?? "")) {
+        throw new Error("Telegram bot username is unavailable.");
+    }
+
+    return `https://t.me/${username}`;
+}
+
 function wait(milliseconds) {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
@@ -577,11 +588,15 @@ function wordCountLabel(count) {
     return "слів";
 }
 
+function dailyLimitReachedText(limit) {
+    return `На сьогодні ліміт — ${limit} ${wordCountLabel(limit)} — уже використано. Нові слова можна буде додати завтра.\n\nЯкщо бот корисний, підтримка допомагає його розвивати й може збільшити персональний ліміт.`;
+}
+
 function mainKeyboard(showAdmin = false) {
     const keyboard = [
         [{ text: "➕ Додати слово" }],
         [{ text: "📚 Мої слова" }, { text: "🎓 Вивчені слова" }],
-        [{ text: "⏰ Щоденне слово" }],
+        [{ text: "📚 Щоденне слово" }, { text: "⚙️ Налаштувати" }],
         [{ text: "☕ Підтримати бот" }, { text: "🎁 Отримати бонус" }],
     ];
 
@@ -602,6 +617,7 @@ function adminKeyboard() {
     return {
         inline_keyboard: [
             [{ text: "👥 Список користувачів", callback_data: "admin:users" }],
+            [{ text: "🔗 Посилання на бота", callback_data: "admin:link" }],
             [{ text: "🎁 Змінити ліміт", callback_data: "admin:grant" }],
             [{ text: "❓ Команди адміна", callback_data: "admin:help" }],
         ],
@@ -609,7 +625,7 @@ function adminKeyboard() {
 }
 
 function adminHelpText() {
-    return "🛠 Адмін-панель\n\n• 👥 Список користувачів — усі користувачі, по 50 на сторінці, з ID, лімітами та кількістю активних слів.\n• /grant <userId> <ліміт> — встановити денний ліміт на 1 місяць.\n  Приклад: /grant 123456789 45\n• 🎁 Заявки на донати приходять окремими картками з кнопками підтвердження.";
+    return "🛠 Адмін-панель\n\n• 👥 Список користувачів — усі користувачі, по 50 на сторінці, з ID, лімітами та кількістю активних слів.\n• 🔗 Посилання на бота — показує пряме посилання, яке можна скопіювати або переслати.\n• /grant <userId> <ліміт> — встановити денний ліміт на 1 місяць.\n  Приклад: /grant 123456789 45\n• 🎁 Заявки на донати приходять окремими картками з кнопками підтвердження.";
 }
 
 function compactAdminNumber(value) {
@@ -683,6 +699,19 @@ async function sendAdminUserList(env, chatId, requestedPage = 0, messageId = nul
     await sendMessage(env, chatId, listText, keyboard);
 }
 
+function dailySettingsMenuKeyboard(user) {
+    return {
+        inline_keyboard: [
+            [{ text: `🕒 Час: ${user.daily_time}`, callback_data: "dailysettings:time" }],
+            [{ text: `🎚 Рівень: ${user.daily_level}`, callback_data: "dailysettings:level" }],
+            [{
+                text: user.daily_enabled ? "🔕 Вимкнути нагадування" : "🔔 Увімкнути нагадування",
+                callback_data: "daily:off",
+            }],
+        ],
+    };
+}
+
 function dailyTimeKeyboard() {
     const rows = [];
 
@@ -695,7 +724,6 @@ function dailyTimeKeyboard() {
         );
     }
 
-    rows.push([{ text: "🔕 Вимкнути нагадування", callback_data: "daily:off" }]);
     return { inline_keyboard: rows };
 }
 
@@ -714,27 +742,42 @@ function dailyLevelKeyboard() {
     };
 }
 
-async function sendDailySettings(env, chatId, userId) {
-    const user = await env.DB
+async function getDailySettings(env, userId) {
+    return env.DB
         .prepare("SELECT daily_time, daily_enabled, daily_level FROM users WHERE telegram_user_id = ?")
         .bind(userId)
         .first();
+}
 
+function dailySettingsText(user) {
     const status = user?.daily_enabled
         ? `увімкнене о ${user.daily_time}`
         : "вимкнене";
 
-    await sendMessage(
-        env,
-        chatId,
-        `Щоденне слово зараз ${status}. Рівень: ${user?.daily_level ?? "B1"}.\n\nОбери годину або вимкни нагадування:`,
-        dailyTimeKeyboard()
-    );
+    return `Щоденне слово зараз ${status}. Рівень: ${user?.daily_level ?? "B1"}.\n\nОбери, що налаштувати:`;
+}
+
+async function sendDailySettings(env, chatId, userId) {
+    const user = await getDailySettings(env, userId);
 
     await sendMessage(
         env,
-        "Обери рівень для нових слів:",
-        dailyLevelKeyboard()
+        chatId,
+        dailySettingsText(user),
+        dailySettingsMenuKeyboard(user ?? { daily_time: "09:00", daily_enabled: 1, daily_level: "B1" })
+    );
+}
+
+async function refreshDailySettings(env, chatId, messageId, userId) {
+    const user = await getDailySettings(env, userId);
+    const settings = user ?? { daily_time: "09:00", daily_enabled: 1, daily_level: "B1" };
+
+    await editMessage(
+        env,
+        chatId,
+        messageId,
+        dailySettingsText(settings),
+        dailySettingsMenuKeyboard(settings)
     );
 }
 
@@ -1365,24 +1408,155 @@ async function generateNewDailyWord(env, userId, level) {
     throw new Error("Could not generate a new daily word.");
 }
 
-async function savePendingDailyWord(env, userId, card) {
+async function savePendingDailyWord(env, userId, card, localDate) {
+    await env.DB
+        .prepare("DELETE FROM pending_daily_words WHERE user_id = ? AND local_date <> ?")
+        .bind(userId, localDate)
+        .run();
+
     const inserted = await env.DB
         .prepare(`
           INSERT INTO pending_daily_words (
-            user_id, source_text, translation_uk, context_note, examples_json
+            user_id, source_text, translation_uk, context_note, examples_json, local_date
           )
-          VALUES (?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?)
         `)
         .bind(
             userId,
             card.word.trim(),
             card.translation_uk,
             card.context_en,
-            JSON.stringify(card.examples)
+            JSON.stringify(card.examples),
+            localDate
         )
         .run();
 
     return inserted.meta.last_row_id;
+}
+
+async function getPendingDailyWord(env, userId, localDate) {
+    const pending = await env.DB
+        .prepare(`
+          SELECT id, source_text, translation_uk, context_note, examples_json
+          FROM pending_daily_words
+          WHERE user_id = ? AND local_date = ?
+          LIMIT 1
+        `)
+        .bind(userId, localDate)
+        .first();
+
+    if (!pending) {
+        return null;
+    }
+
+    try {
+        const examples = JSON.parse(pending.examples_json);
+
+        if (!Array.isArray(examples) || examples.length !== 2) {
+            return null;
+        }
+
+        return {
+            id: pending.id,
+            card: {
+                word: pending.source_text,
+                translation_uk: pending.translation_uk,
+                context_en: pending.context_note,
+                examples,
+            },
+        };
+    } catch {
+        return null;
+    }
+}
+
+async function hasPendingDailyWord(env, userId, pendingId) {
+    return Boolean(await env.DB
+        .prepare("SELECT 1 FROM pending_daily_words WHERE id = ? AND user_id = ?")
+        .bind(pendingId, userId)
+        .first());
+}
+
+async function sendTodayDailyWord(env, chatId, userId) {
+    const user = await env.DB
+        .prepare(`
+          SELECT timezone, daily_level, last_delivery_local_date
+          FROM users
+          WHERE telegram_user_id = ?
+        `)
+        .bind(userId)
+        .first();
+    const localTime = localDateAndTime(user?.timezone ?? "Europe/Warsaw", Date.now());
+
+    if (!localTime) {
+        throw new Error("Unable to calculate local date for daily word.");
+    }
+
+    if (user?.last_delivery_local_date === localTime.date) {
+        const pending = await getPendingDailyWord(env, userId, localTime.date);
+
+        if (!pending) {
+            await sendMessage(env, chatId, "Сьогоднішню картку вже оброблено. Завтра буде нове слово.");
+            return;
+        }
+
+        await sendMessage(
+            env,
+            chatId,
+            dailyWordText(pending.card, user?.daily_level ?? "B1"),
+            dailyWordKeyboard(pending.id)
+        );
+        return;
+    }
+
+    const claimed = await env.DB
+        .prepare(`
+          UPDATE users
+          SET last_delivery_local_date = ?
+          WHERE telegram_user_id = ?
+            AND (last_delivery_local_date IS NULL OR last_delivery_local_date <> ?)
+        `)
+        .bind(localTime.date, userId, localTime.date)
+        .run();
+
+    if (claimed.meta.changes === 0) {
+        const pending = await getPendingDailyWord(env, userId, localTime.date);
+
+        if (pending) {
+            await sendMessage(
+                env,
+                chatId,
+                dailyWordText(pending.card, user?.daily_level ?? "B1"),
+                dailyWordKeyboard(pending.id)
+            );
+        } else {
+            await sendMessage(env, chatId, "Сьогоднішня картка вже готується. Спробуй ще раз за кілька секунд.");
+        }
+        return;
+    }
+
+    let pendingId = null;
+
+    try {
+        const level = user?.daily_level ?? "B1";
+        const card = await generateNewDailyWord(env, userId, level);
+        pendingId = await savePendingDailyWord(env, userId, card, localTime.date);
+        await sendMessage(env, chatId, dailyWordText(card, level), dailyWordKeyboard(pendingId));
+    } catch (error) {
+        await env.DB
+            .prepare("UPDATE users SET last_delivery_local_date = NULL WHERE telegram_user_id = ? AND last_delivery_local_date = ?")
+            .bind(userId, localTime.date)
+            .run();
+
+        if (pendingId) {
+            await env.DB
+                .prepare("DELETE FROM pending_daily_words WHERE id = ? AND user_id = ?")
+                .bind(pendingId, userId)
+                .run();
+        }
+
+        throw error;
+    }
 }
 
 async function savePendingDailyWordToLearning(env, userId, pendingId) {
@@ -1475,7 +1649,8 @@ async function sendDueDailyWords(env, scheduledTime) {
             pendingId = await savePendingDailyWord(
                 env,
                 user.telegram_user_id,
-                card
+                card,
+                localTime.date
             );
             await sendMessage(
                 env,
@@ -1525,7 +1700,7 @@ async function sendHelp(env, chatId, userId) {
     await sendMessage(
         env,
         chatId,
-        "Як користуватися ботом:\n\n1. Натисни «➕ Додати слово» або просто надішли англійське слово чи фразу.\n2. Якщо знаєш потрібне значення, напиши його після |:\ncharge | payment for a service\n3. Обери потрібне значення, якщо бот його уточнить.\n4. Відкрий «📚 Мої слова», щоб переглянути свій каталог.\n5. Відкрий «🎓 Вивчені слова», щоб повернути слово до навчання.\n6. У «⏰ Щоденне слово» обери час і рівень. У картці натисни «Знаю» або «Вчити» — другий варіант додасть слово до каталогу.\n7. Щоб підтримати бот, натисни «☕ Підтримати бот», додай виданий код у коментар платежу, а потім — «🎁 Отримати бонус».\n\nНаприклад: resilient",
+        "Як користуватися ботом:\n\n1. Натисни «➕ Додати слово» або просто надішли англійське слово чи фразу.\n2. Якщо знаєш потрібне значення, напиши його після |:\ncharge | payment for a service\n3. Обери потрібне значення, якщо бот його уточнить.\n4. Відкрий «📚 Мої слова», щоб переглянути свій каталог.\n5. Відкрий «🎓 Вивчені слова», щоб повернути слово до навчання.\n6. Натисни «📚 Щоденне слово», щоб показати сьогоднішню картку, або «⚙️ Налаштувати», щоб окремо вибрати час і рівень. У картці натисни «Знаю» або «Вчити».\n7. Щоб підтримати бот, натисни «☕ Підтримати бот», додай виданий код у коментар платежу, а потім — «🎁 Отримати бонус».\n\nНаприклад: resilient",
         mainKeyboard(isAdmin(env, userId))
     );
 }
@@ -1607,6 +1782,26 @@ export default {
                         chatId,
                         "Щоб змінити ліміт користувача, надішли:\n/grant userId ліміт\n\nНаприклад: /grant 123456789 45"
                     );
+                    return new Response("ok");
+                }
+
+                if (callback.data === "admin:link") {
+                    try {
+                        const botLink = await getBotLink(env);
+                        await answerCallbackQuery(env, callback.id, "Показую посилання.");
+                        await sendMessage(
+                            env,
+                            chatId,
+                            `🔗 Посилання на бота:\n${botLink}`,
+                            { inline_keyboard: [[{ text: "Відкрити бота", url: botLink }]] }
+                        );
+                    } catch (error) {
+                        console.error({
+                            event: "admin_bot_link_failed",
+                            message: error instanceof Error ? error.message : "Unknown error",
+                        });
+                        await answerCallbackQuery(env, callback.id, "Не вдалося отримати посилання.");
+                    }
                     return new Response("ok");
                 }
 
@@ -1727,19 +1922,37 @@ export default {
                 return new Response("ok");
             }
 
-            if (callback.data === "daily:off") {
-                await env.DB
-                    .prepare("UPDATE users SET daily_enabled = 0 WHERE telegram_user_id = ?")
-                    .bind(userId)
-                    .run();
-                await answerCallbackQuery(env, callback.id, "Нагадування вимкнено.");
+            if (callback.data === "dailysettings:time") {
+                await answerCallbackQuery(env, callback.id, "Обери час.");
                 await editMessage(
                     env,
                     chatId,
                     messageId,
-                    "🔕 Щоденні нагадування вимкнено. У будь-який момент увімкни їх з меню «⏰ Щоденне слово».",
-                    { inline_keyboard: [] }
+                    "🕒 Обери час щоденного слова:",
+                    dailyTimeKeyboard()
                 );
+                return new Response("ok");
+            }
+
+            if (callback.data === "dailysettings:level") {
+                await answerCallbackQuery(env, callback.id, "Обери рівень.");
+                await editMessage(
+                    env,
+                    chatId,
+                    messageId,
+                    "🎚 Обери рівень нових слів:",
+                    dailyLevelKeyboard()
+                );
+                return new Response("ok");
+            }
+
+            if (callback.data === "daily:off") {
+                await env.DB
+                    .prepare("UPDATE users SET daily_enabled = CASE WHEN daily_enabled = 1 THEN 0 ELSE 1 END WHERE telegram_user_id = ?")
+                    .bind(userId)
+                    .run();
+                await answerCallbackQuery(env, callback.id, "Налаштування оновлено.");
+                await refreshDailySettings(env, chatId, messageId, userId);
                 return new Response("ok");
             }
 
@@ -1756,13 +1969,7 @@ export default {
                     .bind(level, userId)
                     .run();
                 await answerCallbackQuery(env, callback.id, "Рівень збережено.");
-                await editMessage(
-                    env,
-                    chatId,
-                    messageId,
-                    `✅ Рівень нових слів: ${level}.`,
-                    { inline_keyboard: [] }
-                );
+                await refreshDailySettings(env, chatId, messageId, userId);
                 return new Response("ok");
             }
 
@@ -1778,6 +1985,20 @@ export default {
                 const pendingId = Number(match[2]);
 
                 try {
+                    if (action === "learn") {
+                        if (!(await hasPendingDailyWord(env, userId, pendingId))) {
+                            await answerCallbackQuery(env, callback.id, "Ця картка вже оброблена.");
+                            return new Response("ok");
+                        }
+
+                        if (!(await claimDailyWordAddition(env, userId))) {
+                            const dailyLimit = await getDailyAdditionLimit(env, userId);
+                            await answerCallbackQuery(env, callback.id, "Денний ліміт вичерпано.");
+                            await sendMessage(env, chatId, dailyLimitReachedText(dailyLimit));
+                            return new Response("ok");
+                        }
+                    }
+
                     const changed = action === "learn"
                         ? await savePendingDailyWordToLearning(env, userId, pendingId)
                         : (await env.DB
@@ -1833,13 +2054,7 @@ export default {
                     .run();
 
                 await answerCallbackQuery(env, callback.id, "Час збережено.");
-                await editMessage(
-                    env,
-                    chatId,
-                    messageId,
-                    `✅ Готово! Нове слово приходитиме о ${dailyTime}.`,
-                    { inline_keyboard: [] }
-                );
+                await refreshDailySettings(env, chatId, messageId, userId);
                 return new Response("ok");
             }
 
@@ -2056,8 +2271,25 @@ export default {
             return new Response("ok");
         }
 
-        if (text === "⏰ Щоденне слово") {
+        if (text === "⚙️ Налаштувати" || text === "⏰ Щоденне слово") {
             await sendDailySettings(env, chatId, userId);
+            return new Response("ok");
+        }
+
+        if (text === "📚 Щоденне слово") {
+            try {
+                await sendTodayDailyWord(env, chatId, userId);
+            } catch (error) {
+                console.error({
+                    event: "manual_daily_word_failed",
+                    message: error instanceof Error ? error.message : "Unknown error",
+                });
+                await sendMessage(
+                    env,
+                    chatId,
+                    "Не вдалося показати щоденне слово. Спробуй ще раз за хвилину."
+                );
+            }
             return new Response("ok");
         }
 
@@ -2247,7 +2479,7 @@ export default {
                 await sendMessage(
                     env,
                     chatId,
-                    `На сьогодні вже додано ${dailyLimit} ${wordCountLabel(dailyLimit)}. Спробуй завтра.`
+                    dailyLimitReachedText(dailyLimit)
                 );
                 return new Response("ok");
             }
