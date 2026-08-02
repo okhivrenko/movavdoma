@@ -45,7 +45,7 @@ const BOT_BRAND_NAME = "MovaVDoma";
 // The Worker name is still technical for now. Keep this URL aligned with its
 // active workers.dev route; it also lets the cron repair Telegram's webhook
 // after an account-subdomain or Worker-name change.
-const PUBLIC_WORKER_URL = "https://vocab-telegram-bot.oleksiikhivrenko.workers.dev";
+const PUBLIC_WORKER_URL = "https://movavdoma.oleksiikhivrenko.workers.dev";
 const PRIVACY_POLICY_URL = `${PUBLIC_WORKER_URL}/privacy`;
 const DAILY_TIME_OPTIONS = Array.from(
     { length: 24 },
