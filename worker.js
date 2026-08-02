@@ -20,15 +20,18 @@ import {
     localDateAndTime,
     wordCountLabel,
 } from "./helpers.js";
+import {
+    dailyWordCardLimitForLevel,
+    donationAccessLevel,
+    donationDailyLimit,
+    normalizeAccessLevel,
+} from "./policies.js";
 
 const SENSES_PER_PAGE = 3;
 const MAX_SENSES = 9;
 // Default daily quota for newly saved words; individual bonuses may raise it.
 const DAILY_ADD_LIMIT = 10;
 // Daily-card quota is separate from the learning-list quota and depends on access.
-const DAILY_WORD_CARD_LIMITS = [5, 10, 15, 20];
-const DONATION_TIER_50_KOPIYKAS = 10_000;
-const DONATION_TIER_100_KOPIYKAS = 20_000;
 const MONOBANK_JAR_URL = "https://send.monobank.ua/jar/8sko6A3Cma";
 const MONOBANK_JAR_SEND_ID = "8sko6A3Cma";
 const MONOBANK_MIN_SYNC_INTERVAL_SECONDS = 60;
@@ -592,29 +595,6 @@ async function getAdminChatId(env) {
     return admin?.chat_id ?? null;
 }
 
-function donationDailyLimit(amountKopiykas) {
-    if (amountKopiykas > DONATION_TIER_100_KOPIYKAS) {
-        return 40;
-    }
-
-    if (amountKopiykas >= DONATION_TIER_50_KOPIYKAS) {
-        return 25;
-    }
-
-    return 15;
-}
-
-/** Maps a matched donation to a permanent, monotonic daily-card access level. */
-function donationAccessLevel(amountKopiykas) {
-    if (amountKopiykas > DONATION_TIER_100_KOPIYKAS) return 3;
-    if (amountKopiykas >= DONATION_TIER_50_KOPIYKAS) return 2;
-    return 1;
-}
-
-function dailyWordCardLimitForLevel(accessLevel) {
-    return DAILY_WORD_CARD_LIMITS[Math.min(Math.max(Number(accessLevel) || 0, 0), 3)];
-}
-
 async function getUserAccessLevel(env, userId) {
     if (isAdmin(env, userId)) return 3;
 
@@ -622,11 +602,11 @@ async function getUserAccessLevel(env, userId) {
         .prepare("SELECT access_level FROM user_access_levels WHERE user_id = ?")
         .bind(userId)
         .first();
-    return Math.min(Math.max(Number(access?.access_level ?? 0), 0), 3);
+    return normalizeAccessLevel(access?.access_level);
 }
 
 async function grantAccessLevel(env, userId, accessLevel, source, donationRequestId = null) {
-    const level = Math.min(Math.max(Number(accessLevel), 0), 3);
+    const level = normalizeAccessLevel(accessLevel);
     const previousLevel = await getUserAccessLevel(env, userId);
 
     if (level <= previousLevel && !isAdmin(env, userId)) {
@@ -1395,6 +1375,16 @@ async function sendDueDailyWords(env, scheduledTime) {
         }
 
         if (user.last_delivery_local_date === localTime.date) {
+            continue;
+        }
+
+        // Do not replace a card the user has not answered yet. A manual card
+        // and the scheduled reminder share the same daily-card experience.
+        if (await getPendingDailyWord(env, user.telegram_user_id, localTime.date)) {
+            await env.DB
+                .prepare("UPDATE users SET last_delivery_local_date = ? WHERE telegram_user_id = ?")
+                .bind(localTime.date, user.telegram_user_id)
+                .run();
             continue;
         }
 

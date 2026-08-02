@@ -100,8 +100,9 @@ restoration. Learned words remain in D1 with `is_active = 0`.
 ### Daily word
 
 `📚 Щоденне слово` shows the current pending card or generates a new one.
-After `Знаю` or `Вчити`, the user can open another card on the same day, up to
-five newly generated cards per local day. `⚙️ Налаштувати` opens a two-step settings flow: choose
+After `Знаю` or `Вчити`, the user can open another card on the same day. The
+number of newly generated cards depends on access level: 5, 10, 15, or 20.
+`⚙️ Налаштувати` opens a two-step settings flow: choose
 whether to change the delivery time or CEFR level (A0–C2), then choose its
 value. It can also turn reminders on or off. The card has `Знаю` and `Вчити`
 buttons: `Знаю` discards it, while `Вчити` adds the card and examples to the
@@ -329,6 +330,9 @@ CREATE TABLE IF NOT EXISTS pending_daily_words (
   database.
 - Then execute `migrations/0009_add_user_access_levels.sql` against the remote
   D1 database.
+- Then execute `migrations/0010_enforce_one_pending_daily_word.sql` against
+  the remote D1 database before deploying the corresponding Worker code.
+- Long-lived technical decisions are recorded in `docs/adr/`.
 
 ## Next product features
 
