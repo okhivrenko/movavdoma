@@ -1162,12 +1162,15 @@ async function getMonobankJarId(env) {
     }
 
     const clientInfo = await response.json();
-    const jar = clientInfo.jars?.find(
-        (candidate) => candidate.sendId === MONOBANK_JAR_SEND_ID
+    const jars = Array.isArray(clientInfo.jars) ? clientInfo.jars : [];
+    const jar = jars.find(
+        (candidate) => candidate?.sendId === MONOBANK_JAR_SEND_ID
     );
 
     if (!jar?.id) {
-        throw new Error("Monobank jar was not found for configured public link.");
+        // Only the count is logged. Jar names, balances, IDs, and payment
+        // details are intentionally never sent to Worker logs.
+        throw new Error(`Monobank jar was not found for configured public link (visible jars: ${jars.length}).`);
     }
 
     await env.DB
