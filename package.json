@@ -1,0 +1,8 @@
+{
+  "name": "vocab-telegram-bot",
+  "private": true,
+  "scripts": {
+    "build": "npx --yes wrangler@latest deploy --dry-run --outdir dist",
+    "deploy": "npx --yes wrangler@latest deploy"
+  }
+}
