@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS daily_word_card_views (
+  user_id INTEGER NOT NULL,
+  local_date TEXT NOT NULL,
+  views INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, local_date),
+  FOREIGN KEY (user_id) REFERENCES users(telegram_user_id)
+);

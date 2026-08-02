@@ -23,7 +23,10 @@ import {
 
 const SENSES_PER_PAGE = 3;
 const MAX_SENSES = 9;
+// Default daily quota for newly saved words; individual bonuses may raise it.
 const DAILY_ADD_LIMIT = 10;
+// Daily-card quota is separate from the learning-list quota and depends on access.
+const DAILY_WORD_CARD_LIMITS = [5, 10, 15, 20];
 const DONATION_TIER_50_KOPIYKAS = 10_000;
 const DONATION_TIER_100_KOPIYKAS = 20_000;
 const MONOBANK_JAR_URL = "https://send.monobank.ua/jar/8sko6A3Cma";
@@ -37,6 +40,8 @@ const DAILY_TIME_OPTIONS = Array.from(
 const DAILY_LEVEL_OPTIONS = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
 const MAX_DAILY_WORD_ATTEMPTS = 3;
 const ADMIN_USER_LIST_LIMIT = 50;
+// Increment only when the persistent reply keyboard changes for users.
+const INTERFACE_VERSION = 1;
 const ADD_WORD_HINT =
     "Надішли англійське слово або фразу.\n\nЯкщо важливе конкретне значення, додай контекст після |:\ncharge | payment for a service\n\nПриклад без контексту: resilient";
 
@@ -311,19 +316,52 @@ function mainKeyboard(showAdmin = false) {
     };
 }
 
+/**
+ * Telegram persists reply keyboards until the bot sends another one. On the
+ * user's first interaction after a UI release, refresh it once automatically
+ * instead of requiring /start or sending a broadcast to every user.
+ */
+async function refreshInterfaceIfNeeded(env, chatId, userId) {
+    const user = await env.DB
+        .prepare("SELECT interface_version FROM users WHERE telegram_user_id = ?")
+        .bind(userId)
+        .first();
+
+    if (Number(user?.interface_version ?? 0) >= INTERFACE_VERSION) {
+        return;
+    }
+
+    await sendMessage(
+        env,
+        chatId,
+        "✨ Меню оновлено. Можеш користуватися новими кнопками нижче.",
+        mainKeyboard(isAdmin(env, userId))
+    );
+
+    await markInterfaceVersion(env, userId);
+}
+
+async function markInterfaceVersion(env, userId) {
+    await env.DB
+        .prepare("UPDATE users SET interface_version = ? WHERE telegram_user_id = ?")
+        .bind(INTERFACE_VERSION, userId)
+        .run();
+}
+
 function adminKeyboard() {
     return {
         inline_keyboard: [
             [{ text: "👥 Список користувачів", callback_data: "admin:users" }],
             [{ text: "🔗 Посилання на бота", callback_data: "admin:link" }],
             [{ text: "🎁 Змінити ліміт", callback_data: "admin:grant" }],
+            [{ text: "🎚 Змінити рівень", callback_data: "admin:level" }],
             [{ text: "❓ Команди адміна", callback_data: "admin:help" }],
         ],
     };
 }
 
 function adminHelpText() {
-    return "🛠 Адмін-панель\n\n• 👥 Список користувачів — усі користувачі, по 50 на сторінці, з ID, лімітами та кількістю активних слів.\n• 🔗 Посилання на бота — показує пряме посилання, яке можна скопіювати або переслати.\n• /grant <userId> <ліміт> — встановити денний ліміт на 1 місяць.\n  Приклад: /grant 123456789 45\n• 🎁 Заявки на донати приходять окремими картками з кнопками підтвердження.";
+    return "🛠 Адмін-панель\n\n• 👥 Список користувачів — усі користувачі, по 50 на сторінці, з ID, лімітами та кількістю активних слів.\n• 🔗 Посилання на бота — показує пряме посилання, яке можна скопіювати або переслати.\n• /grant <userId> <ліміт> — встановити ліміт додавання слів на 1 місяць.\n  Приклад: /grant 123456789 45\n• /level <userId> <0-3> — підвищити рівень доступу. Щоденні картки: 0→5, 1→10, 2→15, 3→20.\n  Приклад: /level 123456789 2\n• 🎁 Заявки на донати приходять окремими картками з кнопками підтвердження.";
 }
 
 function compactAdminNumber(value) {
@@ -369,6 +407,7 @@ async function sendAdminUserList(env, chatId, requestedPage = 0, messageId = nul
             u.telegram_user_id,
             (SELECT COUNT(*) FROM words w WHERE w.user_id = u.telegram_user_id AND w.is_active = 1) AS active_word_count,
             (SELECT daily_limit FROM user_daily_limits l WHERE l.user_id = u.telegram_user_id AND l.expires_at > CURRENT_TIMESTAMP) AS bonus_daily_limit
+            ,COALESCE((SELECT access_level FROM user_access_levels a WHERE a.user_id = u.telegram_user_id), 0) AS access_level
           FROM users u
           ORDER BY u.created_at DESC
           LIMIT ? OFFSET ?
@@ -382,7 +421,7 @@ async function sendAdminUserList(env, chatId, requestedPage = 0, messageId = nul
                 ? "∞"
                 : compactAdminNumber(user.bonus_daily_limit ?? DAILY_ADD_LIMIT);
             const position = page * ADMIN_USER_LIST_LIMIT + index + 1;
-            return `${position}. ID ${user.telegram_user_id} · слів: ${compactAdminNumber(user.active_word_count)} · ліміт: ${dailyLimit}`;
+            return `${position}. ID ${user.telegram_user_id} · слів: ${compactAdminNumber(user.active_word_count)} · ліміт: ${dailyLimit} · рівень: ${user.access_level}`;
         })
         .join("\n");
 
@@ -565,6 +604,51 @@ function donationDailyLimit(amountKopiykas) {
     return 15;
 }
 
+/** Maps a matched donation to a permanent, monotonic daily-card access level. */
+function donationAccessLevel(amountKopiykas) {
+    if (amountKopiykas > DONATION_TIER_100_KOPIYKAS) return 3;
+    if (amountKopiykas >= DONATION_TIER_50_KOPIYKAS) return 2;
+    return 1;
+}
+
+function dailyWordCardLimitForLevel(accessLevel) {
+    return DAILY_WORD_CARD_LIMITS[Math.min(Math.max(Number(accessLevel) || 0, 0), 3)];
+}
+
+async function getUserAccessLevel(env, userId) {
+    if (isAdmin(env, userId)) return 3;
+
+    const access = await env.DB
+        .prepare("SELECT access_level FROM user_access_levels WHERE user_id = ?")
+        .bind(userId)
+        .first();
+    return Math.min(Math.max(Number(access?.access_level ?? 0), 0), 3);
+}
+
+async function grantAccessLevel(env, userId, accessLevel, source, donationRequestId = null) {
+    const level = Math.min(Math.max(Number(accessLevel), 0), 3);
+    const previousLevel = await getUserAccessLevel(env, userId);
+
+    if (level <= previousLevel && !isAdmin(env, userId)) {
+        return { changed: false, accessLevel: previousLevel };
+    }
+
+    await env.DB
+        .prepare(`
+          INSERT INTO user_access_levels (user_id, access_level, donation_request_id, source)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(user_id) DO UPDATE SET
+            access_level = MAX(user_access_levels.access_level, excluded.access_level),
+            donation_request_id = excluded.donation_request_id,
+            source = excluded.source,
+            updated_at = CURRENT_TIMESTAMP
+        `)
+        .bind(userId, level, donationRequestId, source)
+        .run();
+
+    return { changed: level > previousLevel, accessLevel: Math.max(level, previousLevel) };
+}
+
 function adminDonationKeyboard(requestId, suggestedLimit) {
     const suggestedButton = suggestedLimit
         ? [{ text: `Видати ${suggestedLimit}/день на місяць`, callback_data: `bonus:${suggestedLimit}:${requestId}` }]
@@ -615,11 +699,14 @@ async function notifyPendingDonationRequests(env) {
         const suggestedLimit = transaction
             ? donationDailyLimit(transaction.amount_kopiykas)
             : null;
+        const suggestedAccessLevel = transaction
+            ? donationAccessLevel(transaction.amount_kopiykas)
+            : null;
 
         await sendMessage(
             env,
             adminChatId,
-            `🎁 Заявка на бонус\nКористувач: ${request.user_id}\nКод: ${request.support_code}${amount}${suggestedLimit ? `\nРекомендація: ${suggestedLimit} слів/день на 1 місяць.` : ""}`,
+            `🎁 Заявка на бонус\nКористувач: ${request.user_id}\nКод: ${request.support_code}${amount}${suggestedLimit ? `\nРекомендація: ${suggestedLimit} слів/день на 1 місяць.` : ""}${suggestedAccessLevel ? `\nРівень доступу: ${suggestedAccessLevel} (${dailyWordCardLimitForLevel(suggestedAccessLevel)} щоденних карток).` : ""}`,
             adminDonationKeyboard(request.id, suggestedLimit)
         );
 
@@ -688,7 +775,7 @@ async function submitDonationBonusRequest(env, chatId, userId) {
     await sendMessage(
         env,
         chatId,
-        "🎁 Заявку на бонус прийнято. Я перевірю донат і надам бонус найближчим часом. Бонус діє 1 місяць: менше 100 грн — 15 слів/день, від 100 до 200 грн включно — 25 слів/день, понад 200 грн — 40 слів/день."
+        "🎁 Заявку на бонус прийнято. Я перевірю донат і надам бонус найближчим часом. Ліміт додавання на 1 місяць: менше 100 грн — 15 слів/день, від 100 до 200 грн включно — 25, понад 200 грн — 40. Рівні щоденних карток: 1→10, 2→15, 3→20 на день."
     );
 
     await notifyPendingDonationRequests(env);
@@ -697,7 +784,7 @@ async function submitDonationBonusRequest(env, chatId, userId) {
 async function grantDonationBonus(env, requestId, dailyLimit) {
     const request = await env.DB
         .prepare(`
-          SELECT id, user_id, status
+          SELECT id, user_id, status, matched_transaction_id
           FROM donation_requests
           WHERE id = ?
         `)
@@ -734,6 +821,17 @@ async function grantDonationBonus(env, requestId, dailyLimit) {
         .bind(request.user_id, dailyLimit, request.id)
         .run();
 
+    const transaction = request.matched_transaction_id
+        ? await env.DB
+              .prepare("SELECT amount_kopiykas FROM bank_transactions WHERE transaction_id = ?")
+              .bind(request.matched_transaction_id)
+              .first()
+        : null;
+    const accessLevel = transaction ? donationAccessLevel(transaction.amount_kopiykas) : 0;
+    const access = accessLevel > 0
+        ? await grantAccessLevel(env, request.user_id, accessLevel, "donation", request.id)
+        : { changed: false, accessLevel: await getUserAccessLevel(env, request.user_id) };
+
     const user = await env.DB
         .prepare("SELECT chat_id FROM users WHERE telegram_user_id = ?")
         .bind(request.user_id)
@@ -743,11 +841,33 @@ async function grantDonationBonus(env, requestId, dailyLimit) {
         await sendMessage(
             env,
             user.chat_id,
-            `🎁 Дякую за підтримку! Твій денний ліміт — ${dailyLimit} ${wordCountLabel(dailyLimit)} на наступний місяць.`
+            `🎁 Дякую за підтримку! Твій ліміт додавання — ${dailyLimit} ${wordCountLabel(dailyLimit)} на наступний місяць. Рівень доступу: ${access.accessLevel}; нових щоденних карток: ${dailyWordCardLimitForLevel(access.accessLevel)} на день.`
         );
     }
 
     return request;
+}
+
+/** Admin-only upgrade. Levels are intentionally monotonic: support is never lost. */
+async function grantManualAccessLevel(env, userId, accessLevel) {
+    const user = await env.DB
+        .prepare("SELECT chat_id FROM users WHERE telegram_user_id = ?")
+        .bind(userId)
+        .first();
+
+    if (!user?.chat_id) return null;
+
+    const access = await grantAccessLevel(env, userId, accessLevel, "manual");
+
+    if (access.changed) {
+        await sendMessage(
+            env,
+            user.chat_id,
+            `🎁 Привіт! Твій рівень доступу підвищено до ${access.accessLevel}. Тепер можна відкривати ${dailyWordCardLimitForLevel(access.accessLevel)} нових щоденних карток на день.`
+        );
+    }
+
+    return access;
 }
 
 async function grantManualDailyLimit(env, userId, dailyLimit) {
@@ -870,6 +990,27 @@ async function getDailyAdditionLimit(env, userId) {
         .first();
 
     return limit?.daily_limit ?? DAILY_ADD_LIMIT;
+}
+
+async function claimDailyWordCard(env, userId, localDate) {
+    if (isAdmin(env, userId)) {
+        return true;
+    }
+
+    const limit = dailyWordCardLimitForLevel(await getUserAccessLevel(env, userId));
+
+    const claimed = await env.DB
+        .prepare(`
+          INSERT INTO daily_word_card_views (user_id, local_date, views)
+          VALUES (?, ?, 1)
+          ON CONFLICT(user_id, local_date) DO UPDATE
+          SET views = views + 1
+          WHERE views < ?
+        `)
+        .bind(userId, localDate, limit)
+        .run();
+
+    return claimed.meta.changes > 0;
 }
 
 async function claimMonobankSync(env, nowSeconds) {
@@ -1032,7 +1173,7 @@ async function syncMonobankDonations(env, scheduledTime) {
 }
 
 // Daily cards remain pending until the user explicitly knows or saves the word.
-// local_date prevents an old pending card from being reused on a later day.
+// After either choice, the button can generate another card while quota remains.
 function dailyWordKeyboard(pendingId) {
     return {
         inline_keyboard: [[
@@ -1043,7 +1184,7 @@ function dailyWordKeyboard(pendingId) {
 }
 
 function dailyWordText(card, level) {
-    return `📚 Нове слово дня · ${level}\n\n${card.word} — ${card.translation_uk}\n\n1. ${card.examples[0].source}\n${card.examples[0].uk}\n\n2. ${card.examples[1].source}\n${card.examples[1].uk}\n\nЯкщо хочеш додати його до свого списку, натисни «Вчити».`;
+    return `📚 Нове слово · ${level}\n\n${card.word} — ${card.translation_uk}\n\n1. ${card.examples[0].source}\n${card.examples[0].uk}\n\n2. ${card.examples[1].source}\n${card.examples[1].uk}\n\nЯкщо хочеш додати його до свого списку, натисни «Вчити».`;
 }
 
 async function generateNewDailyWord(env, userId, level) {
@@ -1139,7 +1280,7 @@ async function hasPendingDailyWord(env, userId, pendingId) {
 async function sendTodayDailyWord(env, chatId, userId) {
     const user = await env.DB
         .prepare(`
-          SELECT timezone, daily_level, last_delivery_local_date
+          SELECT timezone, daily_level
           FROM users
           WHERE telegram_user_id = ?
         `)
@@ -1151,14 +1292,9 @@ async function sendTodayDailyWord(env, chatId, userId) {
         throw new Error("Unable to calculate local date for daily word.");
     }
 
-    if (user?.last_delivery_local_date === localTime.date) {
-        const pending = await getPendingDailyWord(env, userId, localTime.date);
+    const pending = await getPendingDailyWord(env, userId, localTime.date);
 
-        if (!pending) {
-            await sendMessage(env, chatId, "Сьогоднішню картку вже оброблено. Завтра буде нове слово.");
-            return;
-        }
-
+    if (pending) {
         await sendMessage(
             env,
             chatId,
@@ -1168,29 +1304,13 @@ async function sendTodayDailyWord(env, chatId, userId) {
         return;
     }
 
-    const claimed = await env.DB
-        .prepare(`
-          UPDATE users
-          SET last_delivery_local_date = ?
-          WHERE telegram_user_id = ?
-            AND (last_delivery_local_date IS NULL OR last_delivery_local_date <> ?)
-        `)
-        .bind(localTime.date, userId, localTime.date)
-        .run();
-
-    if (claimed.meta.changes === 0) {
-        const pending = await getPendingDailyWord(env, userId, localTime.date);
-
-        if (pending) {
-            await sendMessage(
-                env,
-                chatId,
-                dailyWordText(pending.card, user?.daily_level ?? "B1"),
-                dailyWordKeyboard(pending.id)
-            );
-        } else {
-            await sendMessage(env, chatId, "Сьогоднішня картка вже готується. Спробуй ще раз за кілька секунд.");
-        }
+    if (!(await claimDailyWordCard(env, userId, localTime.date))) {
+        const limit = dailyWordCardLimitForLevel(await getUserAccessLevel(env, userId));
+        await sendMessage(
+            env,
+            chatId,
+            `На сьогодні вже показано ${limit} нових карток. Завтра можна буде відкрити ще.`
+        );
         return;
     }
 
@@ -1202,11 +1322,6 @@ async function sendTodayDailyWord(env, chatId, userId) {
         pendingId = await savePendingDailyWord(env, userId, card, localTime.date);
         await sendMessage(env, chatId, dailyWordText(card, level), dailyWordKeyboard(pendingId));
     } catch (error) {
-        await env.DB
-            .prepare("UPDATE users SET last_delivery_local_date = NULL WHERE telegram_user_id = ? AND last_delivery_local_date = ?")
-            .bind(userId, localTime.date)
-            .run();
-
         if (pendingId) {
             await env.DB
                 .prepare("DELETE FROM pending_daily_words WHERE id = ? AND user_id = ?")
@@ -1266,7 +1381,7 @@ async function savePendingDailyWordToLearning(env, userId, pendingId) {
 async function sendDueDailyWords(env, scheduledTime) {
     const users = await env.DB
         .prepare(`
-          SELECT telegram_user_id, chat_id, timezone, daily_time, daily_level
+          SELECT telegram_user_id, chat_id, timezone, daily_time, daily_level, last_delivery_local_date
           FROM users
           WHERE is_active = 1 AND daily_enabled = 1
         `)
@@ -1276,6 +1391,14 @@ async function sendDueDailyWords(env, scheduledTime) {
         const localTime = localDateAndTime(user.timezone, scheduledTime);
 
         if (!localTime || localTime.time !== user.daily_time) {
+            continue;
+        }
+
+        if (user.last_delivery_local_date === localTime.date) {
+            continue;
+        }
+
+        if (!(await claimDailyWordCard(env, user.telegram_user_id, localTime.date))) {
             continue;
         }
 
@@ -1411,6 +1534,8 @@ export default {
                 return new Response("ok");
             }
 
+            await refreshInterfaceIfNeeded(env, chatId, userId);
+
             if (callback.data.startsWith("admin:")) {
                 if (!isAdmin(env, userId)) {
                     await answerCallbackQuery(env, callback.id, "Ця дія доступна лише адміну.");
@@ -1443,6 +1568,16 @@ export default {
                         env,
                         chatId,
                         "Щоб змінити ліміт користувача, надішли:\n/grant userId ліміт\n\nНаприклад: /grant 123456789 45"
+                    );
+                    return new Response("ok");
+                }
+
+                if (callback.data === "admin:level") {
+                    await answerCallbackQuery(env, callback.id, "Показую формат команди.");
+                    await sendMessage(
+                        env,
+                        chatId,
+                        "Щоб підвищити рівень доступу, надішли:\n/level userId рівень\n\nРівні: 0→5, 1→10, 2→15, 3→20 щоденних карток.\nПриклад: /level 123456789 2"
                     );
                     return new Response("ok");
                 }
@@ -1899,6 +2034,10 @@ export default {
             .bind(userId, chatId)
             .run();
 
+        if (text !== "/start" && text !== "/menu") {
+            await refreshInterfaceIfNeeded(env, chatId, userId);
+        }
+
         if (text === "/start") {
             await sendMessage(
                 env,
@@ -1906,11 +2045,13 @@ export default {
                 "Привіт! Я допоможу запам’ятовувати англійські слова.\n\nПросто надішли мені слово або фразу. Якщо знаєш потрібне значення, додай його після |:\ncharge | payment for a service",
                 mainKeyboard(isAdmin(env, userId))
             );
+            await markInterfaceVersion(env, userId);
             return new Response("ok");
         }
 
         if (text === "/menu") {
             await sendMessage(env, chatId, "Ось меню:", mainKeyboard(isAdmin(env, userId)));
+            await markInterfaceVersion(env, userId);
             return new Response("ok");
         }
 
@@ -2069,6 +2210,55 @@ export default {
                     chatId,
                     "Не вдалося видати ліміт. Спробуй ще раз за хвилину."
                 );
+            }
+
+            return new Response("ok");
+        }
+
+        const levelMatch = text.match(/^\/level(?:\s+(.+))?$/i);
+
+        if (levelMatch) {
+            if (!isAdmin(env, userId)) {
+                await sendMessage(env, chatId, "Ця команда доступна лише адміну.");
+                return new Response("ok");
+            }
+
+            const parts = levelMatch[1]?.trim().split(/\s+/) ?? [];
+
+            if (parts.length !== 2 || !/^\d+$/.test(parts[0]) || !/^[0-3]$/.test(parts[1])) {
+                await sendMessage(
+                    env,
+                    chatId,
+                    "Використай: /level userId рівень\nРівні: 0→5, 1→10, 2→15, 3→20 щоденних карток.\nНаприклад: /level 123456789 2"
+                );
+                return new Response("ok");
+            }
+
+            const targetUserId = Number(parts[0]);
+            const accessLevel = Number(parts[1]);
+
+            if (!Number.isSafeInteger(targetUserId) || targetUserId <= 0) {
+                await sendMessage(env, chatId, "userId має бути додатним цілим числом.");
+                return new Response("ok");
+            }
+
+            try {
+                const access = await grantManualAccessLevel(env, targetUserId, accessLevel);
+                await sendMessage(
+                    env,
+                    chatId,
+                    !access
+                        ? "Користувача не знайдено. Він має спершу написати боту /start."
+                        : access.changed
+                          ? `✅ Рівень користувача ${targetUserId} підвищено до ${access.accessLevel}. Ліміт щоденних карток: ${dailyWordCardLimitForLevel(access.accessLevel)}.`
+                          : `У користувача ${targetUserId} вже рівень ${access.accessLevel} або вищий.`
+                );
+            } catch (error) {
+                console.error({
+                    event: "manual_access_level_failed",
+                    message: error instanceof Error ? error.message : "Unknown error",
+                });
+                await sendMessage(env, chatId, "Не вдалося змінити рівень. Спробуй ще раз за хвилину.");
             }
 
             return new Response("ok");

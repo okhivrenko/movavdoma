@@ -1,5 +1,6 @@
 {
   "name": "vocab-telegram-bot",
+  "version": "1.2.0",
   "private": true,
   "scripts": {
     "build": "npx --yes wrangler@latest deploy --dry-run --outdir dist",

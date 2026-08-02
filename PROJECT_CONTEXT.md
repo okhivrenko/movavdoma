@@ -99,8 +99,9 @@ restoration. Learned words remain in D1 with `is_active = 0`.
 
 ### Daily word
 
-`📚 Щоденне слово` shows the current daily card or generates it once for the
-current local day. `⚙️ Налаштувати` opens a two-step settings flow: choose
+`📚 Щоденне слово` shows the current pending card or generates a new one.
+After `Знаю` or `Вчити`, the user can open another card on the same day, up to
+five newly generated cards per local day. `⚙️ Налаштувати` opens a two-step settings flow: choose
 whether to change the delivery time or CEFR level (A0–C2), then choose its
 value. It can also turn reminders on or off. The card has `Знаю` and `Вчити`
 buttons: `Знаю` discards it, while `Вчити` adds the card and examples to the
@@ -165,6 +166,12 @@ date.
 - Choosing `Вчити` for a daily card also uses one addition from that day's
   limit; choosing `Знаю` does not.
 - `daily_word_additions` stores only the user ID, local date, and count.
+- `daily_word_card_views` independently limits newly generated daily cards to
+  five per local day; it does not reduce the ten-word learning-list quota.
+- `user_access_levels` stores a permanent donor level: 0→5, 1→10, 2→15, and
+  3→20 daily cards. A donation maps to 1 below 100 UAH, 2 from 100 through
+  200 UAH, and 3 above 200 UAH. The admin can only raise a level with
+  `/level <telegramUserId> <0-3>`.
 
 ## D1 binding
 
@@ -317,6 +324,11 @@ CREATE TABLE IF NOT EXISTS pending_daily_words (
   the remote D1 database.
 - Then execute only `migrations/0006_add_pending_daily_word_date.sql` against
   the remote D1 database.
+- Then execute only `migrations/0007_add_interface_version.sql` and
+  `migrations/0008_add_daily_word_card_limit.sql` against the remote D1
+  database.
+- Then execute `migrations/0009_add_user_access_levels.sql` against the remote
+  D1 database.
 
 ## Next product features
 
