@@ -6,7 +6,7 @@ MovaVDoma is a Telegram bot for learning vocabulary. This policy explains what
 information the bot processes, why it is needed, and how to contact the bot
 operator about your data.
 
-Canonical public version: https://vocab-telegram-bot.alexeykhivrenko.workers.dev/privacy
+Canonical public version: https://vocab-telegram-bot.oleksiikhivrenko.workers.dev/privacy
 
 ## 1. Information the bot processes
 

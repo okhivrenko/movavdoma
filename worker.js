@@ -6,6 +6,7 @@ import {
     editMessage,
     getBotLink,
     sendMessage,
+    telegramApi,
 } from "./telegram.js";
 import { openAIJson } from "./openai.js";
 import {
@@ -41,7 +42,11 @@ const MONOBANK_JAR_SEND_ID = "8sko6A3Cma";
 const MONOBANK_MIN_SYNC_INTERVAL_SECONDS = 60;
 const MONOBANK_STATEMENT_OVERLAP_SECONDS = 5 * 60;
 const BOT_BRAND_NAME = "MovaVDoma";
-const PRIVACY_POLICY_URL = "https://vocab-telegram-bot.alexeykhivrenko.workers.dev/privacy";
+// The Worker name is still technical for now. Keep this URL aligned with its
+// active workers.dev route; it also lets the cron repair Telegram's webhook
+// after an account-subdomain or Worker-name change.
+const PUBLIC_WORKER_URL = "https://vocab-telegram-bot.oleksiikhivrenko.workers.dev";
+const PRIVACY_POLICY_URL = `${PUBLIC_WORKER_URL}/privacy`;
 const DAILY_TIME_OPTIONS = Array.from(
     { length: 24 },
     (_, hour) => `${String(hour).padStart(2, "0")}:00`
@@ -1644,6 +1649,36 @@ function privacyPolicyPage() {
 </main></body></html>`;
 }
 
+// Telegram stores a full webhook URL, so changing a workers.dev subdomain
+// otherwise leaves the bot pointing to its old host. An operation key makes
+// this idempotent: the configured URL is sent once and retried only on error.
+async function ensureTelegramWebhook(env) {
+    const operationKey = `telegram_webhook:${PUBLIC_WORKER_URL}`;
+    const claim = await env.DB
+        .prepare("INSERT OR IGNORE INTO worker_operations (operation_key) VALUES (?)")
+        .bind(operationKey)
+        .run();
+
+    if (claim.meta.changes === 0) {
+        return;
+    }
+
+    try {
+        await telegramApi(env, "setWebhook", {
+            url: PUBLIC_WORKER_URL,
+            secret_token: env.TELEGRAM_WEBHOOK_SECRET,
+            allowed_updates: ["message", "callback_query"],
+        });
+        console.log({ event: "telegram_webhook_configured", url: PUBLIC_WORKER_URL });
+    } catch (error) {
+        await env.DB
+            .prepare("DELETE FROM worker_operations WHERE operation_key = ?")
+            .bind(operationKey)
+            .run();
+        throw error;
+    }
+}
+
 // Telegram webhook and scheduled delivery entry points. Callback actions are
 // validated in the router before any user-owned data is read or changed.
 export default {
@@ -2951,6 +2986,15 @@ export default {
     },
 
     async scheduled(controller, env) {
+        try {
+            await ensureTelegramWebhook(env);
+        } catch (error) {
+            console.error({
+                event: "telegram_webhook_configuration_failed",
+                message: error instanceof Error ? error.message : "Unknown error",
+            });
+        }
+
         if (controller.cron === "0 3 * * *") {
             try {
                 await removeExpiredLearnedWords(env);

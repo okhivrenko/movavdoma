@@ -17,11 +17,14 @@ Users add words through Telegram. The bot:
 - Hosting/runtime: Cloudflare Workers
 - Database: Cloudflare D1 (SQLite)
 - Worker name: `vocab-telegram-bot`
-- Public URL: `https://vocab-telegram-bot.alexeykhivrenko.workers.dev/`
+- Public URL: `https://vocab-telegram-bot.oleksiikhivrenko.workers.dev/`
 - D1 database name: `vocab-words-db`
 - D1 database ID: `62ded422-e125-42b3-99de-a86fdcf5f9f8`
 - Telegram receives updates through a webhook.
 - The webhook must accept both `message` and `callback_query` updates.
+- The scheduled Worker configures the current public webhook URL once through
+  the existing Telegram secrets. This safely repairs the webhook after a
+  workers.dev subdomain or Worker-name migration without exposing the token.
 
 ## Secrets
 
