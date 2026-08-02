@@ -45,6 +45,11 @@ Welcomes the user and shows a persistent reply keyboard with:
 - `⏰ Щоденне слово`
 - `❓ Допомога`
 
+The admin also sees `🛠 Адмін`, which opens an admin-only panel with a paginated
+user list, the `/grant <userId> <dailyLimit>` format, and a summary of
+admin-only commands. The user list includes Telegram IDs, active-word count,
+and the current daily limit.
+
 Users can simply send an English word or phrase; `/add` remains supported.
 `/menu` shows the keyboard again if it was hidden.
 

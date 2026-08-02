@@ -15,6 +15,7 @@ const DAILY_TIME_OPTIONS = Array.from(
 );
 const DAILY_LEVEL_OPTIONS = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
 const MAX_DAILY_WORD_ATTEMPTS = 3;
+const ADMIN_USER_LIST_LIMIT = 50;
 const ADD_WORD_HINT =
     "Надішли англійське слово або фразу.\n\nЯкщо важливе конкретне значення, додай контекст після |:\ncharge | payment for a service\n\nПриклад без контексту: resilient";
 
@@ -576,18 +577,110 @@ function wordCountLabel(count) {
     return "слів";
 }
 
-function mainKeyboard() {
+function mainKeyboard(showAdmin = false) {
+    const keyboard = [
+        [{ text: "➕ Додати слово" }],
+        [{ text: "📚 Мої слова" }, { text: "🎓 Вивчені слова" }],
+        [{ text: "⏰ Щоденне слово" }],
+        [{ text: "☕ Підтримати бот" }, { text: "🎁 Отримати бонус" }],
+    ];
+
+    if (showAdmin) {
+        keyboard.push([{ text: "🛠 Адмін" }]);
+    }
+
+    keyboard.push([{ text: "❓ Допомога" }]);
+
     return {
-        keyboard: [
-            [{ text: "➕ Додати слово" }],
-            [{ text: "📚 Мої слова" }, { text: "🎓 Вивчені слова" }],
-            [{ text: "⏰ Щоденне слово" }],
-            [{ text: "☕ Підтримати бот" }, { text: "🎁 Отримати бонус" }],
-            [{ text: "❓ Допомога" }],
-        ],
+        keyboard,
         resize_keyboard: true,
         is_persistent: true,
     };
+}
+
+function adminKeyboard() {
+    return {
+        inline_keyboard: [
+            [{ text: "👥 Список користувачів", callback_data: "admin:users" }],
+            [{ text: "🎁 Змінити ліміт", callback_data: "admin:grant" }],
+            [{ text: "❓ Команди адміна", callback_data: "admin:help" }],
+        ],
+    };
+}
+
+function adminHelpText() {
+    return "🛠 Адмін-панель\n\n• 👥 Список користувачів — усі користувачі, по 50 на сторінці, з ID, лімітами та кількістю активних слів.\n• /grant <userId> <ліміт> — встановити денний ліміт на 1 місяць.\n  Приклад: /grant 123456789 45\n• 🎁 Заявки на донати приходять окремими картками з кнопками підтвердження.";
+}
+
+function compactAdminNumber(value) {
+    const number = Number(value);
+
+    if (!Number.isFinite(number) || number < 0) {
+        return "?";
+    }
+
+    return number > 999 ? "999+" : String(Math.floor(number));
+}
+
+function adminUserListKeyboard(page, totalPages) {
+    const navigation = [];
+
+    if (page > 0) {
+        navigation.push({ text: "← Назад", callback_data: `admin:users:${page - 1}` });
+    }
+
+    if (page < totalPages - 1) {
+        navigation.push({ text: "Далі →", callback_data: `admin:users:${page + 1}` });
+    }
+
+    return navigation.length > 0 ? { inline_keyboard: [navigation] } : { inline_keyboard: [] };
+}
+
+async function sendAdminUserList(env, chatId, requestedPage = 0, messageId = null) {
+    const count = await env.DB
+        .prepare("SELECT COUNT(*) AS total FROM users")
+        .first();
+    const total = Number(count?.total ?? 0);
+
+    if (total === 0) {
+        await sendMessage(env, chatId, "Користувачів поки немає.");
+        return;
+    }
+
+    const totalPages = Math.ceil(total / ADMIN_USER_LIST_LIMIT);
+    const page = Math.min(Math.max(requestedPage, 0), totalPages - 1);
+    const result = await env.DB
+        .prepare(`
+          SELECT
+            u.telegram_user_id,
+            (SELECT COUNT(*) FROM words w WHERE w.user_id = u.telegram_user_id AND w.is_active = 1) AS active_word_count,
+            (SELECT daily_limit FROM user_daily_limits l WHERE l.user_id = u.telegram_user_id AND l.expires_at > CURRENT_TIMESTAMP) AS bonus_daily_limit
+          FROM users u
+          ORDER BY u.created_at DESC
+          LIMIT ? OFFSET ?
+        `)
+        .bind(ADMIN_USER_LIST_LIMIT, page * ADMIN_USER_LIST_LIMIT)
+        .all();
+
+    const text = result.results
+        .map((user, index) => {
+            const dailyLimit = isAdmin(env, user.telegram_user_id)
+                ? "∞"
+                : compactAdminNumber(user.bonus_daily_limit ?? DAILY_ADD_LIMIT);
+            const position = page * ADMIN_USER_LIST_LIMIT + index + 1;
+            return `${position}. ID ${user.telegram_user_id} · слів: ${compactAdminNumber(user.active_word_count)} · ліміт: ${dailyLimit}`;
+        })
+        .join("\n");
+
+    const listText = `👥 Користувачі: ${total}\nСторінка ${page + 1} з ${totalPages}\n\n${text}\n\nЩоб змінити ліміт: /grant userId ліміт`;
+    const keyboard = adminUserListKeyboard(page, totalPages);
+
+    if (messageId) {
+        await editMessage(env, chatId, messageId, listText, keyboard);
+        return;
+    }
+
+    await sendMessage(env, chatId, listText, keyboard);
 }
 
 function dailyTimeKeyboard() {
@@ -985,7 +1078,7 @@ async function grantManualDailyLimit(env, userId, dailyLimit) {
     await sendMessage(
         env,
         user.chat_id,
-        `🎁 Твій денний ліміт — ${dailyLimit} ${wordCountLabel(dailyLimit)} на наступний місяць.`
+        `🎁 Привіт! Для тебе надійшов бонус. Твій ліміт слів на день збільшено до ${dailyLimit} ${wordCountLabel(dailyLimit)} на наступний місяць.`
     );
 
     return true;
@@ -1428,12 +1521,12 @@ async function sendLearnedWordList(env, chatId, userId) {
     await sendMessage(env, chatId, archivedText(words), archivedKeyboard(words));
 }
 
-async function sendHelp(env, chatId) {
+async function sendHelp(env, chatId, userId) {
     await sendMessage(
         env,
         chatId,
         "Як користуватися ботом:\n\n1. Натисни «➕ Додати слово» або просто надішли англійське слово чи фразу.\n2. Якщо знаєш потрібне значення, напиши його після |:\ncharge | payment for a service\n3. Обери потрібне значення, якщо бот його уточнить.\n4. Відкрий «📚 Мої слова», щоб переглянути свій каталог.\n5. Відкрий «🎓 Вивчені слова», щоб повернути слово до навчання.\n6. У «⏰ Щоденне слово» обери час і рівень. У картці натисни «Знаю» або «Вчити» — другий варіант додасть слово до каталогу.\n7. Щоб підтримати бот, натисни «☕ Підтримати бот», додай виданий код у коментар платежу, а потім — «🎁 Отримати бонус».\n\nНаприклад: resilient",
-        mainKeyboard()
+        mainKeyboard(isAdmin(env, userId))
     );
 }
 
@@ -1473,10 +1566,57 @@ export default {
 
         if (callback?.data) {
             const chatId = callback.message?.chat?.id;
+            const chatType = callback.message?.chat?.type;
             const messageId = callback.message?.message_id;
             const userId = callback.from?.id;
 
-            if (!chatId || !messageId || !userId) {
+            if (!chatId || !messageId || !userId || chatType !== "private") {
+                return new Response("ok");
+            }
+
+            if (callback.data.startsWith("admin:")) {
+                if (!isAdmin(env, userId)) {
+                    await answerCallbackQuery(env, callback.id, "Ця дія доступна лише адміну.");
+                    return new Response("ok");
+                }
+
+                const usersMatch = callback.data.match(/^admin:users(?::(\d+))?$/);
+
+                if (usersMatch) {
+                    const page = Number(usersMatch[1] ?? 0);
+
+                    if (!Number.isInteger(page) || page < 0) {
+                        await answerCallbackQuery(env, callback.id, "Невірна сторінка.");
+                        return new Response("ok");
+                    }
+
+                    await answerCallbackQuery(env, callback.id, "Готую список користувачів.");
+                    await sendAdminUserList(
+                        env,
+                        chatId,
+                        page,
+                        usersMatch[1] ? messageId : null
+                    );
+                    return new Response("ok");
+                }
+
+                if (callback.data === "admin:grant") {
+                    await answerCallbackQuery(env, callback.id, "Показую формат команди.");
+                    await sendMessage(
+                        env,
+                        chatId,
+                        "Щоб змінити ліміт користувача, надішли:\n/grant userId ліміт\n\nНаприклад: /grant 123456789 45"
+                    );
+                    return new Response("ok");
+                }
+
+                if (callback.data === "admin:help") {
+                    await answerCallbackQuery(env, callback.id, "Показую команди.");
+                    await sendMessage(env, chatId, adminHelpText());
+                    return new Response("ok");
+                }
+
+                await answerCallbackQuery(env, callback.id, "Невідома адмінська дія.");
                 return new Response("ok");
             }
 
@@ -1887,13 +2027,13 @@ export default {
                 env,
                 chatId,
                 "Привіт! Я допоможу запам’ятовувати англійські слова.\n\nПросто надішли мені слово або фразу. Якщо знаєш потрібне значення, додай його після |:\ncharge | payment for a service",
-                mainKeyboard()
+                mainKeyboard(isAdmin(env, userId))
             );
             return new Response("ok");
         }
 
         if (text === "/menu") {
-            await sendMessage(env, chatId, "Ось меню:", mainKeyboard());
+            await sendMessage(env, chatId, "Ось меню:", mainKeyboard(isAdmin(env, userId)));
             return new Response("ok");
         }
 
@@ -1955,13 +2095,23 @@ export default {
             return new Response("ok");
         }
 
+        if (text === "🛠 Адмін") {
+            if (!isAdmin(env, userId)) {
+                await sendMessage(env, chatId, "Ця дія доступна лише адміну.");
+                return new Response("ok");
+            }
+
+            await sendMessage(env, chatId, adminHelpText(), adminKeyboard());
+            return new Response("ok");
+        }
+
         if (text === "❓ Допомога") {
-            await sendHelp(env, chatId);
+            await sendHelp(env, chatId, userId);
             return new Response("ok");
         }
 
         if (text === "/help") {
-            await sendHelp(env, chatId);
+            await sendHelp(env, chatId, userId);
             return new Response("ok");
         }
 
@@ -2419,7 +2569,7 @@ export default {
         }
 
         if (text.startsWith("/")) {
-            await sendHelp(env, chatId);
+            await sendHelp(env, chatId, userId);
             return new Response("ok");
         }
 
