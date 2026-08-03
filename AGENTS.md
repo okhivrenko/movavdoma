@@ -3,15 +3,29 @@
 ## Fast orientation
 
 - Runtime entry point: `worker.js`.
-- Network clients: `telegram.js`, `openai.js`.
-- Shared helpers: `helpers.js`; vocabulary-list UI: `word-list.js`.
-- Pure access-level and donation rules: `policies.js`; its unit tests: `test/`.
+- Network clients: `src/platform/telegram.js`, `src/platform/openai.js`.
+- Shared helpers: `src/domain/helpers.js`; vocabulary-list UI:
+  `src/features/vocabulary/word-list.js`.
+- Pure access-level and donation rules: `src/domain/policies.js`; tests: `test/`.
 - Product behavior and schema: `PROJECT_CONTEXT.md`.
 - Release process: `RELEASING.md`.
 - Cloudflare config: `wrangler.jsonc`; SQL changes: `migrations/`.
 - Senior JavaScript review role: `agents/senior-javascript-engineer.md`.
 - For reusable Cloudflare-bot architecture and release practice, use the shared
   `$cloudflare-worker-bot` skill. These project-specific rules take priority.
+
+## Architecture map
+
+- Read `docs/ARCHITECTURE.md` before a structural, framework, multilingual, or
+  cross-feature decision.
+- Run `workflows/cloudflare-telegram-feature.md` for every feature/refactor.
+- `worker.js` is the authenticated composition root; production modules live in
+  `src/domain`, `src/platform`, and `src/features/<feature>`.
+- Use ESM functions and explicit dependencies. Do not add Express, a generic
+  repository layer, or OOP classes without a concrete demonstrated need.
+- The current direction is English → Ukrainian. `src/domain/languages.js`
+  defines planned directions; enabling one requires a neutral schema migration,
+  backfill, user selection, prompt/rendering changes, and tests in one slice.
 
 ## Non-negotiable rules
 

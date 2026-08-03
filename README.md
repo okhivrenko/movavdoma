@@ -15,3 +15,8 @@ npm run deploy             # production deploy (only when intended)
 
 Read `AGENTS.md` before changing code, `PROJECT_CONTEXT.md` for product
 behavior, and `RELEASING.md` before a production release.
+
+For the module map and multilingual boundary, read
+[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md). To transfer the agent setup
+to a new Telegram bot, use [`docs/AGENT_HANDOFF.md`](./docs/AGENT_HANDOFF.md)
+and [`workflows/cloudflare-telegram-feature.md`](./workflows/cloudflare-telegram-feature.md).
