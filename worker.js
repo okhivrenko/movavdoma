@@ -47,12 +47,12 @@ import {
 } from "./daily-settings.js";
 import {
     getRecentActiveWords,
+    handleExamplesCallback,
     LIST_LIMIT,
     refreshArchivedMessage,
     refreshListMessage,
     sendActiveWordList,
     sendLearnedWordList,
-    sendWordExamples,
 } from "./word-list.js";
 import {
     dailyScheduleKeyboardLabel,
@@ -313,41 +313,7 @@ export default {
                 return new Response("ok");
             }
 
-            if (callback.data.startsWith("examples:")) {
-                const wordId = Number(callback.data.replace("examples:", ""));
-
-                if (!Number.isInteger(wordId) || wordId <= 0) {
-                    await answerCallbackQuery(env, callback.id, "Невірний вибір.");
-                    return new Response("ok");
-                }
-
-                let sent;
-
-                try {
-                    sent = await sendWordExamples(env, chatId, userId, wordId);
-                } catch (error) {
-                    console.error({
-                        event: "show_examples_failed",
-                        message:
-                            error instanceof Error
-                                ? error.message
-                                : "Unknown error",
-                    });
-                    await answerCallbackQuery(
-                        env,
-                        callback.id,
-                        "Не вдалося показати приклади."
-                    );
-                    return new Response("ok");
-                }
-
-                await answerCallbackQuery(
-                    env,
-                    callback.id,
-                    sent
-                        ? "Показую приклади."
-                        : "Це слово вже недоступне."
-                );
+            if (await handleExamplesCallback(env, callback, { chatId, userId })) {
                 return new Response("ok");
             }
 

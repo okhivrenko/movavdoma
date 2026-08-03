@@ -1,4 +1,4 @@
-import { editMessage, sendMessage } from "./telegram.js";
+import { answerCallbackQuery, editMessage, sendMessage } from "./telegram.js";
 
 export const LIST_LIMIT = 10;
 // Keep both vocabulary lists compact and visually consistent in Telegram.
@@ -97,6 +97,23 @@ export async function sendWordExamples(env, chatId, userId, wordId) {
       SELECT sentence_source, sentence_uk FROM examples WHERE word_id = ? ORDER BY position ASC
     `).bind(wordId).all();
     await sendMessage(env, chatId, examplesText(word, result.results));
+    return true;
+}
+
+export async function handleExamplesCallback(env, callback, { chatId, userId }) {
+    if (!callback.data.startsWith("examples:")) return false;
+    const wordId = Number(callback.data.replace("examples:", ""));
+    if (!Number.isInteger(wordId) || wordId <= 0) {
+        await answerCallbackQuery(env, callback.id, "Невірний вибір.");
+        return true;
+    }
+    try {
+        const sent = await sendWordExamples(env, chatId, userId, wordId);
+        await answerCallbackQuery(env, callback.id, sent ? "Показую приклади." : "Це слово вже недоступне.");
+    } catch (error) {
+        console.error({ event: "show_examples_failed", message: error instanceof Error ? error.message : "Unknown error" });
+        await answerCallbackQuery(env, callback.id, "Не вдалося показати приклади.");
+    }
     return true;
 }
 
