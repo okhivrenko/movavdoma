@@ -1,0 +1,26 @@
+export const vocabulary = Object.freeze({
+    addWordHint: "Надішли англійське слово або фразу — цього достатньо.\n\nНаприклад:\nresilient\n\nЯкщо важливе конкретне значення, додай контекст після / (також працюють | та \\):\ncharge / payment for a service",
+    missingWord: "Напиши слово після /add.",
+    invalidWord: "Надішли англійське слово або фразу.",
+    wordTooLong: "Слово має бути до 80 символів, а контекст — до 250.",
+    quotaCheckFailed: "Не вдалося перевірити денний ліміт. Спробуй ще раз за хвилину.",
+    addFailed: "Не вдалося обробити слово. Спробуй ще раз за хвилину.",
+    archive: Object.freeze({
+        missing: "Вкажи номер або діапазон зі списку: /delete 1 чи /delete 5-10. Для всіх слів: /delete all",
+        invalid: "Невірний формат. Використай /delete 1, /delete 5-10 або /delete all.",
+        outOfRange: "Можна видалити позиції від 1 до 10 із поточного /list.",
+        empty: "Немає активних слів, які можна позначити як вивчені.",
+        unavailable: "Не знайшов активних слів за цими позиціями. Онови список командою /list.",
+        shortList(count, wordCountLabel) { return `У поточному списку лише ${count} ${wordCountLabel(count)}. Онови його командою /list.`; },
+        success(count, wordCountLabel) { return `✅ Позначено як вивчені: ${count} ${wordCountLabel(count)}.`; },
+    }),
+    restore: Object.freeze({
+        missing: "Вкажи номер або діапазон з /archived: /restore 1 чи /restore 5-10. Для всіх слів: /restore all",
+        invalid: "Невірний формат. Використай /restore 1, /restore 5-10 або /restore all.",
+        outOfRange: "Можна повернути позиції від 1 до 10 із поточного /archived.",
+        empty: "Немає вивчених слів для повернення до навчання.",
+        unavailable: "Не знайшов вивчених слів за цими позиціями. Онови список командою /learned.",
+        shortList(count, wordCountLabel) { return `У списку вивчених лише ${count} ${wordCountLabel(count)}. Онови його командою /learned.`; },
+        success(count, wordCountLabel) { return `✅ Повернено до навчання ${count} ${wordCountLabel(count)}.`; },
+    }),
+});

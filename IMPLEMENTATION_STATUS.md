@@ -36,11 +36,13 @@ slices and genuine blockers. It is not a stream of intentions.
   helpers in `test-support/` and composition tests beside `worker.js`
 - [x] Add Ukrainian content catalog and stable navigation action foundation for
   a future interface locale
+- [x] Reduce `worker.js` to webhook composition by extracting navigation,
+  privacy rendering, and vocabulary text-command flows
 - [ ] Follow-up: release the first multilingual direction as a complete
   direction-neutral data-contract change.
 
 ## Latest verified result
 
-- `npm run check`: 48 tests passed, migrations validated, Worker dry-run built
+- `npm run check`: 51 tests passed, migrations validated, Worker dry-run built
 - Worker dry-run build: passed
 - Last deployed Worker status: HTTP 200

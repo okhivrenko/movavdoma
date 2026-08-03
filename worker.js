@@ -12,6 +12,8 @@ import {
     closePendingSelection,
     handleVocabularyCallback,
     saveAndSendWord,
+    senseKeyboard,
+    senseText,
     suggestSenses,
 } from "./src/features/vocabulary/vocabulary-cards.js";
 import { createMonobankDonationSync } from "./src/platform/monobank-donations.js";
@@ -40,7 +42,7 @@ import {
 import { adminHelpText, adminKeyboard } from "./src/features/admin/admin-panel.js";
 import { handleAdminCallback } from "./src/features/admin/admin-callbacks.js";
 import { handleAdminCommand } from "./src/features/admin/admin-commands.js";
-import { ADD_WORD_HINT, messages } from "./src/domain/messages.js";
+import { messages } from "./src/domain/messages.js";
 import {
     getDailySettings,
     handleDailySettingsCallback,
@@ -48,6 +50,7 @@ import {
 } from "./src/features/daily-words/daily-settings.js";
 import {
     getRecentActiveWords,
+    getRecentArchivedWords,
     handleExamplesCallback,
     handleWordListCallback,
     LIST_LIMIT,
@@ -90,6 +93,7 @@ import {
 } from "./src/features/navigation/navigation.js";
 import { privacyPolicyPage as renderPrivacyPolicyPage } from "./src/platform/privacy-policy.js";
 import { contentFor } from "./src/content/index.js";
+import { handleVocabularyTextCommand } from "./src/features/vocabulary/text-commands.js";
 
 // Default daily quota for newly saved words; individual bonuses may raise it.
 const DAILY_ADD_LIMIT = 10;
@@ -351,24 +355,13 @@ export default {
             adminKeyboard,
             sendHelp: sendHelpFlow,
             privacyPolicyUrl: PRIVACY_POLICY_URL,
-            addWordHint: ADD_WORD_HINT,
+            addWordHint: contentFor().vocabulary.addWordHint,
             welcome: messages.welcome,
             getDailySettings,
             contactPrompt: messages.contactPrompt,
             logError(event, error) {
                 console.error({ event, message: error instanceof Error ? error.message : "Unknown error" });
             },
-        })) {
-            return new Response("ok");
-        }
-
-        if (await handleAdminCommand(env, text, { chatId, userId }, {
-            isAdmin,
-            wordCountLabel,
-            dailyWordCardLimitForLevel,
-            grantManualDailyLimit: (targetEnv, targetUserId, dailyLimit) => grantManualDailyLimitFlow(targetEnv, targetUserId, dailyLimit, { getUserAccessLevel, dailyWordCardLimitForLevel, adminSettingsUpdated: messages.adminSettingsUpdated }),
-            grantManualAccessLevel: (targetEnv, targetUserId, accessLevel) => grantManualAccessLevelFlow(targetEnv, targetUserId, accessLevel, { grantAccessLevel, getDailyAdditionLimit, dailyAddLimit: DAILY_ADD_LIMIT, dailyWordCardLimitForLevel, adminSettingsUpdated: messages.adminSettingsUpdated }),
-            grantTestLevelOne: (targetEnv, targetUserId) => grantTestLevelOneFlow(targetEnv, targetUserId, { grantTemporaryAccessLevel, getDailyAdditionLimit, dailyAddLimit: DAILY_ADD_LIMIT, dailyWordCardLimitForLevel, adminSettingsUpdated: messages.adminSettingsUpdated }),
         })) {
             return new Response("ok");
         }
@@ -387,390 +380,35 @@ export default {
             }
             return new Response("ok");
         }
-
-        if (text === "/add") {
-            await sendMessage(
-                env,
-                chatId,
-                ADD_WORD_HINT
-            );
+        if (await handleVocabularyTextCommand(env, text, { chatId, userId }, {
+            sendMessage,
+            parseVocabularyInput,
+            claimDailyWordAddition,
+            getDailyAdditionLimit,
+            dailyLimitReachedText,
+            closePendingSelection,
+            saveAndSendWord,
+            suggestSenses,
+            senseText,
+            senseKeyboard,
+            wordCountLabel,
+            listLimit: LIST_LIMIT,
+            getRecentActiveWords,
+            getRecentArchivedWords,
+            sendActiveWordList,
+            sendLearnedWordList,
+        })) {
             return new Response("ok");
         }
 
-        const addMatch = text.match(/^\/add\s+(.+)$/i);
-        const addInput = addMatch
-            ? addMatch[1]
-            : text.startsWith("/")
-              ? null
-              : text;
-
-        if (addInput) {
-            const { word, explicitContext } = parseVocabularyInput(addInput);
-
-            if (!word) {
-                await sendMessage(env, chatId, "Напиши слово після /add.");
-                return new Response("ok");
-            }
-
-            if (!/[A-Za-z]/.test(word)) {
-                await sendMessage(
-                    env,
-                    chatId,
-                    ADD_WORD_HINT
-                );
-                return new Response("ok");
-            }
-
-            if (word.length > 80 || explicitContext.length > 250) {
-                await sendMessage(
-                    env,
-                    chatId,
-                    "Слово має бути до 80 символів, а контекст — до 250."
-                );
-                return new Response("ok");
-            }
-
-            let canAddWord;
-
-            try {
-                canAddWord = await claimDailyWordAddition(env, userId);
-            } catch (error) {
-                console.error({
-                    event: "daily_addition_limit_check_failed",
-                    message:
-                        error instanceof Error ? error.message : "Unknown error",
-                });
-                await sendMessage(
-                    env,
-                    chatId,
-                    "Не вдалося перевірити денний ліміт. Спробуй ще раз за хвилину."
-                );
-                return new Response("ok");
-            }
-
-            if (!canAddWord) {
-                const dailyLimit = await getDailyAdditionLimit(env, userId);
-                await sendMessage(
-                    env,
-                    chatId,
-                    dailyLimitReachedText(dailyLimit)
-                );
-                return new Response("ok");
-            }
-
-            await closePendingSelection(env, userId);
-
-            try {
-                if (explicitContext) {
-                    await saveAndSendWord(env, chatId, userId, word, explicitContext);
-                    return new Response("ok");
-                }
-
-                const senses = await suggestSenses(env, word);
-
-                if (senses.length === 1) {
-                    await saveAndSendWord(
-                        env,
-                        chatId,
-                        userId,
-                        word,
-                        senses[0].context_en
-                    );
-                    return new Response("ok");
-                }
-
-                const selectionMessage = await sendMessage(
-                    env,
-                    chatId,
-                    senseText(word, senses, 0),
-                    senseKeyboard(senses, 0)
-                );
-
-                await env.DB
-                    .prepare(`
-            INSERT INTO pending_words (
-              user_id,
-              source_text,
-              senses_json,
-              chat_id,
-              message_id
-            )
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(user_id)
-            DO UPDATE SET
-              source_text = excluded.source_text,
-              senses_json = excluded.senses_json,
-              chat_id = excluded.chat_id,
-              message_id = excluded.message_id,
-              created_at = CURRENT_TIMESTAMP
-          `)
-                    .bind(
-                        userId,
-                        word,
-                        JSON.stringify(senses),
-                        chatId,
-                        selectionMessage.message_id
-                    )
-                    .run();
-            } catch (error) {
-                console.error({
-                    event: "add_word_failed",
-                    message:
-                        error instanceof Error ? error.message : "Unknown error",
-                });
-                await sendMessage(
-                    env,
-                    chatId,
-                    "Не вдалося обробити слово. Спробуй ще раз за хвилину."
-                );
-            }
-
-            return new Response("ok");
-        }
-
-        const archiveMatch = text.match(/^\/(?:archive|delete)(?:\s+(.+))?$/i);
-
-        if (archiveMatch) {
-            const selection = archiveMatch[1]?.trim().toLowerCase();
-
-            if (!selection) {
-                await sendMessage(
-                    env,
-                    chatId,
-                    "Вкажи номер або діапазон зі списку: /delete 1 чи /delete 5-10. Для всіх слів: /delete all"
-                );
-                return new Response("ok");
-            }
-
-            if (selection === "all") {
-                const archived = await env.DB
-                    .prepare(`
-              UPDATE words
-              SET is_active = 0, learned_at = CURRENT_TIMESTAMP
-              WHERE user_id = ? AND is_active = 1
-            `)
-                    .bind(userId)
-                    .run();
-
-                if (archived.meta.changes === 0) {
-                    await sendMessage(
-                        env,
-                        chatId,
-                        "Немає активних слів, які можна позначити як вивчені."
-                    );
-                    return new Response("ok");
-                }
-
-                await sendMessage(
-                    env,
-                    chatId,
-                    `✅ Позначено як вивчені: ${archived.meta.changes} ${wordCountLabel(
-                        archived.meta.changes
-                    )}.`
-                );
-                return new Response("ok");
-            }
-
-            const rangeMatch = selection.match(/^(\d+)(?:\s*-\s*(\d+))?$/);
-
-            if (!rangeMatch) {
-                await sendMessage(
-                    env,
-                    chatId,
-                    "Невірний формат. Використай /delete 1, /delete 5-10 або /delete all."
-                );
-                return new Response("ok");
-            }
-
-            const start = Number(rangeMatch[1]);
-            const end = Number(rangeMatch[2] ?? rangeMatch[1]);
-
-            if (
-                !Number.isInteger(start) ||
-                !Number.isInteger(end) ||
-                start < 1 ||
-                end < start ||
-                end > LIST_LIMIT
-            ) {
-                await sendMessage(
-                    env,
-                    chatId,
-                    "Можна видалити позиції від 1 до 10 із поточного /list."
-                );
-                return new Response("ok");
-            }
-
-            const words = await getRecentActiveWords(env, userId);
-
-            if (end > words.length) {
-                await sendMessage(
-                    env,
-                    chatId,
-                    `У поточному списку лише ${words.length} ${wordCountLabel(
-                        words.length
-                    )}. Онови його командою /list.`
-                );
-                return new Response("ok");
-            }
-
-            const wordIds = words
-                .slice(start - 1, end)
-                .map((word) => word.id);
-            const placeholders = wordIds.map(() => "?").join(", ");
-            const archived = await env.DB
-                .prepare(`
-              UPDATE words
-              SET is_active = 0, learned_at = CURRENT_TIMESTAMP
-              WHERE user_id = ? AND is_active = 1 AND id IN (${placeholders})
-            `)
-                .bind(userId, ...wordIds)
-                .run();
-
-            if (archived.meta.changes === 0) {
-                await sendMessage(
-                    env,
-                    chatId,
-                    "Не знайшов активних слів за цими позиціями. Онови список командою /list."
-                );
-                return new Response("ok");
-            }
-
-            await sendMessage(
-                env,
-                chatId,
-                `✅ Позначено як вивчені: ${archived.meta.changes} ${wordCountLabel(
-                    archived.meta.changes
-                )}.`
-            );
-            return new Response("ok");
-        }
-
-        const restoreMatch = text.match(/^\/restore(?:\s+(.+))?$/i);
-
-        if (restoreMatch) {
-            const selection = restoreMatch[1]?.trim().toLowerCase();
-
-            if (!selection) {
-                await sendMessage(
-                    env,
-                    chatId,
-                    "Вкажи номер або діапазон з /archived: /restore 1 чи /restore 5-10. Для всіх слів: /restore all"
-                );
-                return new Response("ok");
-            }
-
-            if (selection === "all") {
-                const restored = await env.DB
-                    .prepare(`
-              UPDATE words
-              SET is_active = 1, learned_at = NULL
-              WHERE user_id = ? AND is_active = 0
-            `)
-                    .bind(userId)
-                    .run();
-
-                if (restored.meta.changes === 0) {
-                    await sendMessage(
-                        env,
-                        chatId,
-                        "Немає вивчених слів для повернення до навчання."
-                    );
-                    return new Response("ok");
-                }
-
-                await sendMessage(
-                    env,
-                    chatId,
-                    `✅ Повернено до навчання ${restored.meta.changes} ${wordCountLabel(
-                        restored.meta.changes
-                    )}.`
-                );
-                return new Response("ok");
-            }
-
-            const rangeMatch = selection.match(/^(\d+)(?:\s*-\s*(\d+))?$/);
-
-            if (!rangeMatch) {
-                await sendMessage(
-                    env,
-                    chatId,
-                    "Невірний формат. Використай /restore 1, /restore 5-10 або /restore all."
-                );
-                return new Response("ok");
-            }
-
-            const start = Number(rangeMatch[1]);
-            const end = Number(rangeMatch[2] ?? rangeMatch[1]);
-
-            if (
-                !Number.isInteger(start) ||
-                !Number.isInteger(end) ||
-                start < 1 ||
-                end < start ||
-                end > LIST_LIMIT
-            ) {
-                await sendMessage(
-                    env,
-                    chatId,
-                    "Можна повернути позиції від 1 до 10 із поточного /archived."
-                );
-                return new Response("ok");
-            }
-
-            const words = await getRecentArchivedWords(env, userId);
-
-            if (end > words.length) {
-                await sendMessage(
-                    env,
-                    chatId,
-                    `У списку вивчених лише ${words.length} ${wordCountLabel(
-                        words.length
-                    )}. Онови його командою /learned.`
-                );
-                return new Response("ok");
-            }
-
-            const wordIds = words
-                .slice(start - 1, end)
-                .map((word) => word.id);
-            const placeholders = wordIds.map(() => "?").join(", ");
-            const restored = await env.DB
-                .prepare(`
-              UPDATE words
-              SET is_active = 1, learned_at = NULL
-              WHERE user_id = ? AND is_active = 0 AND id IN (${placeholders})
-            `)
-                .bind(userId, ...wordIds)
-                .run();
-
-            if (restored.meta.changes === 0) {
-                await sendMessage(
-                    env,
-                    chatId,
-                    "Не знайшов вивчених слів за цими позиціями. Онови список командою /learned."
-                );
-                return new Response("ok");
-            }
-
-            await sendMessage(
-                env,
-                chatId,
-                `✅ Повернено до навчання ${restored.meta.changes} ${wordCountLabel(
-                    restored.meta.changes
-                )}.`
-            );
-            return new Response("ok");
-        }
-
-        if (text === "/list") {
-            await sendActiveWordList(env, chatId, userId);
-
-            return new Response("ok");
-        }
-
-        if (text === "/archived" || text === "/learned") {
-            await sendLearnedWordList(env, chatId, userId);
-
+        if (await handleAdminCommand(env, text, { chatId, userId }, {
+            isAdmin,
+            wordCountLabel,
+            dailyWordCardLimitForLevel,
+            grantManualDailyLimit: (targetEnv, targetUserId, dailyLimit) => grantManualDailyLimitFlow(targetEnv, targetUserId, dailyLimit, { getUserAccessLevel, dailyWordCardLimitForLevel, adminSettingsUpdated: messages.adminSettingsUpdated }),
+            grantManualAccessLevel: (targetEnv, targetUserId, accessLevel) => grantManualAccessLevelFlow(targetEnv, targetUserId, accessLevel, { grantAccessLevel, getDailyAdditionLimit, dailyAddLimit: DAILY_ADD_LIMIT, dailyWordCardLimitForLevel, adminSettingsUpdated: messages.adminSettingsUpdated }),
+            grantTestLevelOne: (targetEnv, targetUserId) => grantTestLevelOneFlow(targetEnv, targetUserId, { grantTemporaryAccessLevel, getDailyAdditionLimit, dailyAddLimit: DAILY_ADD_LIMIT, dailyWordCardLimitForLevel, adminSettingsUpdated: messages.adminSettingsUpdated }),
+        })) {
             return new Response("ok");
         }
 

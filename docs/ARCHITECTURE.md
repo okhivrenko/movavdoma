@@ -33,11 +33,13 @@ src/
     monobank-donations.js    Monobank statement synchronization
     worker-support.js        webhook repair and generic Worker support
   features/
+    navigation/              reply-keyboard action routing and localized menu copy
     admin/                   access grants, panel, callbacks, commands
     daily-words/             settings, quota, card generation, delivery
     donations/               requests, grants, notifications, callbacks
     feedback/                one-message feedback flow
     vocabulary/              cards, lists, callbacks, learned-word cleanup
+                            and text-command ingestion/archive/restore flows
 *.test.js                    Node tests co-located with their production module
 test-support/                shared test helpers (not executable tests)
 migrations/                  forward-only D1 schema changes
