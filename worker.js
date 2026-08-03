@@ -48,9 +48,8 @@ import {
 import {
     getRecentActiveWords,
     handleExamplesCallback,
+    handleWordListCallback,
     LIST_LIMIT,
-    refreshArchivedMessage,
-    refreshListMessage,
     sendActiveWordList,
     sendLearnedWordList,
 } from "./word-list.js";
@@ -328,99 +327,7 @@ export default {
                 return new Response("ok");
             }
 
-
-            if (
-                callback.data.startsWith("delete:") ||
-                callback.data.startsWith("archive:")
-            ) {
-                // New list buttons keep their page in callback data so a user
-                // stays on the same page after marking a word as learned.
-                // The optional page also preserves compatibility with older
-                // already-sent buttons that contain only the word ID.
-                const archiveMatch = callback.data.match(/^(?:delete|archive):(\d+)(?::(\d+))?$/);
-                const wordId = Number(archiveMatch?.[1]);
-                const page = Number(archiveMatch?.[2] ?? 0);
-
-                if (!Number.isInteger(wordId) || wordId <= 0 || !Number.isInteger(page) || page < 0) {
-                    await answerCallbackQuery(env, callback.id, "Невірний вибір.");
-                    return new Response("ok");
-                }
-
-                const archived = await env.DB
-                    .prepare(`
-              UPDATE words
-              SET is_active = 0, learned_at = CURRENT_TIMESTAMP
-              WHERE id = ? AND user_id = ? AND is_active = 1
-            `)
-                    .bind(wordId, userId)
-                    .run();
-
-                await answerCallbackQuery(
-                    env,
-                    callback.id,
-                    archived.meta.changes > 0
-                        ? "Слово позначено як вивчене."
-                        : "Це слово вже позначене як вивчене."
-                );
-
-                await refreshListMessage(env, chatId, messageId, userId, page);
-                return new Response("ok");
-            }
-
-            if (callback.data.startsWith("active-page:")) {
-                const page = Number(callback.data.replace("active-page:", ""));
-
-                if (!Number.isInteger(page) || page < 0) {
-                    await answerCallbackQuery(env, callback.id, "Невірна сторінка.");
-                    return new Response("ok");
-                }
-
-                await answerCallbackQuery(env, callback.id);
-                await refreshListMessage(env, chatId, messageId, userId, page);
-                return new Response("ok");
-            }
-
-            if (callback.data.startsWith("learned-page:")) {
-                const page = Number(callback.data.replace("learned-page:", ""));
-
-                if (!Number.isInteger(page) || page < 0) {
-                    await answerCallbackQuery(env, callback.id, "Невірна сторінка.");
-                    return new Response("ok");
-                }
-
-                await answerCallbackQuery(env, callback.id);
-                await refreshArchivedMessage(env, chatId, messageId, userId, page);
-                return new Response("ok");
-            }
-
-            if (callback.data.startsWith("restore:")) {
-                const restoreMatch = callback.data.match(/^restore:(\d+)(?::(\d+))?$/);
-                const wordId = Number(restoreMatch?.[1]);
-                const page = Number(restoreMatch?.[2] ?? 0);
-
-                if (!Number.isInteger(wordId) || wordId <= 0 || !Number.isInteger(page) || page < 0) {
-                    await answerCallbackQuery(env, callback.id, "Невірний вибір.");
-                    return new Response("ok");
-                }
-
-                const restored = await env.DB
-                    .prepare(`
-              UPDATE words
-              SET is_active = 1, learned_at = NULL
-              WHERE id = ? AND user_id = ? AND is_active = 0
-            `)
-                    .bind(wordId, userId)
-                    .run();
-
-                await answerCallbackQuery(
-                    env,
-                    callback.id,
-                    restored.meta.changes > 0
-                        ? "Слово повернено до навчання."
-                        : "Це слово вже у списку для навчання."
-                );
-
-                await refreshArchivedMessage(env, chatId, messageId, userId, page);
+            if (await handleWordListCallback(env, callback, { chatId, messageId, userId })) {
                 return new Response("ok");
             }
 

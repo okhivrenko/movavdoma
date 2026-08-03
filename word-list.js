@@ -169,3 +169,45 @@ export async function refreshArchivedMessage(env, chatId, messageId, userId, req
     try { await editMessage(env, chatId, messageId, text, keyboard); }
     catch { await sendMessage(env, chatId, text, keyboard); }
 }
+
+/** Handles archive, restore, and pagination callbacks for vocabulary lists. */
+export async function handleWordListCallback(env, callback, { chatId, messageId, userId }) {
+    const data = callback.data;
+    const invalid = async (text = "Невірний вибір.") => {
+        await answerCallbackQuery(env, callback.id, text);
+        return true;
+    };
+    if (data.startsWith("delete:") || data.startsWith("archive:")) {
+        const match = data.match(/^(?:delete|archive):(\d+)(?::(\d+))?$/);
+        const wordId = Number(match?.[1]);
+        const page = Number(match?.[2] ?? 0);
+        if (!Number.isInteger(wordId) || wordId <= 0 || !Number.isInteger(page) || page < 0) return invalid();
+        const archived = await env.DB.prepare(`
+          UPDATE words SET is_active = 0, learned_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND user_id = ? AND is_active = 1
+        `).bind(wordId, userId).run();
+        await answerCallbackQuery(env, callback.id, archived.meta.changes > 0 ? "Слово позначено як вивчене." : "Це слово вже позначене як вивчене.");
+        await refreshListMessage(env, chatId, messageId, userId, page);
+        return true;
+    }
+    if (data.startsWith("active-page:") || data.startsWith("learned-page:")) {
+        const page = Number(data.replace(/^(?:active|learned)-page:/, ""));
+        if (!Number.isInteger(page) || page < 0) return invalid("Невірна сторінка.");
+        await answerCallbackQuery(env, callback.id);
+        if (data.startsWith("active-page:")) await refreshListMessage(env, chatId, messageId, userId, page);
+        else await refreshArchivedMessage(env, chatId, messageId, userId, page);
+        return true;
+    }
+    if (!data.startsWith("restore:")) return false;
+    const match = data.match(/^restore:(\d+)(?::(\d+))?$/);
+    const wordId = Number(match?.[1]);
+    const page = Number(match?.[2] ?? 0);
+    if (!Number.isInteger(wordId) || wordId <= 0 || !Number.isInteger(page) || page < 0) return invalid();
+    const restored = await env.DB.prepare(`
+      UPDATE words SET is_active = 1, learned_at = NULL
+      WHERE id = ? AND user_id = ? AND is_active = 0
+    `).bind(wordId, userId).run();
+    await answerCallbackQuery(env, callback.id, restored.meta.changes > 0 ? "Слово повернено до навчання." : "Це слово вже у списку для навчання.");
+    await refreshArchivedMessage(env, chatId, messageId, userId, page);
+    return true;
+}
