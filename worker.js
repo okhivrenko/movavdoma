@@ -94,17 +94,11 @@ import {
 import { privacyPolicyPage as renderPrivacyPolicyPage } from "./src/platform/privacy-policy.js";
 import { contentFor } from "./src/content/index.js";
 import { handleVocabularyTextCommand } from "./src/features/vocabulary/text-commands.js";
+import { publicRuntimeConfig } from "./src/platform/runtime-config.js";
 
 // Default daily quota for newly saved words; individual bonuses may raise it.
 const DAILY_ADD_LIMIT = 10;
 // Daily-card quota is separate from the learning-list quota and depends on access.
-const MONOBANK_JAR_SEND_ID = "9vp8W5V9nQ";
-const BOT_BRAND_NAME = "MovaYakVDoma";
-// The Worker name is still technical for now. Keep this URL aligned with its
-// active workers.dev route; it also lets the cron repair Telegram's webhook
-// after an account-subdomain or Worker-name change.
-const PUBLIC_WORKER_URL = "https://movavdoma.oleksiikhivrenko.workers.dev";
-const PRIVACY_POLICY_URL = `${PUBLIC_WORKER_URL}/privacy`;
 const MAX_DAILY_WORD_ATTEMPTS = 3;
 const LEARNED_WORD_RETENTION_DAYS = 30;
 // Increment only when the persistent reply keyboard changes for users.
@@ -175,16 +169,15 @@ async function getDailyAdditionLimit(env, userId) {
 }
 
 const syncMonobankDonations = createMonobankDonationSync({
-    jarSendId: MONOBANK_JAR_SEND_ID,
     notifyPendingDonationRequests,
     notifyUnmatchedDonations,
 });
 
 // A public, static policy page is intentionally served before webhook
 // authentication so Telegram and users can open it without bot credentials.
-function privacyPolicyPage() {
+function privacyPolicyPage(env) {
     return renderPrivacyPolicyPage({
-        brandName: BOT_BRAND_NAME,
+        brandName: publicRuntimeConfig(env).botBrandName,
         effectiveDate: "2 серпня 2026 року",
         content: contentFor().privacyPolicy,
     });
@@ -196,7 +189,7 @@ export default {
     async fetch(request, env) {
         const url = new URL(request.url);
         if (request.method === "GET" && url.pathname === "/privacy") {
-            return new Response(privacyPolicyPage(), {
+            return new Response(privacyPolicyPage(env), {
                 headers: {
                     "content-type": "text/html; charset=UTF-8",
                     "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
@@ -206,7 +199,7 @@ export default {
         }
 
         if (request.method !== "POST") {
-            return new Response(`${BOT_BRAND_NAME} is running.`);
+            return new Response(`${publicRuntimeConfig(env).botBrandName} is running.`);
         }
 
         const webhookSecret = request.headers.get(
@@ -358,7 +351,7 @@ export default {
             adminHelpText,
             adminKeyboard,
             sendHelp: sendHelpFlow,
-            privacyPolicyUrl: PRIVACY_POLICY_URL,
+            privacyPolicyUrl: `${publicRuntimeConfig(env).publicWorkerUrl}/privacy`,
             addWordHint: contentFor().vocabulary.addWordHint,
             welcome: messages.welcome,
             getDailySettings,
@@ -427,7 +420,7 @@ export default {
 
     async scheduled(controller, env) {
         try {
-            await ensureTelegramWebhookFlow(env, PUBLIC_WORKER_URL, telegramApi);
+            await ensureTelegramWebhookFlow(env, publicRuntimeConfig(env).publicWorkerUrl, telegramApi);
         } catch (error) {
             console.error({
                 event: "telegram_webhook_configuration_failed",

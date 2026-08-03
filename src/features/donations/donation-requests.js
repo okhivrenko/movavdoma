@@ -1,7 +1,6 @@
 import { createSupportCode } from "../../domain/helpers.js";
 import { sendMessage } from "../../platform/telegram.js";
-
-export const MONOBANK_JAR_URL = "https://send.monobank.ua/jar/9vp8W5V9nQ";
+import { publicRuntimeConfig } from "../../platform/runtime-config.js";
 
 /** One open donation request per user, linked to a unique payment-comment code. */
 export async function getOpenDonationRequest(env, userId) {
@@ -29,15 +28,16 @@ export async function getOrCreateDonationRequest(env, userId) {
     throw new Error("Unable to generate a unique donation code.");
 }
 
-function supportKeyboard() {
-    return { inline_keyboard: [[{ text: "☕ Відкрити банку", url: MONOBANK_JAR_URL }]] };
+function supportKeyboard(env) {
+    const { monobankJarSendId } = publicRuntimeConfig(env);
+    return { inline_keyboard: [[{ text: "☕ Відкрити банку", url: `https://send.monobank.ua/jar/${encodeURIComponent(monobankJarSendId)}` }]] };
 }
 
 export async function sendDonationInstructions(env, chatId, userId) {
     const request = await getOrCreateDonationRequest(env, userId);
     await sendMessage(env, chatId,
         `Дякую за підтримку! Відкрий банку й, будь ласка, додай цей код у коментар до платежу:\n\n${request.support_code}\n\nПісля переказу натисни «🎁 Отримати бонус». Код допоможе мені точно знайти твій донат.`,
-        supportKeyboard());
+        supportKeyboard(env));
 }
 
 /** Marks an existing payment request for review and alerts the administrator. */

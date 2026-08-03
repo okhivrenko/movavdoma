@@ -2,6 +2,11 @@
   "name": "movavdoma",
   "main": "worker.js",
   "compatibility_date": "2026-07-31",
+  "vars": {
+    "BOT_BRAND_NAME": "MovaYakVDoma",
+    "PUBLIC_WORKER_URL": "https://movavdoma.oleksiikhivrenko.workers.dev",
+    "MONOBANK_JAR_SEND_ID": "9vp8W5V9nQ"
+  },
   "triggers": {
     "crons": ["* * * * *", "0 3 * * *"]
   },

@@ -36,6 +36,11 @@ Never commit or print these values:
 - `DEEPL_API_KEY` — currently no longer used by the latest card-generation flow, but remains configured in Cloudflare.
 - `MONOBANK_API_TOKEN` — personal Monobank API token used only to read the configured jar statement.
 
+Public runtime configuration lives in the version-controlled `vars` section of
+`wrangler.jsonc`: `BOT_BRAND_NAME`, `PUBLIC_WORKER_URL`, and
+`MONOBANK_JAR_SEND_ID`. These values are public identifiers, not credentials;
+tokens and API keys remain Worker Secrets.
+
 ## Current Worker behavior
 
 ### `/start`

@@ -26,7 +26,13 @@ function donationDb(request) {
 test("open donation requests are scoped to their owner and reused for instructions", async () => {
     const request = { id: 41, support_code: "MOV-ABCD", status: "awaiting_payment" };
     const db = donationDb(request);
-    const env = { DB: db, TELEGRAM_BOT_TOKEN: "test-token" };
+    const env = {
+        DB: db,
+        TELEGRAM_BOT_TOKEN: "test-token",
+        BOT_BRAND_NAME: "MovaYakVDoma",
+        PUBLIC_WORKER_URL: "https://example.test",
+        MONOBANK_JAR_SEND_ID: "9vp8W5V9nQ",
+    };
 
     assert.equal((await getOpenDonationRequest(env, 123)).id, 41);
     const { calls } = await captureTelegramCalls(() => sendDonationInstructions(env, 123, 123));

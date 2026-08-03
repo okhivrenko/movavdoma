@@ -1,5 +1,7 @@
 // Monobank statement synchronization is isolated from the webhook router so
 // its payment-validation and time-window rules remain independently testable.
+import { publicRuntimeConfig } from "./runtime-config.js";
+
 export const MONOBANK_MIN_SYNC_INTERVAL_SECONDS = 60;
 export const MONOBANK_STATEMENT_OVERLAP_SECONDS = 5 * 60;
 const MONOBANK_STATEMENT_MAX_LOOKBACK_SECONDS = 2_682_000;
@@ -21,7 +23,7 @@ export function monobankStatementStartTime(lastSuccessfulSyncAt, nowSeconds) {
     return Math.max(overlapStart, nowSeconds - MONOBANK_STATEMENT_MAX_LOOKBACK_SECONDS);
 }
 
-export function createMonobankDonationSync({ jarSendId, notifyPendingDonationRequests, notifyUnmatchedDonations }) {
+export function createMonobankDonationSync({ notifyPendingDonationRequests, notifyUnmatchedDonations }) {
     async function claimSync(env, nowSeconds) {
         const claimed = await env.DB
             .prepare(`
@@ -36,6 +38,7 @@ export function createMonobankDonationSync({ jarSendId, notifyPendingDonationReq
     }
 
     async function getJarId(env) {
+        const { monobankJarSendId: jarSendId } = publicRuntimeConfig(env);
         const state = await env.DB
             .prepare("SELECT jar_id, jar_send_id FROM monobank_sync_state WHERE id = 1")
             .first();
