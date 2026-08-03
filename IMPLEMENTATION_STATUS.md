@@ -34,11 +34,13 @@ slices and genuine blockers. It is not a stream of intentions.
   deliberate scaling path
 - [x] Co-locate module tests with their production modules; keep only shared
   helpers in `test-support/` and composition tests beside `worker.js`
+- [x] Add Ukrainian content catalog and stable navigation action foundation for
+  a future interface locale
 - [ ] Follow-up: release the first multilingual direction as a complete
   direction-neutral data-contract change.
 
 ## Latest verified result
 
-- `npm run check`: 46 tests passed, migrations validated, Worker dry-run built
+- `npm run check`: 48 tests passed, migrations validated, Worker dry-run built
 - Worker dry-run build: passed
 - Last deployed Worker status: HTTP 200

@@ -1,0 +1,36 @@
+export const navigation = Object.freeze({
+    buttons: Object.freeze({
+        addWord: "➕ Додати слово",
+        activeWords: "📚 Мої слова",
+        dailyWord: "📚 Щоденне слово",
+        learnedWords: "🎓 Вивчені слова",
+        help: "❓ Допомога",
+        nextPage: "➡️ Далі",
+        support: "☕ Підтримати бот",
+        bonus: "🎁 Отримати бонус",
+        feedback: "💬 Відгук",
+        contact: "📩 Зв’язатися з нами",
+        admin: "🛠 Адмін",
+        previousPage: "⬅️ Назад",
+    }),
+    legacySettingsButtons: Object.freeze([
+        "⚙️ Налаштувати",
+        "⚙️ Налаштувати щоденне слово",
+        "⏰ Нагадування",
+        "⏰ Щоденне слово",
+    ]),
+    schedulePrefix: "⏰ Розклад і рівень",
+    copy: Object.freeze({
+        interfaceUpdated: "✨ Меню оновлено. Можеш користуватися новими кнопками нижче.",
+        menu: "Ось меню:",
+        additionalMenu: "Додаткові можливості:",
+        mainMenu: "Основне меню:",
+        dailyWordFailed: "Не вдалося показати щоденне слово. Спробуй ще раз за хвилину.",
+        donationInstructionsFailed: "Не вдалося підготувати код для донату. Спробуй ще раз за хвилину.",
+        donationBonusFailed: "Не вдалося надіслати заявку на бонус. Спробуй ще раз за хвилину.",
+        adminOnly: "Ця дія доступна лише адміну.",
+        privacyPolicy(url) {
+            return `🔒 Політика конфіденційності: ${url}`;
+        },
+    }),
+});

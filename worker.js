@@ -55,7 +55,6 @@ import {
     sendLearnedWordList,
 } from "./src/features/vocabulary/word-list.js";
 import {
-    dailyScheduleKeyboardLabel,
     DEFAULT_DAILY_SETTINGS,
     dailyLimitReachedText,
     formatHryvnias,
@@ -84,6 +83,7 @@ import {
     ensureTelegramWebhook as ensureTelegramWebhookFlow,
     sendHelp as sendHelpFlow,
 } from "./src/platform/worker-support.js";
+import { mainKeyboard as localizedMainKeyboard } from "./src/features/navigation/navigation.js";
 
 // Default daily quota for newly saved words; individual bonuses may raise it.
 const DAILY_ADD_LIMIT = 10;
@@ -103,28 +103,7 @@ const INTERFACE_VERSION = 7;
 // User-facing reply/inline keyboards and the admin-only user directory.
 // Authorization itself stays in helpers.js so every entry path compares IDs consistently.
 function mainKeyboard(showAdmin = false, page = 1, dailySettings = DEFAULT_DAILY_SETTINGS) {
-    const firstPage = [
-        [{ text: "➕ Додати слово" }, { text: "📚 Мої слова" }],
-        [{ text: "📚 Щоденне слово" }, { text: "🎓 Вивчені слова" }],
-        [{ text: dailyScheduleKeyboardLabel(dailySettings) }],
-        [{ text: "❓ Допомога" }, { text: "➡️ Далі" }],
-    ];
-    const secondPage = [
-        [{ text: "☕ Підтримати бот" }, { text: "🎁 Отримати бонус" }],
-        [{ text: "💬 Відгук" }, { text: "📩 Зв’язатися з нами" }],
-    ];
-
-    if (showAdmin) {
-        secondPage.push([{ text: "🛠 Адмін" }]);
-    }
-
-    secondPage.push([{ text: "⬅️ Назад" }]);
-
-    return {
-        keyboard: page === 2 ? secondPage : firstPage,
-        resize_keyboard: true,
-        is_persistent: true,
-    };
+    return localizedMainKeyboard(showAdmin, page, dailySettings);
 }
 
 /** Builds a current reply keyboard without hard-coding a user's schedule. */

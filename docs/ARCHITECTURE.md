@@ -21,6 +21,7 @@ The Worker has two entry points:
 worker.js                    composition root
 worker.test.js               composition-level HTTP/webhook tests
 src/
+  content/                   locale-specific product copy (`uk` is current default)
   domain/                    pure rules and stable shared vocabulary
     helpers.js               parsing, formatting, local date, admin predicate
     messages.js              user-facing message templates
@@ -55,6 +56,14 @@ mutable global application state. Do not import `worker.js` from a module.
 Prefer exported functions and explicit dependency objects over classes. Cloudflare
 isolates are not durable process instances, so state belongs in D1/KV/Durable
 Objects, never in singleton classes.
+
+## Interface localization
+
+The current interface locale is Ukrainian (`uk`). `src/content/` separates
+localized copy from behavior; `src/features/navigation/navigation.js` maps
+reply-keyboard labels to stable internal menu actions. Do not store or expose a
+new interface locale until a separate migration and locale-selection feature
+handles existing Ukrainian keyboards safely.
 
 ## Multilingual boundary
 
