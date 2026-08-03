@@ -41,12 +41,8 @@ import { adminHelpText, adminKeyboard } from "./admin-panel.js";
 import { handleAdminCallback } from "./admin-callbacks.js";
 import { ADD_WORD_HINT, messages } from "./messages.js";
 import {
-    DAILY_LEVEL_OPTIONS,
-    DAILY_TIME_OPTIONS,
-    dailyLevelKeyboard,
-    dailyTimeKeyboard,
     getDailySettings,
-    refreshDailySettings,
+    handleDailySettingsCallback,
     sendDailySettings,
 } from "./daily-settings.js";
 import {
@@ -355,54 +351,7 @@ export default {
                 return new Response("ok");
             }
 
-            if (callback.data === "dailysettings:time") {
-                await answerCallbackQuery(env, callback.id, "Обери час.");
-                await editMessage(
-                    env,
-                    chatId,
-                    messageId,
-                    "🕒 Обери час щоденного слова:",
-                    dailyTimeKeyboard()
-                );
-                return new Response("ok");
-            }
-
-            if (callback.data === "dailysettings:level") {
-                await answerCallbackQuery(env, callback.id, "Обери рівень.");
-                await editMessage(
-                    env,
-                    chatId,
-                    messageId,
-                    "🎚 Обери рівень нових слів:",
-                    dailyLevelKeyboard()
-                );
-                return new Response("ok");
-            }
-
-            if (callback.data === "daily:off") {
-                await env.DB
-                    .prepare("UPDATE users SET daily_enabled = CASE WHEN daily_enabled = 1 THEN 0 ELSE 1 END WHERE telegram_user_id = ?")
-                    .bind(userId)
-                    .run();
-                await answerCallbackQuery(env, callback.id, "Налаштування оновлено.");
-                await refreshDailySettings(env, chatId, messageId, userId);
-                return new Response("ok");
-            }
-
-            if (callback.data.startsWith("dailylevel:")) {
-                const level = callback.data.replace("dailylevel:", "");
-
-                if (!DAILY_LEVEL_OPTIONS.includes(level)) {
-                    await answerCallbackQuery(env, callback.id, "Невірний рівень.");
-                    return new Response("ok");
-                }
-
-                await env.DB
-                    .prepare("UPDATE users SET daily_level = ? WHERE telegram_user_id = ?")
-                    .bind(level, userId)
-                    .run();
-                await answerCallbackQuery(env, callback.id, "Рівень збережено.");
-                await refreshDailySettings(env, chatId, messageId, userId);
+            if (await handleDailySettingsCallback(env, callback, { chatId, messageId, userId })) {
                 return new Response("ok");
             }
 
@@ -413,27 +362,6 @@ export default {
                 return new Response("ok");
             }
 
-            if (callback.data.startsWith("dailytime:")) {
-                const dailyTime = callback.data.replace("dailytime:", "");
-
-                if (!DAILY_TIME_OPTIONS.includes(dailyTime)) {
-                    await answerCallbackQuery(env, callback.id, "Невірний час.");
-                    return new Response("ok");
-                }
-
-                await env.DB
-                    .prepare(`
-                      UPDATE users
-                      SET daily_time = ?, daily_enabled = 1
-                      WHERE telegram_user_id = ?
-                    `)
-                    .bind(dailyTime, userId)
-                    .run();
-
-                await answerCallbackQuery(env, callback.id, "Час збережено.");
-                await refreshDailySettings(env, chatId, messageId, userId);
-                return new Response("ok");
-            }
 
             if (
                 callback.data.startsWith("delete:") ||
