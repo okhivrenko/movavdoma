@@ -64,14 +64,13 @@ export function mainKeyboard(showAdmin = false, page = 1, dailySettings, locale 
     const secondPage = [
         [{ text: buttons.support }, { text: buttons.bonus }],
         [{ text: buttons.feedback }, { text: buttons.contact }],
-        [{ text: buttons.shareBot }],
     ];
 
     if (showAdmin) {
         secondPage.push([{ text: buttons.admin }]);
     }
 
-    secondPage.push([{ text: buttons.previousPage }]);
+    secondPage.push([{ text: buttons.shareBot }, { text: buttons.previousPage }]);
 
     return {
         keyboard: page === 2 ? secondPage : firstPage,

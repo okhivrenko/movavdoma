@@ -22,7 +22,10 @@ test("navigation keyboard and feedback cancellation retain current Ukrainian UI"
     assert.equal(shouldClearPendingFeedback("📚 Мої слова"), true);
     assert.equal(menuActionFromText("📤 Поділитися ботом"), MENU_ACTION.SHARE_BOT);
     const secondPage = mainKeyboard(false, 2, { daily_time: "18:00", daily_enabled: 1, daily_level: "C1" });
-    assert.ok(secondPage.keyboard.flat().some((button) => button.text === "📤 Поділитися ботом"));
+    assert.deepEqual(
+        secondPage.keyboard.at(-1).map((button) => button.text),
+        ["📤 Поділитися ботом", "⬅️ Назад"]
+    );
 });
 
 test("share action sends a native Telegram share button and a copyable link", async () => {

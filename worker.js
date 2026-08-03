@@ -108,7 +108,7 @@ const PRIVACY_POLICY_URL = `${PUBLIC_WORKER_URL}/privacy`;
 const MAX_DAILY_WORD_ATTEMPTS = 3;
 const LEARNED_WORD_RETENTION_DAYS = 30;
 // Increment only when the persistent reply keyboard changes for users.
-const INTERFACE_VERSION = 8;
+const INTERFACE_VERSION = 9;
 
 // User-facing reply/inline keyboards and the admin-only user directory.
 // Authorization itself stays in helpers.js so every entry path compares IDs consistently.
