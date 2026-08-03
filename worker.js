@@ -70,6 +70,7 @@ import {
 } from "./daily-words.js";
 import { handleDailyWordCallback } from "./daily-word-callbacks.js";
 import { clearPendingFeedback, startFeedback, submitFeedback } from "./feedback.js";
+import { removeExpiredLearnedWords as cleanupLearnedWords } from "./learned-word-cleanup.js";
 
 // Default daily quota for newly saved words; individual bonuses may raise it.
 const DAILY_ADD_LIMIT = 10;
@@ -438,25 +439,6 @@ async function notifyExpiredDonationAccessGrants(env) {
 
 // Remove only already learned vocabulary after its retention period. Child rows
 // are deleted first because examples and reviews reference the vocabulary word.
-async function removeExpiredLearnedWords(env) {
-    const cutoff = `-${LEARNED_WORD_RETENTION_DAYS} days`;
-    const expiredWordIds = `
-      SELECT id FROM words
-      WHERE is_active = 0 AND learned_at IS NOT NULL
-        AND learned_at < datetime('now', ?)
-    `;
-    const results = await env.DB.batch([
-        env.DB.prepare(`DELETE FROM examples WHERE word_id IN (${expiredWordIds})`).bind(cutoff),
-        env.DB.prepare(`DELETE FROM reviews WHERE word_id IN (${expiredWordIds})`).bind(cutoff),
-        env.DB.prepare(`DELETE FROM words WHERE id IN (${expiredWordIds})`).bind(cutoff),
-    ]);
-
-    const deleted = results[2]?.meta?.changes ?? 0;
-    if (deleted > 0) {
-        console.log({ event: "expired_learned_words_removed", deleted });
-    }
-}
-
 /** Admin-only upgrade. Levels are intentionally monotonic: support is never lost. */
 async function grantManualAccessLevel(env, userId, accessLevel) {
     const user = await env.DB
@@ -2058,7 +2040,7 @@ export default {
 
         if (controller.cron === "0 3 * * *") {
             try {
-                await removeExpiredLearnedWords(env);
+                await cleanupLearnedWords(env, LEARNED_WORD_RETENTION_DAYS);
             } catch (error) {
                 console.error({
                     event: "learned_word_cleanup_failed",
