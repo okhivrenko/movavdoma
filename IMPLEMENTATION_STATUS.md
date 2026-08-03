@@ -45,8 +45,6 @@ slices and genuine blockers. It is not a stream of intentions.
 
 - `npm run check`: 53 tests passed, migrations validated, Worker dry-run built
 - Worker dry-run build: passed
-- Release blocker (3 August 2026): Cloudflare rejected remote D1 migration
-  access for `vocab-words-db` with error 7403. Do not push or deploy commit
-  the local feature commit until `wrangler d1 migrations list vocab-words-db --remote` works;
-  then apply migration `0016_add_telegram_profile_fields.sql`, confirm no
-  pending migrations, deploy, and verify HTTP 200.
+- Version 1.3.0 deployed on 3 August 2026: migration
+  `0016_add_telegram_profile_fields.sql` applied, D1 journal has no pending
+  migrations, and the production Worker returned HTTP 200.
