@@ -1,5 +1,5 @@
-import { createSupportCode } from "./helpers.js";
-import { sendMessage } from "./telegram.js";
+import { createSupportCode } from "../../domain/helpers.js";
+import { sendMessage } from "../../platform/telegram.js";
 
 export const MONOBANK_JAR_URL = "https://send.monobank.ua/jar/9vp8W5V9nQ";
 

@@ -1,5 +1,5 @@
-import { dailyWordCardLimitForLevel } from "./policies.js";
-import { sendMessage } from "./telegram.js";
+import { dailyWordCardLimitForLevel } from "../../domain/policies.js";
+import { sendMessage } from "../../platform/telegram.js";
 
 /** Idempotently approves one admin-reviewed donation and grants one month. */
 export async function grantDonationBonus(env, requestId, accessLevel, grantTemporaryAccessLevel) {

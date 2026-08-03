@@ -5,7 +5,7 @@ import {
     dailyScheduleKeyboardLabel,
     DEFAULT_DAILY_SETTINGS,
     parseVocabularyInput,
-} from "../helpers.js";
+} from "../src/domain/helpers.js";
 
 test("schedule menu label shows the current time and level", () => {
     assert.equal(

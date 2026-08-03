@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { grantDonationBonus, notifyExpiredDonationAccessGrants } from "../donation-grants.js";
+import { grantDonationBonus, notifyExpiredDonationAccessGrants } from "../src/features/donations/donation-grants.js";
 import { captureTelegramCalls, telegramCall } from "./worker-test-helpers.js";
 
 test("donation grant is idempotent before creating temporary access", async () => {

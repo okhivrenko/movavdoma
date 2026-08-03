@@ -1,4 +1,4 @@
-import { sendMessage } from "./telegram.js";
+import { sendMessage } from "../../platform/telegram.js";
 
 async function findUserChat(env, userId) {
     return env.DB

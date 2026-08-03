@@ -1,4 +1,4 @@
-import { answerCallbackQuery, sendMessage } from "./telegram.js";
+import { answerCallbackQuery, sendMessage } from "../../platform/telegram.js";
 import { adminHelpText, sendAdminUserList } from "./admin-panel.js";
 
 /** Handles only the stable `admin:` callback namespace after private-chat validation. */

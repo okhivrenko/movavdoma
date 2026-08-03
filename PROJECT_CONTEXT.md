@@ -2,7 +2,7 @@
 
 ## Purpose
 
-A personal Telegram bot for learning English vocabulary.
+A personal Telegram bot for vocabulary learning and future multilingual translation.
 
 Users add words through Telegram. The bot:
 
@@ -61,6 +61,10 @@ admin-only commands. It can also show a copyable direct bot link. The user
 list includes Telegram IDs, active-word count, and the current daily limit.
 
 Users can simply send an English word or phrase; `/add` remains supported.
+The currently active card direction is English → Ukrainian. The architecture also
+defines future Ukrainian → English, Spanish, Polish, and German directions, but
+does not expose them until language-neutral storage and direction selection are
+released together.
 `/menu` shows the keyboard again if it was hidden.
 
 To specify an exact meaning, users can send `word / context`; `|` and `\` are
@@ -320,6 +324,15 @@ CREATE TABLE IF NOT EXISTS pending_daily_words (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
+
+## Multilingual roadmap boundary
+
+Language codes and the first planned Ukrainian-source directions live in
+`src/domain/languages.js`. A future feature must add a forward-only migration
+with neutral target-language fields (and backfill existing Ukrainian values),
+then add user-owned direction selection and OpenAI prompts for the selected
+direction. Do not repurpose `translation_uk` or `sentence_uk` for another
+language.
 
 ## Local development requirements
 

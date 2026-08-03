@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { sendActiveWordList, sendLearnedWordList } from "../word-list.js";
+import { sendActiveWordList, sendLearnedWordList } from "../src/features/vocabulary/word-list.js";
 
 function envWithWords(words, total = words.length) {
     return {

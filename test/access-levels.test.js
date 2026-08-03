@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { getUserAccessLevel, grantAccessLevel } from "../access-levels.js";
+import { getUserAccessLevel, grantAccessLevel } from "../src/features/admin/access-levels.js";
 
 function accessDb({ permanent = 0, temporary = 0 } = {}) {
     const calls = [];

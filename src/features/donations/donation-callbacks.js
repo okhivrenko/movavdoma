@@ -1,5 +1,5 @@
-import { answerCallbackQuery, editMessage } from "./telegram.js";
-import { dailyWordCardLimitForLevel } from "./policies.js";
+import { answerCallbackQuery, editMessage } from "../../platform/telegram.js";
+import { dailyWordCardLimitForLevel } from "../../domain/policies.js";
 
 /** Handles stable `bonus:` callbacks after the Worker has checked private chat. */
 export async function handleDonationCallback(env, callback, context, dependencies) {

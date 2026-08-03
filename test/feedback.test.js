@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { startFeedback, submitFeedback } from "../feedback.js";
+import { startFeedback, submitFeedback } from "../src/features/feedback/feedback.js";
 import { captureTelegramCalls, telegramCall } from "./worker-test-helpers.js";
 
 function feedbackDb() {

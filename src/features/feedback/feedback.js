@@ -1,5 +1,5 @@
-import { messages } from "./messages.js";
-import { sendMessage } from "./telegram.js";
+import { messages } from "../../domain/messages.js";
+import { sendMessage } from "../../platform/telegram.js";
 
 /** The explicit feedback flow: one pending plain-text message per user. */
 export async function startFeedback(env, chatId, userId, prompt = messages.feedbackPrompt) {

@@ -5,7 +5,7 @@ import {
     getOpenDonationRequest,
     sendDonationInstructions,
     submitDonationBonusRequest,
-} from "../donation-requests.js";
+} from "../src/features/donations/donation-requests.js";
 import { captureTelegramCalls, telegramCall } from "./worker-test-helpers.js";
 
 function donationDb(request) {

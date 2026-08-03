@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { grantManualAccessLevel } from "../admin-access.js";
+import { grantManualAccessLevel } from "../src/features/admin/admin-access.js";
 import { captureTelegramCalls, telegramCall } from "./worker-test-helpers.js";
 
 test("manual access upgrade notifies an existing user only when the level changed", async () => {

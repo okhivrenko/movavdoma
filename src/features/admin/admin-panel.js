@@ -1,4 +1,4 @@
-import { editMessage, sendMessage } from "./telegram.js";
+import { editMessage, sendMessage } from "../../platform/telegram.js";
 
 const ADMIN_USER_LIST_LIMIT = 50;
 

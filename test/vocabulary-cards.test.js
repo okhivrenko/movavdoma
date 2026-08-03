@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { senseKeyboard, senseText } from "../vocabulary-cards.js";
+import { senseKeyboard, senseText } from "../src/features/vocabulary/vocabulary-cards.js";
 
 const senses = [
     { label_uk: "значення 1", context_en: "meaning one" },

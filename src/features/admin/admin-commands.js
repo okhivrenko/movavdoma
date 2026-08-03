@@ -1,4 +1,4 @@
-import { sendMessage } from "./telegram.js";
+import { sendMessage } from "../../platform/telegram.js";
 
 export async function handleAdminCommand(env, text, { chatId, userId }, d) {
     const grant = text.match(/^\/grant(?:\s+(.+))?$/i);

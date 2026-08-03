@@ -1,4 +1,4 @@
-import { answerCallbackQuery, editMessage, sendMessage } from "./telegram.js";
+import { answerCallbackQuery, editMessage, sendMessage } from "../../platform/telegram.js";
 
 export const LIST_LIMIT = 10;
 // Keep both vocabulary lists compact and visually consistent in Telegram.

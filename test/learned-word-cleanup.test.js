@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { removeExpiredLearnedWords } from "../learned-word-cleanup.js";
+import { removeExpiredLearnedWords } from "../src/features/vocabulary/learned-word-cleanup.js";
 
 test("learned-word cleanup deletes dependent rows before expired words", async () => {
     const statements = [];

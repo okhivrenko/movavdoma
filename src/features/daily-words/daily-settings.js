@@ -1,5 +1,5 @@
-import { answerCallbackQuery, editMessage, sendMessage } from "./telegram.js";
-import { DEFAULT_DAILY_SETTINGS } from "./helpers.js";
+import { answerCallbackQuery, editMessage, sendMessage } from "../../platform/telegram.js";
+import { DEFAULT_DAILY_SETTINGS } from "../../domain/helpers.js";
 
 // The settings UI is intentionally independent from daily-card delivery.
 // Callback routing remains in worker.js, which validates every user action.

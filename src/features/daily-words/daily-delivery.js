@@ -1,6 +1,6 @@
-import { localDateAndTime } from "./helpers.js";
+import { localDateAndTime } from "../../domain/helpers.js";
 import { dailyWordKeyboard, dailyWordText, getPendingDailyWord, savePendingDailyWord } from "./daily-words.js";
-import { sendMessage } from "./telegram.js";
+import { sendMessage } from "../../platform/telegram.js";
 
 export async function sendTodayDailyWord(env, chatId, userId, dependencies) {
     const user = await env.DB.prepare("SELECT timezone, daily_level FROM users WHERE telegram_user_id = ?").bind(userId).first();

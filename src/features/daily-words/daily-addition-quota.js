@@ -1,4 +1,4 @@
-import { localDateAndTime } from "./helpers.js";
+import { localDateAndTime } from "../../domain/helpers.js";
 
 // Atomically claims a learning-list slot before a word is generated or saved.
 export async function claimDailyWordAddition(env, userId, dependencies) {

@@ -1,9 +1,9 @@
-import { dailyLimitReachedText } from "./helpers.js";
+import { dailyLimitReachedText } from "../../domain/helpers.js";
 import {
     hasPendingDailyWord,
     savePendingDailyWordToLearning,
 } from "./daily-words.js";
-import { answerCallbackQuery, editMessage, sendMessage } from "./telegram.js";
+import { answerCallbackQuery, editMessage, sendMessage } from "../../platform/telegram.js";
 
 /** Handles the two user-owned actions on an already-sent daily word card. */
 export async function handleDailyWordCallback(env, callback, context, dependencies) {

@@ -7,45 +7,45 @@ import {
     getBotLink,
     sendMessage,
     telegramApi,
-} from "./telegram.js";
+} from "./src/platform/telegram.js";
 import {
     closePendingSelection,
     handleVocabularyCallback,
     saveAndSendWord,
     suggestSenses,
-} from "./vocabulary-cards.js";
-import { createMonobankDonationSync } from "./monobank-donations.js";
+} from "./src/features/vocabulary/vocabulary-cards.js";
+import { createMonobankDonationSync } from "./src/platform/monobank-donations.js";
 import {
     sendDonationInstructions,
     submitDonationBonusRequest as submitDonationBonusRequestFlow,
-} from "./donation-requests.js";
+} from "./src/features/donations/donation-requests.js";
 import {
     grantDonationBonus as grantDonationBonusRequest,
     notifyExpiredDonationAccessGrants as notifyExpiredDonationAccessGrantsFlow,
     rejectDonationBonus as rejectDonationBonusRequest,
-} from "./donation-grants.js";
-import { notifyPendingDonationRequests as notifyDonationReviews, notifyUnmatchedDonations as notifyUnmatchedDonationAlerts } from "./donation-notifications.js";
-import { handleDonationCallback } from "./donation-callbacks.js";
+} from "./src/features/donations/donation-grants.js";
+import { notifyPendingDonationRequests as notifyDonationReviews, notifyUnmatchedDonations as notifyUnmatchedDonationAlerts } from "./src/features/donations/donation-notifications.js";
+import { handleDonationCallback } from "./src/features/donations/donation-callbacks.js";
 import {
     getAdminChatId,
     getUserAccessLevel,
     grantAccessLevel,
     grantTemporaryAccessLevel,
-} from "./access-levels.js";
+} from "./src/features/admin/access-levels.js";
 import {
     grantManualAccessLevel as grantManualAccessLevelFlow,
     grantManualDailyLimit as grantManualDailyLimitFlow,
     grantTestLevelOne as grantTestLevelOneFlow,
-} from "./admin-access.js";
-import { adminHelpText, adminKeyboard } from "./admin-panel.js";
-import { handleAdminCallback } from "./admin-callbacks.js";
-import { handleAdminCommand } from "./admin-commands.js";
-import { ADD_WORD_HINT, messages } from "./messages.js";
+} from "./src/features/admin/admin-access.js";
+import { adminHelpText, adminKeyboard } from "./src/features/admin/admin-panel.js";
+import { handleAdminCallback } from "./src/features/admin/admin-callbacks.js";
+import { handleAdminCommand } from "./src/features/admin/admin-commands.js";
+import { ADD_WORD_HINT, messages } from "./src/domain/messages.js";
 import {
     getDailySettings,
     handleDailySettingsCallback,
     sendDailySettings,
-} from "./daily-settings.js";
+} from "./src/features/daily-words/daily-settings.js";
 import {
     getRecentActiveWords,
     handleExamplesCallback,
@@ -53,7 +53,7 @@ import {
     LIST_LIMIT,
     sendActiveWordList,
     sendLearnedWordList,
-} from "./word-list.js";
+} from "./src/features/vocabulary/word-list.js";
 import {
     dailyScheduleKeyboardLabel,
     DEFAULT_DAILY_SETTINGS,
@@ -62,28 +62,28 @@ import {
     isAdmin,
     parseVocabularyInput,
     wordCountLabel,
-} from "./helpers.js";
+} from "./src/domain/helpers.js";
 import {
     claimDailyWordAddition as claimDailyWordAdditionFlow,
     getDailyAdditionLimit as getDailyAdditionLimitFlow,
-} from "./daily-addition-quota.js";
+} from "./src/features/daily-words/daily-addition-quota.js";
 import {
     dailyWordCardLimitForLevel,
     donationAccessLevel,
-} from "./policies.js";
+} from "./src/domain/policies.js";
 import {
     claimDailyWordCard,
     generateDailyWordCard,
     generateNewDailyWord,
-} from "./daily-words.js";
-import { handleDailyWordCallback } from "./daily-word-callbacks.js";
-import { clearPendingFeedback, startFeedback, submitFeedback } from "./feedback.js";
-import { removeExpiredLearnedWords as cleanupLearnedWords } from "./learned-word-cleanup.js";
-import { sendDueDailyWords as deliverDueDailyWords, sendTodayDailyWord as deliverTodayDailyWord } from "./daily-delivery.js";
+} from "./src/features/daily-words/daily-words.js";
+import { handleDailyWordCallback } from "./src/features/daily-words/daily-word-callbacks.js";
+import { clearPendingFeedback, startFeedback, submitFeedback } from "./src/features/feedback/feedback.js";
+import { removeExpiredLearnedWords as cleanupLearnedWords } from "./src/features/vocabulary/learned-word-cleanup.js";
+import { sendDueDailyWords as deliverDueDailyWords, sendTodayDailyWord as deliverTodayDailyWord } from "./src/features/daily-words/daily-delivery.js";
 import {
     ensureTelegramWebhook as ensureTelegramWebhookFlow,
     sendHelp as sendHelpFlow,
-} from "./worker-support.js";
+} from "./src/platform/worker-support.js";
 
 // Default daily quota for newly saved words; individual bonuses may raise it.
 const DAILY_ADD_LIMIT = 10;

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { adminKeyboard, sendAdminUserList } from "../admin-panel.js";
+import { adminKeyboard, sendAdminUserList } from "../src/features/admin/admin-panel.js";
 import { captureTelegramCalls, telegramCall } from "./worker-test-helpers.js";
 
 test("admin panel keeps stable callback actions and reports an empty user list", async () => {

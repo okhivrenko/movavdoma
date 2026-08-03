@@ -6,7 +6,7 @@ import {
     donationAccessLevel,
     donationDailyLimit,
     normalizeAccessLevel,
-} from "../policies.js";
+} from "../src/domain/policies.js";
 
 test("daily-card limits map exactly to access levels", () => {
     assert.deepEqual(

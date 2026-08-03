@@ -1,5 +1,5 @@
-import { openAIJson } from "./openai.js";
-import { answerCallbackQuery, editMessage, sendMessage } from "./telegram.js";
+import { openAIJson } from "../../platform/openai.js";
+import { answerCallbackQuery, editMessage, sendMessage } from "../../platform/telegram.js";
 
 export const SENSES_PER_PAGE = 3;
 const MAX_SENSES = 9;

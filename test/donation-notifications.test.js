@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { adminDonationKeyboard } from "../donation-notifications.js";
-import { notifyUnmatchedDonations } from "../donation-notifications.js";
+import { adminDonationKeyboard } from "../src/features/donations/donation-notifications.js";
+import { notifyUnmatchedDonations } from "../src/features/donations/donation-notifications.js";
 
 test("donation review keyboard preserves stable admin callback formats", () => {
     const keyboard = adminDonationKeyboard(42, 2).inline_keyboard.flat();

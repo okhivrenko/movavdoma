@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { handleDonationCallback } from "../donation-callbacks.js";
+import { handleDonationCallback } from "../src/features/donations/donation-callbacks.js";
 import { captureTelegramCalls, telegramCall } from "./worker-test-helpers.js";
 
 test("donation callbacks reject non-admins before grant operations", async () => {

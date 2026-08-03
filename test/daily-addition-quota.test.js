@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { claimDailyWordAddition, getDailyAdditionLimit } from "../daily-addition-quota.js";
+import { claimDailyWordAddition, getDailyAdditionLimit } from "../src/features/daily-words/daily-addition-quota.js";
 
 test("daily addition quota atomically binds the owner's local day and effective limit", async () => {
     const calls = [];
