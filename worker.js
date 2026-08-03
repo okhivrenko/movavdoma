@@ -10,11 +10,8 @@ import {
 } from "./telegram.js";
 import {
     closePendingSelection,
-    getPendingWord,
+    handleVocabularyCallback,
     saveAndSendWord,
-    senseKeyboard,
-    senseText,
-    SENSES_PER_PAGE,
     suggestSenses,
 } from "./vocabulary-cards.js";
 import { createMonobankDonationSync } from "./monobank-donations.js";
@@ -1292,93 +1289,7 @@ export default {
                 return new Response("ok");
             }
 
-            const pending = await getPendingWord(env, userId);
-
-            if (!pending) {
-                await answerCallbackQuery(
-                    env,
-                    callback.id,
-                    "Цей вибір уже неактуальний. Додай слово ще раз."
-                );
-                return new Response("ok");
-            }
-
-            if (callback.data.startsWith("page:")) {
-                const page = Number(callback.data.replace("page:", ""));
-                const totalPages = Math.ceil(
-                    pending.senses.length / SENSES_PER_PAGE
-                );
-
-                if (!Number.isInteger(page) || page < 0 || page >= totalPages) {
-                    await answerCallbackQuery(env, callback.id, "Невірна сторінка.");
-                    return new Response("ok");
-                }
-
-                await answerCallbackQuery(env, callback.id, "");
-
-                const nextText = senseText(pending.word, pending.senses, page);
-                const nextKeyboard = senseKeyboard(pending.senses, page);
-
-                try {
-                    await editMessage(
-                        env,
-                        chatId,
-                        messageId,
-                        nextText,
-                        nextKeyboard
-                    );
-                } catch {
-                    await sendMessage(
-                        env,
-                        chatId,
-                        nextText,
-                        nextKeyboard
-                    );
-                }
-
-                return new Response("ok");
-            }
-
-            if (callback.data.startsWith("sense:")) {
-                const senseIndex = Number(callback.data.replace("sense:", ""));
-                const selectedSense = pending.senses[senseIndex];
-
-                if (!selectedSense) {
-                    await answerCallbackQuery(env, callback.id, "Невірний вибір.");
-                    return new Response("ok");
-                }
-
-                await answerCallbackQuery(env, callback.id, "Створюю картку…");
-
-                try {
-                    await editMessage(
-                        env,
-                        chatId,
-                        messageId,
-                        `✅ Обране значення: ${selectedSense.label_uk}`,
-                        { inline_keyboard: [] }
-                    );
-
-                    await saveAndSendWord(
-                        env,
-                        chatId,
-                        userId,
-                        pending.word,
-                        selectedSense.context_en
-                    );
-
-                    await env.DB
-                        .prepare("DELETE FROM pending_words WHERE user_id = ?")
-                        .bind(userId)
-                        .run();
-                } catch {
-                    await sendMessage(
-                        env,
-                        chatId,
-                        "Не вдалося створити картку. Спробуй вибрати значення ще раз."
-                    );
-                }
-            }
+            await handleVocabularyCallback(env, callback, { chatId, messageId, userId });
 
             return new Response("ok");
         }
