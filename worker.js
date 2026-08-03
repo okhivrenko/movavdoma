@@ -61,17 +61,13 @@ import {
 } from "./policies.js";
 import {
     claimDailyWordCard,
-    dailyWordKeyboard,
-    dailyWordText,
     generateDailyWordCard,
     generateNewDailyWord,
-    getPendingDailyWord,
-    savePendingDailyWord,
 } from "./daily-words.js";
 import { handleDailyWordCallback } from "./daily-word-callbacks.js";
 import { clearPendingFeedback, startFeedback, submitFeedback } from "./feedback.js";
 import { removeExpiredLearnedWords as cleanupLearnedWords } from "./learned-word-cleanup.js";
-import { sendTodayDailyWord as deliverTodayDailyWord } from "./daily-delivery.js";
+import { sendDueDailyWords as deliverDueDailyWords, sendTodayDailyWord as deliverTodayDailyWord } from "./daily-delivery.js";
 
 // Default daily quota for newly saved words; individual bonuses may raise it.
 const DAILY_ADD_LIMIT = 10;
@@ -597,107 +593,6 @@ const syncMonobankDonations = createMonobankDonationSync({
     notifyPendingDonationRequests,
     notifyUnmatchedDonations,
 });
-
-async function sendDueDailyWords(env, scheduledTime) {
-    const users = await env.DB
-        .prepare(`
-          SELECT telegram_user_id, chat_id, timezone, daily_time, daily_level, last_delivery_local_date
-          FROM users
-          WHERE is_active = 1 AND daily_enabled = 1
-        `)
-        .all();
-
-    for (const user of users.results) {
-        const localTime = localDateAndTime(user.timezone, scheduledTime);
-
-        if (!localTime || localTime.time !== user.daily_time) {
-            continue;
-        }
-
-        if (user.last_delivery_local_date === localTime.date) {
-            continue;
-        }
-
-        // Do not replace a card the user has not answered yet. A manual card
-        // and the scheduled reminder share the same daily-card experience.
-        if (await getPendingDailyWord(env, user.telegram_user_id, localTime.date)) {
-            await env.DB
-                .prepare("UPDATE users SET last_delivery_local_date = ? WHERE telegram_user_id = ?")
-                .bind(localTime.date, user.telegram_user_id)
-                .run();
-            continue;
-        }
-
-        if (!(await claimDailyWordCard(env, user.telegram_user_id, localTime.date, {
-            isAdmin, getUserAccessLevel, dailyWordCardLimitForLevel,
-        }))) {
-            continue;
-        }
-
-        let claimedDelivery = false;
-        let pendingId = null;
-
-        try {
-            const card = await generateNewDailyWord(
-                env, user.telegram_user_id, user.daily_level,
-                generateDailyWordCard, MAX_DAILY_WORD_ATTEMPTS
-            );
-
-            const claimed = await env.DB
-                .prepare(`
-                  UPDATE users
-                  SET last_delivery_local_date = ?
-                  WHERE telegram_user_id = ?
-                    AND (last_delivery_local_date IS NULL OR last_delivery_local_date <> ?)
-                `)
-                .bind(localTime.date, user.telegram_user_id, localTime.date)
-                .run();
-
-            if (claimed.meta.changes === 0) {
-                continue;
-            }
-
-            claimedDelivery = true;
-
-            pendingId = await savePendingDailyWord(
-                env,
-                user.telegram_user_id,
-                card,
-                localTime.date
-            );
-            await sendMessage(
-                env,
-                user.chat_id,
-                dailyWordText(card, user.daily_level),
-                dailyWordKeyboard(pendingId)
-            );
-        } catch (error) {
-            console.error({
-                event: "daily_word_delivery_failed",
-                userId: user.telegram_user_id,
-                message: error instanceof Error ? error.message : "Unknown error",
-            });
-
-            if (claimedDelivery) {
-                await env.DB
-                    .prepare(`
-                      UPDATE users
-                      SET last_delivery_local_date = NULL
-                      WHERE telegram_user_id = ? AND last_delivery_local_date = ?
-                    `)
-                    .bind(user.telegram_user_id, localTime.date)
-                    .run();
-            }
-
-            if (pendingId) {
-                await env.DB
-                    .prepare("DELETE FROM pending_daily_words WHERE id = ? AND user_id = ?")
-                    .bind(pendingId, user.telegram_user_id)
-                    .run();
-            }
-        }
-    }
-}
 
 async function sendHelp(env, chatId, userId) {
     await sendMessage(
@@ -2008,7 +1903,13 @@ export default {
         }
 
         try {
-            await sendDueDailyWords(env, controller.scheduledTime);
+            await deliverDueDailyWords(env, controller.scheduledTime, {
+                claimDailyWordCard,
+                access: { isAdmin, getUserAccessLevel, dailyWordCardLimitForLevel },
+                generateNewDailyWord,
+                generateDailyWordCard,
+                maxAttempts: MAX_DAILY_WORD_ATTEMPTS,
+            });
         } catch (error) {
             console.error({
                 event: "daily_word_schedule_failed",
