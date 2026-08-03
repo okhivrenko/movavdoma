@@ -59,6 +59,15 @@ npm run check
 For a production release, follow `RELEASING.md` and verify the public Worker
 returns HTTP 200 after deployment.
 
+## Delivery cadence
+
+- Work in one small, complete vertical slice at a time: implementation or
+  extraction, focused tests, full check, then commit/push/deploy when required.
+- Do not report a planned action as started until a concrete code or test
+  change has been made.
+- Update `IMPLEMENTATION_STATUS.md` only after a completed slice or a genuine
+  blocker; it is a result monitor, not a stream of intentions.
+
 ## Senior engineering quality gate
 
 For every non-trivial feature, refactor, migration, security-sensitive change,

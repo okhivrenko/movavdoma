@@ -7,7 +7,7 @@ each coherent delivery slice.
 ## Current work
 
 - **Stage:** daily-card flow — test contracts and module extraction
-- **State:** in progress
+- **State:** queued as the next complete delivery slice
 - **Next concrete action:** add isolated D1/Telegram tests for pending cards,
   `know`/`learn`, and independent daily limits before moving code from
   `worker.js` to `daily-words.js`.
