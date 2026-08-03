@@ -91,3 +91,6 @@ Do not add Express. This is a Cloudflare Worker, not a persistent Node HTTP
 server. Use native `fetch`/`Response` plus ES modules. Consider Hono only if a
 real public HTTP API grows to several independently versioned routes with
 shared middleware; it is not needed for the Telegram webhook today.
+
+See [worker refactoring retrospective](./WORKER_REFACTORING_RETROSPECTIVE_UA.md)
+for the completed decomposition and a compact repeatable playbook.
