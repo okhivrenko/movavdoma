@@ -68,6 +68,7 @@ import {
     savePendingDailyWord,
 } from "./daily-words.js";
 import { handleDailyWordCallback } from "./daily-word-callbacks.js";
+import { clearPendingFeedback, startFeedback, submitFeedback } from "./feedback.js";
 
 // Default daily quota for newly saved words; individual bonuses may raise it.
 const DAILY_ADD_LIMIT = 10;
@@ -565,32 +566,6 @@ async function removeExpiredLearnedWords(env) {
     if (deleted > 0) {
         console.log({ event: "expired_learned_words_removed", deleted });
     }
-}
-
-async function startFeedback(env, chatId, userId, prompt = messages.feedbackPrompt) {
-    await env.DB
-        .prepare("UPDATE users SET feedback_pending = 1 WHERE telegram_user_id = ?")
-        .bind(userId)
-        .run();
-    await sendMessage(env, chatId, prompt);
-}
-
-async function clearPendingFeedback(env, userId) {
-    await env.DB
-        .prepare("UPDATE users SET feedback_pending = 0 WHERE telegram_user_id = ? AND feedback_pending = 1")
-        .bind(userId)
-        .run();
-}
-
-async function submitFeedback(env, chatId, userId, feedback) {
-    const adminChatId = await getAdminChatId(env);
-    if (!adminChatId) {
-        throw new Error("Feedback admin chat is unavailable.");
-    }
-
-    await sendMessage(env, adminChatId, `💬 Новий відгук\nКористувач: ${userId}\n\n${feedback}`);
-    await clearPendingFeedback(env, userId);
-    await sendMessage(env, chatId, messages.feedbackThankYou);
 }
 
 /** Admin-only upgrade. Levels are intentionally monotonic: support is never lost. */
@@ -1866,7 +1841,7 @@ export default {
 
         if (feedbackState?.feedback_pending === 1 && !text.startsWith("/")) {
             try {
-                await submitFeedback(env, chatId, userId, text.slice(0, 3500));
+                await submitFeedback(env, chatId, userId, text.slice(0, 3500), getAdminChatId);
             } catch (error) {
                 console.error({ event: "feedback_delivery_failed", message: error instanceof Error ? error.message : "Unknown error" });
                 await sendMessage(env, chatId, "Не вдалося передати відгук. Спробуй надіслати його ще раз за хвилину.");

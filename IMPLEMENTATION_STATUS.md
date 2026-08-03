@@ -7,9 +7,9 @@ each coherent delivery slice.
 ## Current work
 
 - **Stage:** incremental Worker decomposition
-- **State:** daily-card persistence and user-owned callbacks extracted and verified
-- **Next concrete action:** extract donation/feedback service boundaries, then
-  route the remaining callbacks by feature without changing callback formats.
+- **State:** daily-card and feedback flows extracted and verified
+- **Next concrete action:** extract donation service boundaries, then route the
+  remaining callbacks by feature without changing callback formats.
 
 ## Plan
 
@@ -19,6 +19,7 @@ each coherent delivery slice.
 - [x] Extract vocabulary-card generation, sense selection, and persistence
 - [x] Extract access-level reads and monotonic grant operations
 - [x] Test and extract daily-card delivery
+- [x] Extract feedback state and delivery flow
 - [ ] Test and extract donation / Monobank service
 - [ ] Route callbacks by feature
 - [ ] Cover remaining admin, feedback, learned-word, and scheduled-job flows
