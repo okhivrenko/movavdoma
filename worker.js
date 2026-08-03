@@ -95,6 +95,12 @@ import { privacyPolicyPage as renderPrivacyPolicyPage } from "./src/platform/pri
 import { contentFor } from "./src/content/index.js";
 import { handleVocabularyTextCommand } from "./src/features/vocabulary/text-commands.js";
 import { publicRuntimeConfig } from "./src/platform/runtime-config.js";
+import {
+    clearPendingTextTranslation,
+    handlePendingTextTranslation,
+    handleTextTranslationCallback,
+    sendTextTranslationMenu,
+} from "./src/features/translations/text-translation.js";
 
 // Default daily quota for newly saved words; individual bonuses may raise it.
 const DAILY_ADD_LIMIT = 10;
@@ -102,7 +108,7 @@ const DAILY_ADD_LIMIT = 10;
 const MAX_DAILY_WORD_ATTEMPTS = 3;
 const LEARNED_WORD_RETENTION_DAYS = 30;
 // Increment only when the persistent reply keyboard changes for users.
-const INTERFACE_VERSION = 9;
+const INTERFACE_VERSION = 10;
 
 // User-facing reply/inline keyboards and the admin-only user directory.
 // Authorization itself stays in helpers.js so every entry path compares IDs consistently.
@@ -267,6 +273,10 @@ export default {
                 return new Response("ok");
             }
 
+            if (await handleTextTranslationCallback(env, callback, { chatId, messageId, userId })) {
+                return new Response("ok");
+            }
+
             if (await handleDailyWordCallback(env, callback, { chatId, messageId, userId }, {
                 claimDailyWordAddition,
                 getDailyAdditionLimit,
@@ -325,6 +335,7 @@ export default {
         // vocabulary word cannot accidentally be forwarded as feedback.
         if (shouldClearPendingFeedback(text)) {
             await clearPendingFeedback(env, userId);
+            await clearPendingTextTranslation(env, userId);
         }
 
         if (await handleNavigationMessage(env, text, { chatId, userId }, {
@@ -335,6 +346,7 @@ export default {
             sendActiveWordList,
             sendLearnedWordList,
             sendDailySettings,
+            sendTextTranslationMenu,
             sendTodayDailyWord: (targetEnv, targetChatId, targetUserId) => deliverTodayDailyWord(targetEnv, targetChatId, targetUserId, {
                 claimDailyWordCard,
                 access: { isAdmin, getUserAccessLevel, dailyWordCardLimitForLevel },
@@ -376,6 +388,9 @@ export default {
                 console.error({ event: "feedback_delivery_failed", message: error instanceof Error ? error.message : "Unknown error" });
                 await sendMessage(env, chatId, "Не вдалося передати відгук. Спробуй надіслати його ще раз за хвилину.");
             }
+            return new Response("ok");
+        }
+        if (await handlePendingTextTranslation(env, chatId, userId, text)) {
             return new Response("ok");
         }
         if (await handleVocabularyTextCommand(env, text, { chatId, userId }, {

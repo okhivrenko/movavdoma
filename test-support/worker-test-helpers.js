@@ -62,6 +62,9 @@ export class WorkerTestDb {
         if (query.includes("UPDATE users SET feedback_pending = 0")) {
             return { meta: { changes: 0 } };
         }
+        if (query.includes("DELETE FROM pending_text_translations")) {
+            return { meta: { changes: 0 } };
+        }
         if (query.includes("UPDATE users SET feedback_pending = 1")) {
             return { meta: { changes: 1 } };
         }

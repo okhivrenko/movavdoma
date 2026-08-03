@@ -56,7 +56,7 @@ test("/start shows the saved schedule and the first menu page", async () => {
         message.reply_markup.keyboard[0].map((button) => button.text),
         ["➕ Додати слово", "📚 Мої слова"]
     );
-    assert.equal(message.reply_markup.keyboard[2][0].text, "⏰ Розклад і рівень (18:00 — Рівень C1)");
+    assert.equal(message.reply_markup.keyboard[2][0].text, "🌐 Перекласти текст");
 });
 
 test("/menu and Ukrainian menu buttons use navigation routing", async () => {
@@ -72,6 +72,17 @@ test("/menu and Ukrainian menu buttons use navigation routing", async () => {
         webhookRequest(privateMessageUpdate({ updateId: 21, text: "➡️ Далі" })), env
     ));
     assert.equal(telegramCall(nextPage.calls, "sendMessage").text, "Додаткові можливості:");
+    assert.match(telegramCall(nextPage.calls, "sendMessage").reply_markup.keyboard[0][0].text, /^⏰ Розклад і рівень/);
+
+    const translate = await captureTelegramCalls(() => worker.fetch(
+        webhookRequest(privateMessageUpdate({ updateId: 211, text: "🌐 Перекласти текст" })), env
+    ));
+    const translationMenu = telegramCall(translate.calls, "sendMessage");
+    assert.match(translationMenu.text, /Обери напрям перекладу/);
+    assert.deepEqual(
+        translationMenu.reply_markup.inline_keyboard.map(([button]) => button.callback_data),
+        ["translate:uk:en", "translate:en:uk"]
+    );
 
     const feedbackClearCount = db.calls.filter((call) => call.query?.includes("feedback_pending = 0")).length;
     const feedback = await captureTelegramCalls(() => worker.fetch(
@@ -84,6 +95,7 @@ test("/menu and Ukrainian menu buttons use navigation routing", async () => {
 test("daily settings can be changed in two steps and keep the settings menu visible", async () => {
     const db = new WorkerTestDb({
         dailySettings: { daily_time: "10:00", daily_enabled: 1, daily_level: "A0" },
+        interfaceVersion: 10,
     });
     const env = workerEnv(db);
 

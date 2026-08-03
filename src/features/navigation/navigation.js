@@ -6,6 +6,7 @@ export const MENU_ACTION = Object.freeze({
     ACTIVE_WORDS: "active_words",
     DAILY_WORD: "daily_word",
     LEARNED_WORDS: "learned_words",
+    TRANSLATE_TEXT: "translate_text",
     SETTINGS: "settings",
     HELP: "help",
     NEXT_PAGE: "next_page",
@@ -23,6 +24,7 @@ const buttonAction = Object.freeze({
     activeWords: MENU_ACTION.ACTIVE_WORDS,
     dailyWord: MENU_ACTION.DAILY_WORD,
     learnedWords: MENU_ACTION.LEARNED_WORDS,
+    translateText: MENU_ACTION.TRANSLATE_TEXT,
     help: MENU_ACTION.HELP,
     nextPage: MENU_ACTION.NEXT_PAGE,
     support: MENU_ACTION.SUPPORT,
@@ -58,10 +60,11 @@ export function mainKeyboard(showAdmin = false, page = 1, dailySettings, locale 
     const firstPage = [
         [{ text: buttons.addWord }, { text: buttons.activeWords }],
         [{ text: buttons.dailyWord }, { text: buttons.learnedWords }],
-        [{ text: dailyScheduleKeyboardLabel(dailySettings) }],
+        [{ text: buttons.translateText }],
         [{ text: buttons.help }, { text: buttons.nextPage }],
     ];
     const secondPage = [
+        [{ text: dailyScheduleKeyboardLabel(dailySettings) }],
         [{ text: buttons.support }, { text: buttons.bonus }],
         [{ text: buttons.feedback }, { text: buttons.contact }],
     ];
@@ -94,6 +97,7 @@ export async function handleNavigationMessage(env, text, context, dependencies) 
         sendActiveWordList,
         sendLearnedWordList,
         sendDailySettings,
+        sendTextTranslationMenu,
         sendTodayDailyWord,
         sendDonationInstructions,
         submitDonationBonusRequest,
@@ -145,6 +149,11 @@ export async function handleNavigationMessage(env, text, context, dependencies) 
 
     if (action === MENU_ACTION.SETTINGS) {
         await sendDailySettings(env, chatId, userId);
+        return true;
+    }
+
+    if (action === MENU_ACTION.TRANSLATE_TEXT) {
+        await sendTextTranslationMenu(env, chatId);
         return true;
     }
 

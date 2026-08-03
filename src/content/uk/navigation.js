@@ -4,6 +4,7 @@ export const navigation = Object.freeze({
         activeWords: "📚 Мої слова",
         dailyWord: "📚 Щоденне слово",
         learnedWords: "🎓 Вивчені слова",
+        translateText: "🌐 Перекласти текст",
         help: "❓ Допомога",
         nextPage: "➡️ Далі",
         support: "☕ Підтримати бот",

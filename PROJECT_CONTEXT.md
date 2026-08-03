@@ -56,11 +56,11 @@ the current time and level, then leads to:
 - `📚 Мої слова`
 - `🎓 Вивчені слова`
 - `📚 Щоденне слово`
-- `⏰ Розклад і рівень`
+- `🌐 Перекласти текст`
 - `❓ Допомога`
 - `💬 Відгук`
 - `➡️ Далі` / `⬅️ Назад` split the persistent menu into two pages. The second
-  page has support, bonus, feedback, contact, a share-bot action, and the admin entry point.
+  page has `⏰ Розклад і рівень`, support, bonus, feedback, contact, a share-bot action, and the admin entry point.
 
 The admin also sees `🛠 Адмін`, which opens an admin-only panel with a paginated
 user list, the `/grant <userId> <dailyLimit>` format, and a summary of
@@ -140,6 +140,14 @@ timezone to a bot. A Cloudflare Cron Trigger runs every minute in UTC, while
 the Worker compares each user's configured hour in their stored timezone. It
 uses `last_delivery_local_date` to send no more than one daily word per local
 date.
+
+### Text translation
+
+`🌐 Перекласти текст` is an ephemeral Ukrainian ↔ English translation flow.
+The user chooses the direction, then sends exactly one word, phrase, or
+sentence. The input is never added to the vocabulary. Each request is limited
+to 256 Unicode characters and each user can make up to 10 translations per
+local day; the D1 counter is claimed atomically before the OpenAI request.
 
 ### Support and bonuses
 

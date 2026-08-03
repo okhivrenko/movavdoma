@@ -10,7 +10,7 @@ function openAIRetryDelay(response, attempt) {
 }
 
 /** Calls OpenAI with strict JSON output and retries transient failures only. */
-export async function openAIJson(env, name, schema, instructions, input) {
+export async function openAIJson(env, name, schema, instructions, input, options = {}) {
     for (let attempt = 0; attempt < MAX_OPENAI_ATTEMPTS; attempt += 1) {
         let response;
         try {
@@ -18,7 +18,7 @@ export async function openAIJson(env, name, schema, instructions, input) {
                 method: "POST",
                 headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
                 body: JSON.stringify({
-                    model: "gpt-5.4-nano", reasoning_effort: "none", max_completion_tokens: 400,
+                    model: "gpt-5.4-nano", reasoning_effort: "none", max_completion_tokens: options.maxCompletionTokens ?? 400,
                     response_format: { type: "json_schema", json_schema: { name, strict: true, schema } },
                     messages: [{ role: "developer", content: instructions }, { role: "user", content: input }],
                 }),

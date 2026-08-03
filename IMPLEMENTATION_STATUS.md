@@ -9,7 +9,8 @@ slices and genuine blockers. It is not a stream of intentions.
 - **State:** production code is organized into `src/domain`, `src/platform`,
   and feature folders. `worker.js` is the authenticated HTTP/webhook
   composition root. The multilingual catalog is prepared, while the active
-  vocabulary direction remains English → Ukrainian.
+  vocabulary direction remains English → Ukrainian; a separate ephemeral
+  Ukrainian ↔ English text translator is available from the main menu.
 - **Next concrete action:** deliver the first selected multilingual direction
   only as a complete data, UX, prompt, rendering, and test slice; see
   `docs/DEVELOPER_GUIDE_UA.md` and `docs/ARCHITECTURE.md`.
@@ -40,13 +41,13 @@ slices and genuine blockers. It is not a stream of intentions.
   privacy rendering, and vocabulary text-command flows
 - [ ] Follow-up: release the first multilingual direction as a complete
   direction-neutral data-contract change.
+- [x] Add bounded Ukrainian ↔ English text translation without changing
+  vocabulary-card storage.
 
 ## Latest verified result
 
-- `npm run check`: 53 tests passed, migrations validated, Worker dry-run built
-- Worker dry-run build: passed
-- Version 1.4.0 deployed on 3 August 2026: the Cloudflare Worker and public URL
-  are now `movayakvdoma`; health and privacy returned HTTP 200, Telegram
-  webhook repair completed for the new URL, all six Worker secrets remained
-  configured, and D1 has no pending migrations. The GitHub repository retains
-  its existing `okhivrenko/movavdoma` name until it is renamed separately.
+- `npm run check`: 58 tests passed, migrations validated, Worker dry-run built.
+- Version 1.5.0 deployed on 3 August 2026: the bounded Ukrainian ↔ English
+  translation flow and updated menu are live. Production migration `0017` was
+  applied before deployment, the D1 journal has no pending migrations, and the
+  public Worker returned HTTP 200.
