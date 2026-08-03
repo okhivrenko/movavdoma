@@ -20,3 +20,6 @@ For the module map and multilingual boundary, read
 [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md). To transfer the agent setup
 to a new Telegram bot, use [`docs/AGENT_HANDOFF.md`](./docs/AGENT_HANDOFF.md)
 and [`workflows/cloudflare-telegram-feature.md`](./workflows/cloudflare-telegram-feature.md).
+
+For day-to-day manual development and safe scaling, start with
+[`docs/DEVELOPER_GUIDE_UA.md`](./docs/DEVELOPER_GUIDE_UA.md).

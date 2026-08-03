@@ -1,18 +1,18 @@
 # Implementation status
 
-This file is a small, human-readable progress monitor for the active
-architecture and test-hardening work. It is updated at the start and end of
-each coherent delivery slice.
+This file is a small, human-readable progress monitor for completed delivery
+slices and genuine blockers. It is not a stream of intentions.
 
 ## Current work
 
-- **Stage:** incremental Worker decomposition
-- **State:** all callback namespaces, donation lifecycle, daily settings and
-  delivery, word-list actions, quotas, and admin commands are feature modules;
-  `worker.js` is the authenticated HTTP/webhook composition root.
-- **Next concrete action:** make a dedicated, test-backed extraction only when
-  changing one of the remaining text-command domains (menu, word ingestion,
-  archive/restore, or feedback), rather than risk a broad router rewrite.
+- **Stage:** feature-first modular architecture
+- **State:** production code is organized into `src/domain`, `src/platform`,
+  and feature folders. `worker.js` is the authenticated HTTP/webhook
+  composition root. The multilingual catalog is prepared, while the active
+  vocabulary direction remains English → Ukrainian.
+- **Next concrete action:** deliver the first selected multilingual direction
+  only as a complete data, UX, prompt, rendering, and test slice; see
+  `docs/DEVELOPER_GUIDE_UA.md` and `docs/ARCHITECTURE.md`.
 
 ## Plan
 
@@ -29,11 +29,14 @@ each coherent delivery slice.
 - [x] Extract daily-addition quota operations
 - [x] Route callbacks and stable admin commands by feature
 - [x] Final decomposition security and reliability review
-- [ ] Follow-up: extract one remaining text-command domain at a time when it is
-  changed for product work; add a direct Worker test for that domain first.
+- [x] Move production modules into feature-first folders
+- [x] Document the dependency boundaries, manual development workflow, and
+  deliberate scaling path
+- [ ] Follow-up: release the first multilingual direction as a complete
+  direction-neutral data-contract change.
 
 ## Latest verified result
 
-- `npm run check`: 45 tests passed, migrations validated, Worker dry-run built
+- `npm run check`: 46 tests passed, migrations validated, Worker dry-run built
 - Worker dry-run build: passed
 - Last deployed Worker status: HTTP 200
