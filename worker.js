@@ -83,7 +83,13 @@ import {
     ensureTelegramWebhook as ensureTelegramWebhookFlow,
     sendHelp as sendHelpFlow,
 } from "./src/platform/worker-support.js";
-import { mainKeyboard as localizedMainKeyboard } from "./src/features/navigation/navigation.js";
+import {
+    handleNavigationMessage,
+    mainKeyboard as localizedMainKeyboard,
+    shouldClearPendingFeedback,
+} from "./src/features/navigation/navigation.js";
+import { privacyPolicyPage as renderPrivacyPolicyPage } from "./src/platform/privacy-policy.js";
+import { contentFor } from "./src/content/index.js";
 
 // Default daily quota for newly saved words; individual bonuses may raise it.
 const DAILY_ADD_LIMIT = 10;
@@ -173,47 +179,11 @@ const syncMonobankDonations = createMonobankDonationSync({
 // A public, static policy page is intentionally served before webhook
 // authentication so Telegram and users can open it without bot credentials.
 function privacyPolicyPage() {
-    return `<!doctype html>
-<html lang="uk">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Privacy Policy - ${BOT_BRAND_NAME}</title>
-  <style>
-    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #16243a; background: #f6f8fb; }
-    body { margin: 0; padding: 32px 16px; }
-    main { max-width: 760px; margin: 0 auto; padding: 42px; background: #fff; border: 1px solid #dce4ef; border-radius: 20px; box-shadow: 0 12px 35px rgba(31, 52, 81, .08); }
-    h1 { margin: 0 0 8px; font-size: 32px; } h2 { margin-top: 32px; font-size: 21px; } p, li { color: #40516a; line-height: 1.6; } .date { color: #66758b; margin-top: 0; } strong { color: #16243a; } code { padding: 2px 5px; background: #edf2f8; border-radius: 4px; }
-  </style>
-</head>
-<body><main>
-  <h1>Privacy Policy for ${BOT_BRAND_NAME}</h1>
-  <p class="date">Дата набуття чинності: 2 серпня 2026 року</p>
-  <p>${BOT_BRAND_NAME} - Telegram-бот для вивчення лексики. Нижче описано, які дані бот обробляє, навіщо це потрібно та як із нами зв'язатися.</p>
-
-  <h2>1. Які дані обробляються</h2>
-  <ul><li>Telegram user ID і chat ID;</li><li>слова, фрази, необов'язковий контекст і повідомлення feedback;</li><li>налаштування навчання: рівень, час нагадування, статуси слів і ліміти;</li><li>створені переклади, приклади та прогрес навчання;</li><li>технічні записи для захисту від повторних Telegram-оновлень і роботи нагадувань;</li><li>для заявки на бонус: код підтримки, статус заявки й відомості з виписки банки Monobank - сума, час і коментар до платежу.</li></ul>
-  <p>Бот не запитує і не зберігає номери карток, CVV або паролі Telegram.</p>
-
-  <h2>2. Навіщо це потрібно</h2>
-  <p>Дані використовуються лише для створення карток слів, збереження словника й прогресу, надсилання увімкнених нагадувань, керування бонусами, обробки feedback і безпечної роботи бота.</p>
-
-  <h2>3. Сторонні сервіси</h2>
-  <ul><li><strong>Telegram</strong> доставляє повідомлення між вами та ботом.</li><li><strong>Cloudflare</strong> розміщує бот і базу даних D1.</li><li><strong>OpenAI</strong> отримує слово або фразу та необов'язковий контекст для створення перекладу, значень і прикладів.</li><li><strong>Monobank</strong> використовується лише для перевірки донату до підключеної банки.</li></ul>
-  <p>Повідомлення через «📩 Зв'язатися з нами» та «💬 Відгук» пересилаються адміну бота. Дані не продаються й не використовуються для реклами.</p>
-
-  <h2>4. Строк зберігання</h2>
-  <p>Активні слова зберігаються, доки ви не попросите видалити дані. Вивчені слова автоматично видаляються через 30 днів після позначення як вивчені разом із прикладами та історією повторень. Технічні записи зберігаються лише настільки, наскільки це потрібно для роботи, безпеки й підтримки бота.</p>
-
-  <h2>5. Ваші права та запити</h2>
-  <p>Нагадування можна вимкнути у «⏰ Розклад і рівень». Щоб попросити доступ, виправлення або видалення даних, натисніть «📩 Зв'язатися з нами» й надішліть <code>Delete my data</code> або <code>Видалити мої дані</code>. Для захисту даних ми можемо попросити підтвердити запит із того ж Telegram-акаунта.</p>
-
-  <h2>6. Безпека та зміни</h2>
-  <p>Бот використовує HTTPS і обмежує адміністративні дії налаштованим адміністратором. Не надсилайте боту паролі, дані картки або іншу чутливу інформацію. Політика може оновлюватися разом зі змінами функцій або практик обробки даних.</p>
-
-  <h2>7. Контакт</h2>
-  <p>З питань приватності використовуйте кнопку «📩 Зв'язатися з нами» у боті.</p>
-</main></body></html>`;
+    return renderPrivacyPolicyPage({
+        brandName: BOT_BRAND_NAME,
+        effectiveDate: "2 серпня 2026 року",
+        content: contentFor().privacyPolicy,
+    });
 }
 
 // Telegram webhook and scheduled delivery entry points. Callback actions are
@@ -352,174 +322,43 @@ export default {
 
         // Any command or menu action abandons a feedback draft, so a later
         // vocabulary word cannot accidentally be forwarded as feedback.
-        if (text !== "💬 Відгук" && (text.startsWith("/") || text.startsWith("⏰ Розклад і рівень") || [
-            "➕ Додати слово", "📚 Мої слова", "🎓 Вивчені слова",
-            "⚙️ Налаштувати", "⚙️ Налаштувати щоденне слово", "⏰ Нагадування", "⏰ Розклад і рівень", "⏰ Щоденне слово", "📚 Щоденне слово",
-            "☕ Підтримати бот", "🎁 Отримати бонус", "📩 Зв’язатися з нами", "🛠 Адмін", "❓ Допомога",
-            "➡️ Далі", "⬅️ Назад",
-        ].includes(text))) {
+        if (shouldClearPendingFeedback(text)) {
             await clearPendingFeedback(env, userId);
         }
 
-        if (text === "/start") {
-            const settings = await getDailySettings(env, userId) ?? DEFAULT_DAILY_SETTINGS;
-            await sendMessage(
-                env,
-                chatId,
-                messages.welcome(settings),
-                mainKeyboard(isAdmin(env, userId), 1, settings)
-            );
-            await markInterfaceVersion(env, userId);
-            return new Response("ok");
-        }
-
-        if (text === "/menu") {
-            await sendMessage(env, chatId, "Ось меню:", await mainKeyboardForUser(env, userId));
-            await markInterfaceVersion(env, userId);
-            return new Response("ok");
-        }
-
-        if (text === "➕ Додати слово") {
-            await sendMessage(
-                env,
-                chatId,
-                ADD_WORD_HINT
-            );
-            return new Response("ok");
-        }
-
-        if (text === "➡️ Далі") {
-            await sendMessage(env, chatId, "Додаткові можливості:", await mainKeyboardForUser(env, userId, 2));
-            return new Response("ok");
-        }
-
-        if (text === "⬅️ Назад") {
-            await sendMessage(env, chatId, "Основне меню:", await mainKeyboardForUser(env, userId));
-            return new Response("ok");
-        }
-
-        if (text === "📚 Мої слова") {
-            await sendActiveWordList(env, chatId, userId);
-            return new Response("ok");
-        }
-
-        if (text === "🎓 Вивчені слова") {
-            await sendLearnedWordList(env, chatId, userId);
-            return new Response("ok");
-        }
-
-        if (
-            text === "⚙️ Налаштувати" ||
-            text === "⚙️ Налаштувати щоденне слово" ||
-            text === "⏰ Нагадування" ||
-            text.startsWith("⏰ Розклад і рівень") ||
-            text === "⏰ Щоденне слово"
-        ) {
-            await sendDailySettings(env, chatId, userId);
-            return new Response("ok");
-        }
-
-        if (text === "📚 Щоденне слово") {
-            try {
-                await deliverTodayDailyWord(env, chatId, userId, {
-                    claimDailyWordCard,
-                    access: { isAdmin, getUserAccessLevel, dailyWordCardLimitForLevel },
-                    dailyWordCardLimitForLevel,
-                    getUserAccessLevel,
-                    generateNewDailyWord,
-                    generateDailyWordCard,
-                    maxAttempts: MAX_DAILY_WORD_ATTEMPTS,
-                });
-            } catch (error) {
-                console.error({
-                    event: "manual_daily_word_failed",
-                    message: error instanceof Error ? error.message : "Unknown error",
-                });
-                await sendMessage(
-                    env,
-                    chatId,
-                    "Не вдалося показати щоденне слово. Спробуй ще раз за хвилину."
-                );
-            }
-            return new Response("ok");
-        }
-
-        if (text === "☕ Підтримати бот") {
-            try {
-                await sendDonationInstructions(env, chatId, userId);
-            } catch (error) {
-                console.error({
-                    event: "donation_instructions_failed",
-                    message: error instanceof Error ? error.message : "Unknown error",
-                });
-                await sendMessage(
-                    env,
-                    chatId,
-                    "Не вдалося підготувати код для донату. Спробуй ще раз за хвилину."
-                );
-            }
-            return new Response("ok");
-        }
-
-        if (text === "🎁 Отримати бонус") {
-            try {
-                await submitDonationBonusRequestFlow(env, chatId, userId, notifyPendingDonationRequests);
-            } catch (error) {
-                console.error({
-                    event: "donation_bonus_request_failed",
-                    message: error instanceof Error ? error.message : "Unknown error",
-                });
-                await sendMessage(
-                    env,
-                    chatId,
-                    "Не вдалося надіслати заявку на бонус. Спробуй ще раз за хвилину."
-                );
-            }
-            return new Response("ok");
-        }
-
-        if (text === "💬 Відгук") {
-            await startFeedback(env, chatId, userId);
-            return new Response("ok");
-        }
-
-        if (text === "📩 Зв’язатися з нами") {
-            await startFeedback(
-                env,
-                chatId,
-                userId,
-                "📩 Є ідея, запитання чи хочеш створити власного бота? Надішли повідомлення, і ми все обговоримо."
-            );
-            return new Response("ok");
-        }
-
-        if (text === "🛠 Адмін") {
-            if (!isAdmin(env, userId)) {
-                await sendMessage(env, chatId, "Ця дія доступна лише адміну.");
-                return new Response("ok");
-            }
-
-            await sendMessage(env, chatId, adminHelpText(), adminKeyboard());
-            return new Response("ok");
-        }
-
-        if (text === "❓ Допомога") {
-                await sendHelpFlow(env, chatId, userId, mainKeyboardForUser);
-            return new Response("ok");
-        }
-
-        if (text === "/help") {
-            await sendHelpFlow(env, chatId, userId, mainKeyboardForUser);
-            return new Response("ok");
-        }
-
-        if (text === "/privacy") {
-            await sendMessage(
-                env,
-                chatId,
-                `🔒 Політика конфіденційності: ${PRIVACY_POLICY_URL}`,
-                await mainKeyboardForUser(env, userId)
-            );
+        if (await handleNavigationMessage(env, text, { chatId, userId }, {
+            isAdmin,
+            keyboardForUser: mainKeyboardForUser,
+            markInterfaceVersion,
+            sendMessage,
+            sendActiveWordList,
+            sendLearnedWordList,
+            sendDailySettings,
+            sendTodayDailyWord: (targetEnv, targetChatId, targetUserId) => deliverTodayDailyWord(targetEnv, targetChatId, targetUserId, {
+                claimDailyWordCard,
+                access: { isAdmin, getUserAccessLevel, dailyWordCardLimitForLevel },
+                dailyWordCardLimitForLevel,
+                getUserAccessLevel,
+                generateNewDailyWord,
+                generateDailyWordCard,
+                maxAttempts: MAX_DAILY_WORD_ATTEMPTS,
+            }),
+            sendDonationInstructions,
+            submitDonationBonusRequest: submitDonationBonusRequestFlow,
+            notifyPendingDonationRequests,
+            startFeedback,
+            adminHelpText,
+            adminKeyboard,
+            sendHelp: sendHelpFlow,
+            privacyPolicyUrl: PRIVACY_POLICY_URL,
+            addWordHint: ADD_WORD_HINT,
+            welcome: messages.welcome,
+            getDailySettings,
+            contactPrompt: messages.contactPrompt,
+            logError(event, error) {
+                console.error({ event, message: error instanceof Error ? error.message : "Unknown error" });
+            },
+        })) {
             return new Response("ok");
         }
 

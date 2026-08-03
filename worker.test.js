@@ -59,6 +59,28 @@ test("/start shows the saved schedule and the first menu page", async () => {
     assert.equal(message.reply_markup.keyboard[2][0].text, "⏰ Розклад і рівень (18:00 — Рівень C1)");
 });
 
+test("/menu and Ukrainian menu buttons use navigation routing", async () => {
+    const db = new WorkerTestDb();
+    const env = workerEnv(db);
+
+    const menu = await captureTelegramCalls(() => worker.fetch(
+        webhookRequest(privateMessageUpdate({ updateId: 20, text: "/menu" })), env
+    ));
+    assert.equal(telegramCall(menu.calls, "sendMessage").text, "Ось меню:");
+
+    const nextPage = await captureTelegramCalls(() => worker.fetch(
+        webhookRequest(privateMessageUpdate({ updateId: 21, text: "➡️ Далі" })), env
+    ));
+    assert.equal(telegramCall(nextPage.calls, "sendMessage").text, "Додаткові можливості:");
+
+    const feedbackClearCount = db.calls.filter((call) => call.query?.includes("feedback_pending = 0")).length;
+    const feedback = await captureTelegramCalls(() => worker.fetch(
+        webhookRequest(privateMessageUpdate({ updateId: 22, text: "💬 Відгук" })), env
+    ));
+    assert.match(telegramCall(feedback.calls, "sendMessage").text, /Напиши одним повідомленням/);
+    assert.equal(db.calls.filter((call) => call.query?.includes("feedback_pending = 0")).length, feedbackClearCount);
+});
+
 test("daily settings can be changed in two steps and keep the settings menu visible", async () => {
     const db = new WorkerTestDb({
         dailySettings: { daily_time: "10:00", daily_enabled: 1, daily_level: "A0" },

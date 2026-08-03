@@ -62,6 +62,9 @@ export class WorkerTestDb {
         if (query.includes("UPDATE users SET feedback_pending = 0")) {
             return { meta: { changes: 0 } };
         }
+        if (query.includes("UPDATE users SET feedback_pending = 1")) {
+            return { meta: { changes: 1 } };
+        }
         if (query.includes("UPDATE users SET daily_level")) {
             this.dailySettings.daily_level = parameters[0];
             return { meta: { changes: 1 } };
