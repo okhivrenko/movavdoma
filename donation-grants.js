@@ -34,3 +34,46 @@ export async function rejectDonationBonus(env, requestId) {
     if (user?.chat_id) await sendMessage(env, user.chat_id, "Не вдалося підтвердити донат для бонусу. Натисни «☕ Підтримати бот», отримай новий код і додай його в коментар платежу.");
     return request;
 }
+
+/** Notifies users once their donation-funded temporary access has expired. */
+export async function notifyExpiredDonationAccessGrants(env, mainKeyboardForUser) {
+    const expired = await env.DB
+        .prepare(`
+          SELECT g.id, g.user_id, u.chat_id
+          FROM user_temporary_access_grants g
+          JOIN users u ON u.telegram_user_id = g.user_id
+          WHERE g.source = 'donation'
+            AND g.expires_at <= CURRENT_TIMESTAMP
+            AND g.expired_notified_at IS NULL
+          ORDER BY g.id ASC
+        `)
+        .all();
+
+    for (const grant of expired.results) {
+        const claimed = await env.DB
+            .prepare(`
+              UPDATE user_temporary_access_grants
+              SET expired_notified_at = CURRENT_TIMESTAMP
+              WHERE id = ? AND expired_notified_at IS NULL
+            `)
+            .bind(grant.id)
+            .run();
+
+        if (claimed.meta.changes === 0) continue;
+
+        try {
+            await sendMessage(
+                env,
+                grant.chat_id,
+                "🎁 Дякуємо, що користуєшся ботом! На жаль, твій бонусний період завершився.\n\nБудемо вдячні за подальшу підтримку: навіть одна кавуська мотивує нас робити бот кращим.\n\nЯкщо маєш зауваження, ідеї або просто хочеш поділитися враженням — натисни «➡️ Далі», а потім «💬 Відгук». Це допомагає нам ставати кращими.",
+                await mainKeyboardForUser(env, grant.user_id)
+            );
+        } catch (error) {
+            await env.DB
+                .prepare("UPDATE user_temporary_access_grants SET expired_notified_at = NULL WHERE id = ?")
+                .bind(grant.id)
+                .run();
+            throw error;
+        }
+    }
+}
