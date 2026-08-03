@@ -47,6 +47,7 @@ export function menuActionFromText(text, locale = "uk") {
 
     if (
         text.startsWith(navigation.schedulePrefix) ||
+        navigation.legacySchedulePrefixes.some((prefix) => text.startsWith(prefix)) ||
         navigation.legacySettingsButtons.includes(text)
     ) {
         return MENU_ACTION.SETTINGS;
@@ -60,11 +61,10 @@ export function mainKeyboard(showAdmin = false, page = 1, dailySettings, locale 
     const firstPage = [
         [{ text: buttons.addWord }, { text: buttons.activeWords }],
         [{ text: buttons.dailyWord }, { text: buttons.learnedWords }],
-        [{ text: buttons.translateText }],
+        [{ text: buttons.translateText }, { text: dailyScheduleKeyboardLabel(dailySettings) }],
         [{ text: buttons.help }, { text: buttons.nextPage }],
     ];
     const secondPage = [
-        [{ text: dailyScheduleKeyboardLabel(dailySettings) }],
         [{ text: buttons.support }, { text: buttons.bonus }],
         [{ text: buttons.feedback }, { text: buttons.contact }],
     ];

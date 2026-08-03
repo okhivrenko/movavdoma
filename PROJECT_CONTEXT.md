@@ -59,8 +59,10 @@ the current time and level, then leads to:
 - `🌐 Перекласти текст`
 - `❓ Допомога`
 - `💬 Відгук`
+- `⏰ Розклад (10:00 - A0)` opens the schedule and level settings from the
+  first menu page, beside `🌐 Перекласти текст`.
 - `➡️ Далі` / `⬅️ Назад` split the persistent menu into two pages. The second
-  page has `⏰ Розклад і рівень`, support, bonus, feedback, contact, a share-bot action, and the admin entry point.
+  page has support, bonus, feedback, contact, a share-bot action, and the admin entry point.
 
 The admin also sees `🛠 Адмін`, which opens an admin-only panel with a paginated
 user list, the `/grant <userId> <dailyLimit>` format, and a summary of
@@ -130,7 +132,7 @@ restore buttons and next/previous navigation. Learned words remain in D1 with
 `📚 Щоденне слово` shows the current pending card or generates a new one.
 After `Знаю` or `Вчити`, the user can open another card on the same day. The
 number of newly generated cards depends on access level: 5, 10, 15, or 20.
-`⏰ Розклад і рівень` opens a two-step settings flow: choose
+`⏰ Розклад` opens a two-step settings flow: choose
 whether to change the delivery time or CEFR level (A0–C2), then choose its
 value. It can also turn reminders on or off. The card has `Знаю` and `Вчити`
 buttons: `Знаю` discards it, while `Вчити` adds the card and examples to the

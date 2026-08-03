@@ -11,7 +11,7 @@ export function dailyScheduleKeyboardLabel(settings) {
         ? settings.daily_time ?? DEFAULT_DAILY_SETTINGS.daily_time
         : "вимкнено";
     const level = settings?.daily_level ?? DEFAULT_DAILY_SETTINGS.daily_level;
-    return `⏰ Розклад і рівень (${time} — Рівень ${level})`;
+    return `⏰ Розклад (${time} - ${level})`;
 }
 
 export function wordCountLabel(count) {
