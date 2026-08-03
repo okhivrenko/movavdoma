@@ -61,10 +61,13 @@ import {
     dailyLimitReachedText,
     formatHryvnias,
     isAdmin,
-    localDateAndTime,
     parseVocabularyInput,
     wordCountLabel,
 } from "./helpers.js";
+import {
+    claimDailyWordAddition as claimDailyWordAdditionFlow,
+    getDailyAdditionLimit as getDailyAdditionLimitFlow,
+} from "./daily-addition-quota.js";
 import {
     dailyWordCardLimitForLevel,
     donationAccessLevel,
@@ -264,55 +267,12 @@ async function notifyUnmatchedDonations(env) {
 
 // Remove only already learned vocabulary after its retention period. Child rows
 // are deleted first because examples and reviews reference the vocabulary word.
-// This UPSERT is the quota enforcement point: it atomically claims a daily slot
-// before a new word is generated or saved, preventing normal double additions.
 async function claimDailyWordAddition(env, userId) {
-    if (isAdmin(env, userId)) {
-        return true;
-    }
-
-    const user = await env.DB
-        .prepare("SELECT timezone FROM users WHERE telegram_user_id = ?")
-        .bind(userId)
-        .first();
-    const limit = await env.DB
-        .prepare("SELECT daily_limit FROM user_daily_limits WHERE user_id = ? AND expires_at > CURRENT_TIMESTAMP")
-        .bind(userId)
-        .first();
-    const localTime = localDateAndTime(
-        user?.timezone ?? "Europe/Warsaw",
-        Date.now()
-    );
-
-    if (!localTime) {
-        throw new Error("Unable to calculate daily addition date.");
-    }
-
-    const claimed = await env.DB
-        .prepare(`
-          INSERT INTO daily_word_additions (user_id, local_date, additions)
-          VALUES (?, ?, 1)
-          ON CONFLICT(user_id, local_date) DO UPDATE
-          SET additions = additions + 1
-          WHERE additions < ?
-        `)
-        .bind(userId, localTime.date, limit?.daily_limit ?? DAILY_ADD_LIMIT)
-        .run();
-
-    return claimed.meta.changes > 0;
+    return claimDailyWordAdditionFlow(env, userId, { isAdmin, dailyAddLimit: DAILY_ADD_LIMIT });
 }
 
 async function getDailyAdditionLimit(env, userId) {
-    if (isAdmin(env, userId)) {
-        return null;
-    }
-
-    const limit = await env.DB
-        .prepare("SELECT daily_limit FROM user_daily_limits WHERE user_id = ? AND expires_at > CURRENT_TIMESTAMP")
-        .bind(userId)
-        .first();
-
-    return limit?.daily_limit ?? DAILY_ADD_LIMIT;
+    return getDailyAdditionLimitFlow(env, userId, { isAdmin, dailyAddLimit: DAILY_ADD_LIMIT });
 }
 
 const syncMonobankDonations = createMonobankDonationSync({
