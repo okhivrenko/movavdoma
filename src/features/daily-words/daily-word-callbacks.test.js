@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { handleDailyWordCallback } from "../src/features/daily-words/daily-word-callbacks.js";
-import { captureTelegramCalls, telegramCall } from "./worker-test-helpers.js";
+import { handleDailyWordCallback } from "./daily-word-callbacks.js";
+import { captureTelegramCalls, telegramCall } from "../../../test-support/worker-test-helpers.js";
 
 const callback = { id: "callback-1" };
 const context = { chatId: 123, messageId: 7, userId: 123 };

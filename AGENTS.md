@@ -6,7 +6,9 @@
 - Network clients: `src/platform/telegram.js`, `src/platform/openai.js`.
 - Shared helpers: `src/domain/helpers.js`; vocabulary-list UI:
   `src/features/vocabulary/word-list.js`.
-- Pure access-level and donation rules: `src/domain/policies.js`; tests: `test/`.
+- Pure access-level and donation rules: `src/domain/policies.js`; each unit
+  test sits beside its module as `*.test.js`. Shared test helpers live in
+  `test-support/`.
 - Product behavior and schema: `PROJECT_CONTEXT.md`.
 - Release process: `RELEASING.md`.
 - Cloudflare config: `wrangler.jsonc`; SQL changes: `migrations/`.

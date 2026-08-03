@@ -19,6 +19,7 @@ The Worker has two entry points:
 
 ```text
 worker.js                    composition root
+worker.test.js               composition-level HTTP/webhook tests
 src/
   domain/                    pure rules and stable shared vocabulary
     helpers.js               parsing, formatting, local date, admin predicate
@@ -36,7 +37,8 @@ src/
     donations/               requests, grants, notifications, callbacks
     feedback/                one-message feedback flow
     vocabulary/              cards, lists, callbacks, learned-word cleanup
-test/                        Node tests mirroring production module ownership
+*.test.js                    Node tests co-located with their production module
+test-support/                shared test helpers (not executable tests)
 migrations/                  forward-only D1 schema changes
 docs/adr/                    durable architecture decisions
 workflows/                   repeatable agent delivery workflows

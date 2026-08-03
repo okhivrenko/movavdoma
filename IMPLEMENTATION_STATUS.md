@@ -32,6 +32,8 @@ slices and genuine blockers. It is not a stream of intentions.
 - [x] Move production modules into feature-first folders
 - [x] Document the dependency boundaries, manual development workflow, and
   deliberate scaling path
+- [x] Co-locate module tests with their production modules; keep only shared
+  helpers in `test-support/` and composition tests beside `worker.js`
 - [ ] Follow-up: release the first multilingual direction as a complete
   direction-neutral data-contract change.
 

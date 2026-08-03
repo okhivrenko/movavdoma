@@ -5,8 +5,8 @@ import {
     getOpenDonationRequest,
     sendDonationInstructions,
     submitDonationBonusRequest,
-} from "../src/features/donations/donation-requests.js";
-import { captureTelegramCalls, telegramCall } from "./worker-test-helpers.js";
+} from "./donation-requests.js";
+import { captureTelegramCalls, telegramCall } from "../../../test-support/worker-test-helpers.js";
 
 function donationDb(request) {
     const calls = [];

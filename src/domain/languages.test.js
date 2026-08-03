@@ -8,7 +8,7 @@ import {
     PLANNED_TRANSLATION_DIRECTIONS,
     isPlannedTranslationDirection,
     isSupportedLanguage,
-} from "../src/domain/languages.js";
+} from "./languages.js";
 
 test("language catalog preserves the current card direction and planned Ukrainian translations", () => {
     assert.deepEqual(CURRENT_VOCABULARY_DIRECTION, { source: "en", target: "uk" });

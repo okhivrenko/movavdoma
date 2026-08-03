@@ -6,7 +6,7 @@ import {
     createMonobankDonationSync,
     isEligibleMonobankTransaction,
     monobankStatementStartTime,
-} from "../src/platform/monobank-donations.js";
+} from "./monobank-donations.js";
 
 test("Monobank synchronization accepts only positive hryvnia credits with an ID", () => {
     assert.equal(isEligibleMonobankTransaction({ id: "tx-1", amount: 1, currencyCode: 980 }), true);

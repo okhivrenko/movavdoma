@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "check": "npm run check:syntax && npm test && npm run check:migrations && npm run build",
-    "check:syntax": "node --check worker.js && find src test -name '*.js' -exec node --check {} \\;",
+    "check:syntax": "node --check worker.js worker.test.js && find src test-support -name '*.js' -exec node --check {} \\;",
     "test": "npm run test:all",
-    "test:all": "node --test test/*.test.js",
-    "test:worker": "node --test test/worker-http.test.js",
+    "test:all": "node --test",
+    "test:worker": "node --test worker.test.js",
     "test:local": "npm run check:syntax && npm run test:all && npm run check:migrations",
     "check:migrations": "sh scripts/check-migrations.sh",
     "build": "npx --yes wrangler@latest deploy --dry-run --outdir dist",

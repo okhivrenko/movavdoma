@@ -26,7 +26,7 @@ menu wording, quotas, migration history, and supported languages.
 2. Copy or adapt `docs/ARCHITECTURE.md` and
    `workflows/cloudflare-telegram-feature.md`.
 3. Create `src/domain/languages.js` before the first multilingual feature.
-4. Add `test/worker-http.test.js` for webhook auth, private chats, and update
+4. Add `worker.test.js` for webhook auth, private chats, and update
    idempotency before adding product features.
 5. Put each durable decision in a short ADR before its migration or platform
    change.

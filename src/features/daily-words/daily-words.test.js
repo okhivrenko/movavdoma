@@ -7,7 +7,7 @@ import {
     dailyWordText,
     getPendingDailyWord,
     savePendingDailyWordToLearning,
-} from "../src/features/daily-words/daily-words.js";
+} from "./daily-words.js";
 
 const card = {
     word: "reliable",

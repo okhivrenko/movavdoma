@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import worker from "../worker.js";
+import worker from "./worker.js";
 import {
     captureTelegramCalls,
     privateCallbackUpdate,
@@ -9,7 +9,7 @@ import {
     telegramCall,
     WorkerTestDb,
     workerEnv,
-} from "./worker-test-helpers.js";
+} from "./test-support/worker-test-helpers.js";
 
 function webhookRequest(update, secret = "test-webhook-secret") {
     return new Request("https://example.test/", {

@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { handleAdminCallback } from "../src/features/admin/admin-callbacks.js";
-import { captureTelegramCalls, telegramCall } from "./worker-test-helpers.js";
+import { handleAdminCallback } from "./admin-callbacks.js";
+import { captureTelegramCalls, telegramCall } from "../../../test-support/worker-test-helpers.js";
 
 test("admin callbacks reject a non-admin before any admin action", async () => {
     const env = { TELEGRAM_BOT_TOKEN: "test-token" };

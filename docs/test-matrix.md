@@ -7,18 +7,18 @@ before a refactor changes that feature.
 
 | Area | Requirement | Automated contract | Status |
 | --- | --- | --- | --- |
-| Webhook | Privacy page is public; webhook rejects a missing/wrong secret | `worker-http.test.js` | covered |
-| Webhook | Duplicate Telegram updates cause no second side effect | `worker-http.test.js` | covered |
-| Webhook | Group chats are ignored | `worker-http.test.js` | covered |
-| Onboarding | `/start` persists the user and shows their saved time and CEFR level | `worker-http.test.js` | covered |
-| Menu | First page has add/list, daily/learned, schedule and help/next | `worker-http.test.js` | covered |
+| Webhook | Privacy page is public; webhook rejects a missing/wrong secret | `worker.test.js` | covered |
+| Webhook | Duplicate Telegram updates cause no second side effect | `worker.test.js` | covered |
+| Webhook | Group chats are ignored | `worker.test.js` | covered |
+| Onboarding | `/start` persists the user and shows their saved time and CEFR level | `worker.test.js` | covered |
+| Menu | First page has add/list, daily/learned, schedule and help/next | `worker.test.js` | covered |
 | Input | Plain word; `/`, `|`, and `\\` context separators work | `helpers.test.js` | covered |
 | Word card | One selected sense and exactly two examples are saved | Worker integration contract | next |
 | Word quota | Addition quota is claimed before OpenAI and blocks at the limit | Worker+D1 contract | next |
 | Active words | Users see only their own active words, ten per page | `word-list.test.js` + ownership contract | partial |
 | Active words | Examples and learned controls are two blocks of five; paging works | `word-list.test.js` | covered |
 | Learned words | Restore buttons/page work; cleanup removes only learned words after 30 days | Worker+D1 + scheduled contract | next |
-| Daily settings | Time and level are selected in separate steps; reminder can be toggled | `worker-http.test.js`, `daily-settings.test.js` | covered |
+| Daily settings | Time and level are selected in separate steps; reminder can be toggled | `worker.test.js`, `daily-settings.test.js` | covered |
 | Daily words | Pending card is reused; `know` discards; `learn` saves it | Worker+D1 contract | next |
 | Daily quota | New daily-card limits are 5/10/15/20 by effective access level | `policies.test.js` + Worker+D1 contract | partial |
 | Access | Access values are normalized and donation tiers map correctly | `policies.test.js` | covered |

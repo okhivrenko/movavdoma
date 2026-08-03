@@ -8,7 +8,7 @@ import {
     dailySettingsMenuKeyboard,
     dailySettingsText,
     dailyTimeKeyboard,
-} from "../src/features/daily-words/daily-settings.js";
+} from "./daily-settings.js";
 
 test("daily settings expose every CEFR level and all 24 whole-hour times", () => {
     assert.deepEqual(DAILY_LEVEL_OPTIONS, ["A0", "A1", "A2", "B1", "B2", "C1", "C2"]);
