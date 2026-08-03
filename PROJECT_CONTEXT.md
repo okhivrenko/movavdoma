@@ -16,8 +16,8 @@ Users add words through Telegram. The bot:
 
 - Hosting/runtime: Cloudflare Workers
 - Database: Cloudflare D1 (SQLite)
-- Worker name: `movavdoma` (legacy technical identifier; unchanged by brand rename)
-- Public URL: `https://movavdoma.oleksiikhivrenko.workers.dev/`
+- Worker name: `movayakvdoma`
+- Public URL: `https://movayakvdoma.oleksiikhivrenko.workers.dev/`
 - D1 database name: `vocab-words-db`
 - Telegram receives updates through a webhook.
 - The webhook must accept both `message` and `callback_query` updates.
