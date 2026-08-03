@@ -9,6 +9,7 @@ import {
     telegramApi,
 } from "./telegram.js";
 import { openAIJson } from "./openai.js";
+import { ADD_WORD_HINT, messages } from "./messages.js";
 import {
     getRecentActiveWords,
     LIST_LIMIT,
@@ -60,8 +61,6 @@ const ADMIN_USER_LIST_LIMIT = 50;
 const LEARNED_WORD_RETENTION_DAYS = 30;
 // Increment only when the persistent reply keyboard changes for users.
 const INTERFACE_VERSION = 7;
-const ADD_WORD_HINT =
-    "Надішли англійське слово або фразу — цього достатньо.\n\nНаприклад:\nresilient\n\nЯкщо важливе конкретне значення, додай контекст після / (також працюють | та \\):\ncharge / payment for a service";
 
 // Vocabulary card creation and a short-lived meaning-selection flow.
 async function suggestSenses(env, word) {
@@ -695,10 +694,14 @@ async function grantTestLevelOne(env, userId) {
     if (!user?.chat_id) return null;
 
     const access = await grantTemporaryAccessLevel(env, userId, 1, "admin_test", "+1 day");
+    const dailyAdditionLimit = await getDailyAdditionLimit(env, userId);
     await sendMessage(
         env,
         user.chat_id,
-        `🧪 Для тесту тобі увімкнено рівень ${access.accessLevel} на 1 день. Ліміт нових щоденних карток: ${dailyWordCardLimitForLevel(access.accessLevel)}.`
+        messages.adminSettingsUpdated(
+            dailyAdditionLimit ?? DAILY_ADD_LIMIT,
+            dailyWordCardLimitForLevel(access.accessLevel)
+        )
     );
     return access;
 }
@@ -947,7 +950,7 @@ async function removeExpiredLearnedWords(env) {
     }
 }
 
-async function startFeedback(env, chatId, userId, prompt = "💬 Напиши одним повідомленням свій відгук, ідею або зауваження. Я передам його команді.") {
+async function startFeedback(env, chatId, userId, prompt = messages.feedbackPrompt) {
     await env.DB
         .prepare("UPDATE users SET feedback_pending = 1 WHERE telegram_user_id = ?")
         .bind(userId)
@@ -970,7 +973,7 @@ async function submitFeedback(env, chatId, userId, feedback) {
 
     await sendMessage(env, adminChatId, `💬 Новий відгук\nКористувач: ${userId}\n\n${feedback}`);
     await clearPendingFeedback(env, userId);
-    await sendMessage(env, chatId, "Дякуємо за відгук! Завдяки таким повідомленням ми стаємо кращими.");
+    await sendMessage(env, chatId, messages.feedbackThankYou);
 }
 
 /** Admin-only upgrade. Levels are intentionally monotonic: support is never lost. */
@@ -985,10 +988,14 @@ async function grantManualAccessLevel(env, userId, accessLevel) {
     const access = await grantAccessLevel(env, userId, accessLevel, "manual");
 
     if (access.changed) {
+        const dailyAdditionLimit = await getDailyAdditionLimit(env, userId);
         await sendMessage(
             env,
             user.chat_id,
-            `🎁 Привіт! Твій рівень доступу підвищено до ${access.accessLevel}. Тепер можна відкривати ${dailyWordCardLimitForLevel(access.accessLevel)} нових щоденних карток на день.`
+            messages.adminSettingsUpdated(
+                dailyAdditionLimit ?? DAILY_ADD_LIMIT,
+                dailyWordCardLimitForLevel(access.accessLevel)
+            )
         );
     }
 
@@ -1018,10 +1025,14 @@ async function grantManualDailyLimit(env, userId, dailyLimit) {
         .bind(userId, dailyLimit)
         .run();
 
+    const accessLevel = await getUserAccessLevel(env, userId);
     await sendMessage(
         env,
         user.chat_id,
-        `🎁 Привіт! Для тебе надійшов бонус. Твій ліміт слів на день збільшено до ${dailyLimit} ${wordCountLabel(dailyLimit)} на наступний місяць.`
+        messages.adminSettingsUpdated(
+            dailyLimit,
+            dailyWordCardLimitForLevel(accessLevel)
+        )
     );
 
     return true;
@@ -2315,13 +2326,10 @@ export default {
 
         if (text === "/start") {
             const settings = await getDailySettings(env, userId) ?? DEFAULT_DAILY_SETTINGS;
-            const reminder = settings.daily_enabled
-                ? `щодня о ${settings.daily_time}`
-                : "зараз вимкнені";
             await sendMessage(
                 env,
                 chatId,
-                `Привіт! MovaVDoma — бот для щоденного вивчення англійських слів.\n\nТвої поточні налаштування:\n• Рівень щоденних слів: ${settings.daily_level}\n• Нагадування: ${reminder}\n\nЗмінити їх можна в «⏰ Розклад і рівень».\n\nПросто надішли мені слово або фразу — наприклад: resilient\n\nЯкщо знаєш потрібне значення, можеш додати його після / (також працюють | та \\):\ncharge / payment for a service`,
+                messages.welcome(settings),
                 mainKeyboard(isAdmin(env, userId), 1, settings)
             );
             await markInterfaceVersion(env, userId);

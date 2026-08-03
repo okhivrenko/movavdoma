@@ -1,11 +1,11 @@
 {
   "name": "movavdoma",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "private": true,
   "type": "module",
   "scripts": {
     "check": "npm run check:syntax && npm test && npm run check:migrations && npm run build",
-    "check:syntax": "node --check worker.js && node --check helpers.js && node --check openai.js && node --check telegram.js && node --check word-list.js && node --check policies.js",
+    "check:syntax": "node --check worker.js && node --check helpers.js && node --check messages.js && node --check openai.js && node --check telegram.js && node --check word-list.js && node --check policies.js",
     "test": "node --test",
     "check:migrations": "sh scripts/check-migrations.sh",
     "build": "npx --yes wrangler@latest deploy --dry-run --outdir dist",
