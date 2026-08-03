@@ -82,6 +82,10 @@ import { handleDailyWordCallback } from "./daily-word-callbacks.js";
 import { clearPendingFeedback, startFeedback, submitFeedback } from "./feedback.js";
 import { removeExpiredLearnedWords as cleanupLearnedWords } from "./learned-word-cleanup.js";
 import { sendDueDailyWords as deliverDueDailyWords, sendTodayDailyWord as deliverTodayDailyWord } from "./daily-delivery.js";
+import {
+    ensureTelegramWebhook as ensureTelegramWebhookFlow,
+    sendHelp as sendHelpFlow,
+} from "./worker-support.js";
 
 // Default daily quota for newly saved words; individual bonuses may raise it.
 const DAILY_ADD_LIMIT = 10;
@@ -189,15 +193,6 @@ const syncMonobankDonations = createMonobankDonationSync({
     notifyUnmatchedDonations,
 });
 
-async function sendHelp(env, chatId, userId) {
-    await sendMessage(
-        env,
-        chatId,
-        "Як користуватися ботом:\n\n1. Натисни «➕ Додати слово» або просто надішли англійське слово чи фразу. Наприклад: resilient\n2. Якщо потрібне конкретне значення, це необов’язково, але можеш додати його після / (також працюють | та \\):\ncharge / payment for a service\n3. Обери потрібне значення, якщо бот його уточнить.\n4. Відкрий «📚 Мої слова», щоб переглянути свій каталог.\n5. Відкрий «🎓 Вивчені слова», щоб повернути слово до навчання.\n6. Натисни «📚 Щоденне слово», щоб показати сьогоднішню картку, або «⏰ Розклад і рівень», щоб окремо вибрати час і рівень. У картці натисни «Знаю» або «Вчити».\n7. На другій сторінці меню є підтримка, бонуси, відгук і зв’язок із нами.\n8. Є ідея, запитання чи хочеш створити власного бота? Натисни «📩 Зв’язатися з нами» та надішли повідомлення.",
-        await mainKeyboardForUser(env, userId)
-    );
-}
-
 // A public, static policy page is intentionally served before webhook
 // authentication so Telegram and users can open it without bot credentials.
 function privacyPolicyPage() {
@@ -242,36 +237,6 @@ function privacyPolicyPage() {
   <h2>7. Контакт</h2>
   <p>З питань приватності використовуйте кнопку «📩 Зв'язатися з нами» у боті.</p>
 </main></body></html>`;
-}
-
-// Telegram stores a full webhook URL, so changing a workers.dev subdomain
-// otherwise leaves the bot pointing to its old host. An operation key makes
-// this idempotent: the configured URL is sent once and retried only on error.
-async function ensureTelegramWebhook(env) {
-    const operationKey = `telegram_webhook:${PUBLIC_WORKER_URL}`;
-    const claim = await env.DB
-        .prepare("INSERT OR IGNORE INTO worker_operations (operation_key) VALUES (?)")
-        .bind(operationKey)
-        .run();
-
-    if (claim.meta.changes === 0) {
-        return;
-    }
-
-    try {
-        await telegramApi(env, "setWebhook", {
-            url: PUBLIC_WORKER_URL,
-            secret_token: env.TELEGRAM_WEBHOOK_SECRET,
-            allowed_updates: ["message", "callback_query"],
-        });
-        console.log({ event: "telegram_webhook_configured", url: PUBLIC_WORKER_URL });
-    } catch (error) {
-        await env.DB
-            .prepare("DELETE FROM worker_operations WHERE operation_key = ?")
-            .bind(operationKey)
-            .run();
-        throw error;
-    }
 }
 
 // Telegram webhook and scheduled delivery entry points. Callback actions are
@@ -896,12 +861,12 @@ export default {
         }
 
         if (text === "❓ Допомога") {
-            await sendHelp(env, chatId, userId);
+                await sendHelpFlow(env, chatId, userId, mainKeyboardForUser);
             return new Response("ok");
         }
 
         if (text === "/help") {
-            await sendHelp(env, chatId, userId);
+            await sendHelpFlow(env, chatId, userId, mainKeyboardForUser);
             return new Response("ok");
         }
 
@@ -1468,7 +1433,7 @@ export default {
         }
 
         if (text.startsWith("/")) {
-            await sendHelp(env, chatId, userId);
+            await sendHelpFlow(env, chatId, userId, mainKeyboardForUser);
             return new Response("ok");
         }
 
@@ -1477,7 +1442,7 @@ export default {
 
     async scheduled(controller, env) {
         try {
-            await ensureTelegramWebhook(env);
+            await ensureTelegramWebhookFlow(env, PUBLIC_WORKER_URL, telegramApi);
         } catch (error) {
             console.error({
                 event: "telegram_webhook_configuration_failed",
