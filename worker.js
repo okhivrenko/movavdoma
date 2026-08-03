@@ -36,7 +36,8 @@ import {
     grantManualDailyLimit as grantManualDailyLimitFlow,
     grantTestLevelOne as grantTestLevelOneFlow,
 } from "./admin-access.js";
-import { adminHelpText, adminKeyboard, sendAdminUserList as sendAdminUserListFlow } from "./admin-panel.js";
+import { adminHelpText, adminKeyboard } from "./admin-panel.js";
+import { handleAdminCallback } from "./admin-callbacks.js";
 import { ADD_WORD_HINT, messages } from "./messages.js";
 import {
     DAILY_LEVEL_OPTIONS,
@@ -298,90 +299,11 @@ export default {
 
             await refreshInterfaceIfNeeded(env, chatId, userId);
 
-            if (callback.data.startsWith("admin:")) {
-                if (!isAdmin(env, userId)) {
-                    await answerCallbackQuery(env, callback.id, "Ця дія доступна лише адміну.");
-                    return new Response("ok");
-                }
-
-                const usersMatch = callback.data.match(/^admin:users(?::(\d+))?$/);
-
-                if (usersMatch) {
-                    const page = Number(usersMatch[1] ?? 0);
-
-                    if (!Number.isInteger(page) || page < 0) {
-                        await answerCallbackQuery(env, callback.id, "Невірна сторінка.");
-                        return new Response("ok");
-                    }
-
-                    await answerCallbackQuery(env, callback.id, "Готую список користувачів.");
-                    await sendAdminUserListFlow(
-                        env,
-                        chatId,
-                        page,
-                        usersMatch[1] ? messageId : null,
-                        { isAdmin, dailyAddLimit: DAILY_ADD_LIMIT }
-                    );
-                    return new Response("ok");
-                }
-
-                if (callback.data === "admin:grant") {
-                    await answerCallbackQuery(env, callback.id, "Показую формат команди.");
-                    await sendMessage(
-                        env,
-                        chatId,
-                        "Щоб змінити ліміт користувача, надішли:\n/grant userId ліміт\n\nНаприклад: /grant 123456789 45"
-                    );
-                    return new Response("ok");
-                }
-
-                if (callback.data === "admin:level") {
-                    await answerCallbackQuery(env, callback.id, "Показую формат команди.");
-                    await sendMessage(
-                        env,
-                        chatId,
-                        "Щоб підвищити рівень доступу, надішли:\n/level userId рівень\n\nРівні: 0→5, 1→10, 2→15, 3→20 щоденних карток.\nПриклад: /level 123456789 2"
-                    );
-                    return new Response("ok");
-                }
-
-                if (callback.data === "admin:testlevel") {
-                    await answerCallbackQuery(env, callback.id, "Показую формат команди.");
-                    await sendMessage(
-                        env,
-                        chatId,
-                        "Щоб видати тестовий рівень 1 на 1 день, надішли:\n/testlevel userId\n\nНаприклад: /testlevel 123456789"
-                    );
-                    return new Response("ok");
-                }
-
-                if (callback.data === "admin:link") {
-                    try {
-                        const botLink = await getBotLink(env);
-                        await answerCallbackQuery(env, callback.id, "Показую посилання.");
-                        await sendMessage(
-                            env,
-                            chatId,
-                            `🔗 Посилання на бота:\n${botLink}`,
-                            { inline_keyboard: [[{ text: "Відкрити бота", url: botLink }]] }
-                        );
-                    } catch (error) {
-                        console.error({
-                            event: "admin_bot_link_failed",
-                            message: error instanceof Error ? error.message : "Unknown error",
-                        });
-                        await answerCallbackQuery(env, callback.id, "Не вдалося отримати посилання.");
-                    }
-                    return new Response("ok");
-                }
-
-                if (callback.data === "admin:help") {
-                    await answerCallbackQuery(env, callback.id, "Показую команди.");
-                    await sendMessage(env, chatId, adminHelpText());
-                    return new Response("ok");
-                }
-
-                await answerCallbackQuery(env, callback.id, "Невідома адмінська дія.");
+            if (await handleAdminCallback(env, callback, { chatId, messageId, userId }, {
+                isAdmin,
+                dailyAddLimit: DAILY_ADD_LIMIT,
+                getBotLink,
+            })) {
                 return new Response("ok");
             }
 
