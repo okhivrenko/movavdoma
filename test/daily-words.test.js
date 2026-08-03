@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { dailyCardFromPending, dailyWordKeyboard, dailyWordText } from "../daily-words.js";
+import {
+    dailyCardFromPending,
+    dailyWordKeyboard,
+    dailyWordText,
+    getPendingDailyWord,
+    savePendingDailyWordToLearning,
+} from "../daily-words.js";
 
 const card = {
     word: "reliable",
@@ -38,4 +44,45 @@ test("corrupt or incomplete pending daily cards cannot be shown", () => {
     assert.equal(dailyCardFromPending(pending).id, 42);
     assert.equal(dailyCardFromPending({ ...pending, examples_json: "not json" }), null);
     assert.equal(dailyCardFromPending({ ...pending, examples_json: JSON.stringify([card.examples[0]]) }), null);
+});
+
+function pendingDailyWordDb(pending) {
+    const calls = [];
+    return {
+        calls,
+        prepare(query) {
+            return { bind: (...parameters) => ({
+                first: async () => {
+                    calls.push({ method: "first", query, parameters });
+                    return pending;
+                },
+                run: async () => {
+                    calls.push({ method: "run", query, parameters });
+                    return { meta: { changes: 1, last_row_id: 41 } };
+                },
+            }) };
+        },
+    };
+}
+
+test("pending daily cards are read and consumed only through user-owned queries", async () => {
+    const pending = {
+        id: 42,
+        source_text: card.word,
+        translation_uk: card.translation_uk,
+        context_note: card.context_en,
+        examples_json: JSON.stringify(card.examples),
+    };
+    const db = pendingDailyWordDb(pending);
+    const env = { DB: db };
+
+    assert.equal((await getPendingDailyWord(env, 123, "2026-08-03")).id, 42);
+    assert.equal(await savePendingDailyWordToLearning(env, 123, 42), true);
+
+    const ownerQueries = db.calls.filter((call) => call.query.includes("pending_daily_words"));
+    assert.ok(ownerQueries.every((call) => call.query.includes("user_id = ?")));
+    assert.ok(ownerQueries.some((call) => call.parameters.includes(123)));
+    const exampleWrites = db.calls.filter((call) => call.query.includes("INSERT INTO examples"));
+    assert.equal(exampleWrites.length, 2);
+    assert.deepEqual(exampleWrites.map((call) => call.parameters[3]), [1, 2]);
 });

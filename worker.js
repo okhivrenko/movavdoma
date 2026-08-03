@@ -65,10 +65,9 @@ import {
     generateDailyWordCard,
     generateNewDailyWord,
     getPendingDailyWord,
-    hasPendingDailyWord,
     savePendingDailyWord,
-    savePendingDailyWordToLearning,
 } from "./daily-words.js";
+import { handleDailyWordCallback } from "./daily-word-callbacks.js";
 
 // Default daily quota for newly saved words; individual bonuses may raise it.
 const DAILY_ADD_LIMIT = 10;
@@ -1302,66 +1301,10 @@ export default {
                 return new Response("ok");
             }
 
-            if (callback.data.startsWith("daily:know:") || callback.data.startsWith("daily:learn:")) {
-                const match = callback.data.match(/^daily:(know|learn):(\d+)$/);
-
-                if (!match) {
-                    await answerCallbackQuery(env, callback.id, "Невірний вибір.");
-                    return new Response("ok");
-                }
-
-                const action = match[1];
-                const pendingId = Number(match[2]);
-
-                try {
-                    if (action === "learn") {
-                        if (!(await hasPendingDailyWord(env, userId, pendingId))) {
-                            await answerCallbackQuery(env, callback.id, "Ця картка вже оброблена.");
-                            return new Response("ok");
-                        }
-
-                        if (!(await claimDailyWordAddition(env, userId))) {
-                            const dailyLimit = await getDailyAdditionLimit(env, userId);
-                            await answerCallbackQuery(env, callback.id, "Денний ліміт вичерпано.");
-                            await sendMessage(env, chatId, dailyLimitReachedText(dailyLimit));
-                            return new Response("ok");
-                        }
-                    }
-
-                    const changed = action === "learn"
-                        ? await savePendingDailyWordToLearning(env, userId, pendingId)
-                        : (await env.DB
-                            .prepare("DELETE FROM pending_daily_words WHERE id = ? AND user_id = ?")
-                            .bind(pendingId, userId)
-                            .run()).meta.changes > 0;
-
-                    if (!changed) {
-                        await answerCallbackQuery(env, callback.id, "Ця картка вже оброблена.");
-                        return new Response("ok");
-                    }
-
-                    await answerCallbackQuery(
-                        env,
-                        callback.id,
-                        action === "learn" ? "Додано до списку для вивчення." : "Чудово, не додаю до списку."
-                    );
-                    await editMessage(
-                        env,
-                        chatId,
-                        messageId,
-                        action === "learn"
-                            ? "📖 Слово додано до «📚 Мої слова»."
-                            : "✅ Чудово! Це слово не додано до твого списку.",
-                        { inline_keyboard: [] }
-                    );
-                } catch (error) {
-                    console.error({
-                        event: "daily_word_action_failed",
-                        message: error instanceof Error ? error.message : "Unknown error",
-                    });
-                    await answerCallbackQuery(env, callback.id, "Не вдалося зберегти вибір.");
-                }
-
+            if (await handleDailyWordCallback(env, callback, { chatId, messageId, userId }, {
+                claimDailyWordAddition,
+                getDailyAdditionLimit,
+            })) {
                 return new Response("ok");
             }
 
