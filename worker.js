@@ -19,6 +19,10 @@ import {
 } from "./vocabulary-cards.js";
 import { createMonobankDonationSync } from "./monobank-donations.js";
 import {
+    getOpenDonationRequest,
+    sendDonationInstructions,
+} from "./donation-requests.js";
+import {
     getAdminChatId,
     getUserAccessLevel,
     grantAccessLevel,
@@ -44,7 +48,6 @@ import {
     sendWordExamples,
 } from "./word-list.js";
 import {
-    createSupportCode,
     dailyScheduleKeyboardLabel,
     DEFAULT_DAILY_SETTINGS,
     dailyLimitReachedText,
@@ -73,7 +76,6 @@ import { clearPendingFeedback, startFeedback, submitFeedback } from "./feedback.
 // Default daily quota for newly saved words; individual bonuses may raise it.
 const DAILY_ADD_LIMIT = 10;
 // Daily-card quota is separate from the learning-list quota and depends on access.
-const MONOBANK_JAR_URL = "https://send.monobank.ua/jar/9vp8W5V9nQ";
 const MONOBANK_JAR_SEND_ID = "9vp8W5V9nQ";
 const BOT_BRAND_NAME = "MovaVDoma";
 // The Worker name is still technical for now. Keep this URL aligned with its
@@ -242,65 +244,6 @@ async function sendAdminUserList(env, chatId, requestedPage = 0, messageId = nul
     }
 
     await sendMessage(env, chatId, listText, keyboard);
-}
-
-// Donation requests are reviewed by the admin before any personal limit changes.
-// The unique support code links a payment comment to a single user request.
-async function getOrCreateDonationRequest(env, userId) {
-    const existing = await getOpenDonationRequest(env, userId);
-
-    if (existing) {
-        return existing;
-    }
-
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-        const supportCode = createSupportCode();
-        const inserted = await env.DB
-            .prepare(`
-              INSERT OR IGNORE INTO donation_requests (user_id, support_code)
-              VALUES (?, ?)
-            `)
-            .bind(userId, supportCode)
-            .run();
-
-        if (inserted.meta.changes > 0) {
-            return { id: inserted.meta.last_row_id, support_code: supportCode, status: "awaiting_payment" };
-        }
-    }
-
-    throw new Error("Unable to generate a unique donation code.");
-}
-
-async function getOpenDonationRequest(env, userId) {
-    return env.DB
-        .prepare(`
-          SELECT id, support_code, status
-          FROM donation_requests
-          WHERE user_id = ? AND status IN ('awaiting_payment', 'awaiting_review')
-          ORDER BY id DESC
-          LIMIT 1
-        `)
-        .bind(userId)
-        .first();
-}
-
-function supportKeyboard() {
-    return {
-        inline_keyboard: [
-            [{ text: "☕ Відкрити банку", url: MONOBANK_JAR_URL }],
-        ],
-    };
-}
-
-async function sendDonationInstructions(env, chatId, userId) {
-    const request = await getOrCreateDonationRequest(env, userId);
-
-    await sendMessage(
-        env,
-        chatId,
-        `Дякую за підтримку! Відкрий банку й, будь ласка, додай цей код у коментар до платежу:\n\n${request.support_code}\n\nПісля переказу натисни «🎁 Отримати бонус». Код допоможе мені точно знайти твій донат.`,
-        supportKeyboard()
-    );
 }
 
 async function grantTestLevelOne(env, userId) {
