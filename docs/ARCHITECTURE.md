@@ -94,3 +94,5 @@ shared middleware; it is not needed for the Telegram webhook today.
 
 See [worker refactoring retrospective](./WORKER_REFACTORING_RETROSPECTIVE_UA.md)
 for the completed decomposition and a compact repeatable playbook.
+The full commit-by-commit evolution is in
+[the decomposition history](./WORKER_DECOMPOSITION_HISTORY_UA.md).
