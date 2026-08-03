@@ -8,9 +8,10 @@ each coherent delivery slice.
 
 - **Stage:** incremental Worker decomposition
 - **State:** vocabulary, daily-card delivery, feedback, donation lifecycle,
-  learned-word cleanup, and admin access operations are extracted and verified.
-- **Next concrete action:** extract daily-addition quota operations, then reduce
-  the remaining webhook routing by feature boundaries.
+  learned-word cleanup, admin operations, and daily-addition quota are extracted
+  and verified.
+- **Next concrete action:** route the remaining callback and command branches by
+  feature while keeping private-chat and ownership checks at the Worker boundary.
 
 ## Plan
 
@@ -24,12 +25,12 @@ each coherent delivery slice.
 - [x] Extract donation grant operation
 - [x] Extract donation notifications and review operations
 - [x] Cover remaining admin, feedback, learned-word, and scheduled-job flows
-- [ ] Extract daily-addition quota operations
+- [x] Extract daily-addition quota operations
 - [ ] Route callbacks and commands by feature
 - [ ] Final security, performance, and release review
 
 ## Latest verified result
 
-- `npm run check`: 40 tests passed, migrations validated, Worker dry-run built
+- `npm run check`: 43 tests passed, migrations validated, Worker dry-run built
 - Worker dry-run build: passed
 - Last deployed Worker status: HTTP 200
