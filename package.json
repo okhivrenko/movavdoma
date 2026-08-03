@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "check": "npm run check:syntax && npm test && npm run check:migrations && npm run build",
-    "check:syntax": "node --check worker.js && node --check helpers.js && node --check messages.js && node --check monobank-donations.js && node --check donation-requests.js && node --check donation-grants.js && node --check donation-notifications.js && node --check learned-word-cleanup.js && node --check daily-delivery.js && node --check openai.js && node --check telegram.js && node --check word-list.js && node --check policies.js && node --check daily-settings.js && node --check daily-words.js && node --check daily-word-callbacks.js && node --check vocabulary-cards.js && node --check access-levels.js && node --check feedback.js && node --check test/worker-test-helpers.js",
+    "check:syntax": "node --check worker.js && node --check helpers.js && node --check messages.js && node --check monobank-donations.js && node --check donation-requests.js && node --check donation-grants.js && node --check donation-notifications.js && node --check learned-word-cleanup.js && node --check daily-delivery.js && node --check openai.js && node --check telegram.js && node --check word-list.js && node --check policies.js && node --check daily-settings.js && node --check daily-words.js && node --check daily-word-callbacks.js && node --check vocabulary-cards.js && node --check access-levels.js && node --check admin-access.js && node --check feedback.js && node --check test/worker-test-helpers.js",
     "test": "npm run test:all",
     "test:all": "node --test test/*.test.js",
     "test:worker": "node --test test/worker-http.test.js",

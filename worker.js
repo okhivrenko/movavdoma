@@ -31,6 +31,11 @@ import {
     grantAccessLevel,
     grantTemporaryAccessLevel,
 } from "./access-levels.js";
+import {
+    grantManualAccessLevel as grantManualAccessLevelFlow,
+    grantManualDailyLimit as grantManualDailyLimitFlow,
+    grantTestLevelOne as grantTestLevelOneFlow,
+} from "./admin-access.js";
 import { ADD_WORD_HINT, messages } from "./messages.js";
 import {
     DAILY_LEVEL_OPTIONS,
@@ -247,27 +252,6 @@ async function sendAdminUserList(env, chatId, requestedPage = 0, messageId = nul
     await sendMessage(env, chatId, listText, keyboard);
 }
 
-async function grantTestLevelOne(env, userId) {
-    const user = await env.DB
-        .prepare("SELECT chat_id FROM users WHERE telegram_user_id = ?")
-        .bind(userId)
-        .first();
-
-    if (!user?.chat_id) return null;
-
-    const access = await grantTemporaryAccessLevel(env, userId, 1, "admin_test", "+1 day");
-    const dailyAdditionLimit = await getDailyAdditionLimit(env, userId);
-    await sendMessage(
-        env,
-        user.chat_id,
-        messages.adminSettingsUpdated(
-            dailyAdditionLimit ?? DAILY_ADD_LIMIT,
-            dailyWordCardLimitForLevel(access.accessLevel)
-        )
-    );
-    return access;
-}
-
 async function notifyPendingDonationRequests(env) {
     return notifyDonationReviews(env, getAdminChatId, {
         donationAccessLevel, formatHryvnias, dailyWordCardLimitForLevel, sendMessage,
@@ -280,68 +264,6 @@ async function notifyUnmatchedDonations(env) {
 
 // Remove only already learned vocabulary after its retention period. Child rows
 // are deleted first because examples and reviews reference the vocabulary word.
-/** Admin-only upgrade. Levels are intentionally monotonic: support is never lost. */
-async function grantManualAccessLevel(env, userId, accessLevel) {
-    const user = await env.DB
-        .prepare("SELECT chat_id FROM users WHERE telegram_user_id = ?")
-        .bind(userId)
-        .first();
-
-    if (!user?.chat_id) return null;
-
-    const access = await grantAccessLevel(env, userId, accessLevel, "manual");
-
-    if (access.changed) {
-        const dailyAdditionLimit = await getDailyAdditionLimit(env, userId);
-        await sendMessage(
-            env,
-            user.chat_id,
-            messages.adminSettingsUpdated(
-                dailyAdditionLimit ?? DAILY_ADD_LIMIT,
-                dailyWordCardLimitForLevel(access.accessLevel)
-            )
-        );
-    }
-
-    return access;
-}
-
-async function grantManualDailyLimit(env, userId, dailyLimit) {
-    const user = await env.DB
-        .prepare("SELECT chat_id FROM users WHERE telegram_user_id = ?")
-        .bind(userId)
-        .first();
-
-    if (!user?.chat_id) {
-        return false;
-    }
-
-    await env.DB
-        .prepare(`
-          INSERT INTO user_daily_limits (user_id, daily_limit, donation_request_id, expires_at)
-          VALUES (?, ?, NULL, datetime('now', '+1 month'))
-          ON CONFLICT(user_id) DO UPDATE SET
-            daily_limit = excluded.daily_limit,
-            donation_request_id = NULL,
-            expires_at = excluded.expires_at,
-            granted_at = CURRENT_TIMESTAMP
-        `)
-        .bind(userId, dailyLimit)
-        .run();
-
-    const accessLevel = await getUserAccessLevel(env, userId);
-    await sendMessage(
-        env,
-        user.chat_id,
-        messages.adminSettingsUpdated(
-            dailyLimit,
-            dailyWordCardLimitForLevel(accessLevel)
-        )
-    );
-
-    return true;
-}
-
 // This UPSERT is the quota enforcement point: it atomically claims a daily slot
 // before a new word is generated or saved, preventing normal double additions.
 async function claimDailyWordAddition(env, userId) {
@@ -1161,10 +1083,11 @@ export default {
             }
 
             try {
-                const granted = await grantManualDailyLimit(
+                const granted = await grantManualDailyLimitFlow(
                     env,
                     targetUserId,
-                    dailyLimit
+                    dailyLimit,
+                    { getUserAccessLevel, dailyWordCardLimitForLevel, adminSettingsUpdated: messages.adminSettingsUpdated }
                 );
 
                 await sendMessage(
@@ -1217,7 +1140,10 @@ export default {
             }
 
             try {
-                const access = await grantManualAccessLevel(env, targetUserId, accessLevel);
+                const access = await grantManualAccessLevelFlow(env, targetUserId, accessLevel, {
+                    grantAccessLevel, getDailyAdditionLimit, dailyAddLimit: DAILY_ADD_LIMIT,
+                    dailyWordCardLimitForLevel, adminSettingsUpdated: messages.adminSettingsUpdated,
+                });
                 await sendMessage(
                     env,
                     chatId,
@@ -1253,7 +1179,10 @@ export default {
             }
 
             try {
-                const access = await grantTestLevelOne(env, targetUserId);
+                const access = await grantTestLevelOneFlow(env, targetUserId, {
+                    grantTemporaryAccessLevel, getDailyAdditionLimit, dailyAddLimit: DAILY_ADD_LIMIT,
+                    dailyWordCardLimitForLevel, adminSettingsUpdated: messages.adminSettingsUpdated,
+                });
                 await sendMessage(
                     env,
                     chatId,
