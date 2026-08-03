@@ -24,7 +24,8 @@ import {
     notifyExpiredDonationAccessGrants as notifyExpiredDonationAccessGrantsFlow,
     rejectDonationBonus as rejectDonationBonusRequest,
 } from "./donation-grants.js";
-import { adminDonationKeyboard, notifyPendingDonationRequests as notifyDonationReviews, notifyUnmatchedDonations as notifyUnmatchedDonationAlerts } from "./donation-notifications.js";
+import { notifyPendingDonationRequests as notifyDonationReviews, notifyUnmatchedDonations as notifyUnmatchedDonationAlerts } from "./donation-notifications.js";
+import { handleDonationCallback } from "./donation-callbacks.js";
 import {
     getAdminChatId,
     getUserAccessLevel,
@@ -307,73 +308,12 @@ export default {
                 return new Response("ok");
             }
 
-            if (callback.data.startsWith("bonus:")) {
-                if (!isAdmin(env, userId)) {
-                    await answerCallbackQuery(env, callback.id, "Ця дія доступна лише адміну.");
-                    return new Response("ok");
-                }
-
-                // Keep pending admin cards sent before the level update actionable.
-                const match = callback.data.match(/^bonus:(?:level:([1-3])|(15|25|40|30|50|100)|(reject)):(\d+)$/);
-
-                if (!match) {
-                    await answerCallbackQuery(env, callback.id, "Невірна заявка.");
-                    return new Response("ok");
-                }
-
-                const accessLevel = match[1]
-                    ? Number(match[1])
-                    : ({ 15: 1, 25: 2, 40: 3, 30: 1, 50: 2, 100: 3 }[match[2]] ?? null);
-                const requestId = Number(match[4]);
-
-                if (!Number.isInteger(requestId) || requestId <= 0) {
-                    await answerCallbackQuery(env, callback.id, "Невірна заявка.");
-                    return new Response("ok");
-                }
-
-                try {
-                    if (match[3] === "reject") {
-                        const rejected = await rejectDonationBonusRequest(env, requestId);
-
-                        if (!rejected) {
-                            await answerCallbackQuery(env, callback.id, "Заявку вже оброблено.");
-                            return new Response("ok");
-                        }
-
-                        await answerCallbackQuery(env, callback.id, "Заявку відхилено.");
-                        await editMessage(
-                            env,
-                            chatId,
-                            messageId,
-                            `❌ Заявку #${requestId} відхилено.`,
-                            { inline_keyboard: [] }
-                        );
-                        return new Response("ok");
-                    }
-
-                    const granted = await grantDonationBonusRequest(env, requestId, accessLevel, grantTemporaryAccessLevel);
-
-                    if (!granted) {
-                        await answerCallbackQuery(env, callback.id, "Заявку вже оброблено.");
-                        return new Response("ok");
-                    }
-
-                    await answerCallbackQuery(env, callback.id, "Бонус надано.");
-                    await editMessage(
-                        env,
-                        chatId,
-                        messageId,
-                        `✅ Заявка #${requestId}: надано рівень ${granted.access.accessLevel} на 1 місяць; щоденні картки: ${dailyWordCardLimitForLevel(granted.access.accessLevel)} на день.`,
-                        { inline_keyboard: [] }
-                    );
-                } catch (error) {
-                    console.error({
-                        event: "donation_bonus_action_failed",
-                        message: error instanceof Error ? error.message : "Unknown error",
-                    });
-                    await answerCallbackQuery(env, callback.id, "Не вдалося обробити заявку.");
-                }
-
+            if (await handleDonationCallback(env, callback, { chatId, messageId, userId }, {
+                isAdmin,
+                grantDonationBonus: grantDonationBonusRequest,
+                rejectDonationBonus: rejectDonationBonusRequest,
+                grantTemporaryAccessLevel,
+            })) {
                 return new Response("ok");
             }
 
