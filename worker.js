@@ -8,8 +8,22 @@ import {
     sendMessage,
     telegramApi,
 } from "./telegram.js";
-import { openAIJson } from "./openai.js";
+import {
+    closePendingSelection,
+    getPendingWord,
+    saveAndSendWord,
+    senseKeyboard,
+    senseText,
+    SENSES_PER_PAGE,
+    suggestSenses,
+} from "./vocabulary-cards.js";
 import { createMonobankDonationSync } from "./monobank-donations.js";
+import {
+    getAdminChatId,
+    getUserAccessLevel,
+    grantAccessLevel,
+    grantTemporaryAccessLevel,
+} from "./access-levels.js";
 import { ADD_WORD_HINT, messages } from "./messages.js";
 import {
     DAILY_LEVEL_OPTIONS,
@@ -43,12 +57,12 @@ import {
 import {
     dailyWordCardLimitForLevel,
     donationAccessLevel,
-    normalizeAccessLevel,
 } from "./policies.js";
 import {
     claimDailyWordCard,
     dailyWordKeyboard,
     dailyWordText,
+    generateDailyWordCard,
     generateNewDailyWord,
     getPendingDailyWord,
     hasPendingDailyWord,
@@ -56,8 +70,6 @@ import {
     savePendingDailyWordToLearning,
 } from "./daily-words.js";
 
-const SENSES_PER_PAGE = 3;
-const MAX_SENSES = 9;
 // Default daily quota for newly saved words; individual bonuses may raise it.
 const DAILY_ADD_LIMIT = 10;
 // Daily-card quota is separate from the learning-list quota and depends on access.
@@ -74,254 +86,6 @@ const ADMIN_USER_LIST_LIMIT = 50;
 const LEARNED_WORD_RETENTION_DAYS = 30;
 // Increment only when the persistent reply keyboard changes for users.
 const INTERFACE_VERSION = 7;
-
-// Vocabulary card creation and a short-lived meaning-selection flow.
-async function suggestSenses(env, word) {
-    const schema = {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-            senses: {
-                type: "array",
-                items: {
-                    type: "object",
-                    additionalProperties: false,
-                    properties: {
-                        label_uk: { type: "string" },
-                        context_en: { type: "string" },
-                    },
-                    required: ["label_uk", "context_en"],
-                },
-            },
-        },
-        required: ["senses"],
-    };
-
-    const result = await openAIJson(
-        env,
-        "word_senses",
-        schema,
-        "For an English vocabulary word, return one to nine genuinely different common meanings. Return one item only when the word is unambiguous. label_uk must be a short Ukrainian label suitable for a Telegram button. context_en must be a short English explanation of the exact meaning. Prioritize everyday meanings. Do not return grammatical forms of the same sense.",
-        `Word: ${word}`
-    );
-
-    return result.senses.slice(0, MAX_SENSES);
-}
-
-async function generateWordCard(env, word, context) {
-    const schema = {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-            translation_uk: { type: "string" },
-            examples: {
-                type: "array",
-                items: {
-                    type: "object",
-                    additionalProperties: false,
-                    properties: {
-                        source: { type: "string" },
-                        uk: { type: "string" },
-                    },
-                    required: ["source", "uk"],
-                },
-            },
-        },
-        required: ["translation_uk", "examples"],
-    };
-
-    const result = await openAIJson(
-        env,
-        "word_card",
-        schema,
-        "Create one consistent vocabulary card. Translate the word into Ukrainian strictly for the supplied meaning. Create exactly two natural English sentences, each 8–18 words, using only that same meaning. Translate each sentence fluently into Ukrainian. Never mix meanings of the word.",
-        `Word: ${word}\nChosen meaning: ${context}`
-    );
-
-    if (!Array.isArray(result.examples) || result.examples.length !== 2) {
-        throw new Error("Invalid examples response.");
-    }
-
-    return result;
-}
-
-async function generateDailyWordCard(env, level) {
-    const schema = {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-            word: { type: "string" },
-            context_en: { type: "string" },
-            translation_uk: { type: "string" },
-            examples: {
-                type: "array",
-                items: {
-                    type: "object",
-                    additionalProperties: false,
-                    properties: {
-                        source: { type: "string" },
-                        uk: { type: "string" },
-                    },
-                    required: ["source", "uk"],
-                },
-            },
-        },
-        required: ["word", "context_en", "translation_uk", "examples"],
-    };
-
-    const result = await openAIJson(
-        env,
-        "daily_word_card",
-        schema,
-        "Create one useful English vocabulary card for a learner at the requested CEFR level. word must be a single English word or a short common phrase, not a proper noun. context_en must precisely state its meaning. Give a short Ukrainian translation and exactly two natural English example sentences, each 8–18 words, with fluent Ukrainian translations. Both examples must use exactly the stated meaning.",
-        `CEFR level: ${level}`
-    );
-
-    if (!Array.isArray(result.examples) || result.examples.length !== 2) {
-        throw new Error("Invalid daily word examples response.");
-    }
-
-    return result;
-}
-
-function senseKeyboard(senses, page) {
-    const totalPages = Math.ceil(senses.length / SENSES_PER_PAGE);
-    const start = page * SENSES_PER_PAGE;
-    const currentSenses = senses.slice(start, start + SENSES_PER_PAGE);
-
-    const rows = currentSenses.map((sense, offset) => [
-        {
-            text: sense.label_uk,
-            callback_data: `sense:${start + offset}`,
-        },
-    ]);
-
-    const navigation = [];
-
-    if (page > 0) {
-        navigation.push({
-            text: "← Назад",
-            callback_data: `page:${page - 1}`,
-        });
-    }
-
-    if (page < totalPages - 1) {
-        navigation.push({
-            text: "Ще значення →",
-            callback_data: `page:${page + 1}`,
-        });
-    }
-
-    if (navigation.length > 0) {
-        rows.push(navigation);
-    }
-
-    return { inline_keyboard: rows };
-}
-
-function senseText(word, senses, page) {
-    const totalPages = Math.ceil(senses.length / SENSES_PER_PAGE);
-
-    return totalPages > 1
-        ? `${word} має кілька значень. Обери потрібне:\nСторінка ${
-            page + 1
-        } з ${totalPages}`
-        : `${word} має кілька значень. Обери потрібне:`;
-}
-
-async function getPendingWord(env, userId) {
-    const pending = await env.DB
-        .prepare(`
-      SELECT source_text, senses_json
-      FROM pending_words
-      WHERE user_id = ?
-    `)
-        .bind(userId)
-        .first();
-
-    if (!pending) {
-        return null;
-    }
-
-    try {
-        return {
-            word: pending.source_text,
-            senses: JSON.parse(pending.senses_json),
-        };
-    } catch {
-        return null;
-    }
-}
-
-async function closePendingSelection(env, userId) {
-    const previous = await env.DB
-        .prepare(`
-      SELECT chat_id, message_id
-      FROM pending_words
-      WHERE user_id = ?
-    `)
-        .bind(userId)
-        .first();
-
-    if (!previous?.chat_id || !previous?.message_id) {
-        return;
-    }
-
-    try {
-        await editMessage(
-            env,
-            previous.chat_id,
-            previous.message_id,
-            "Вибір скасовано: ти почав додавати інше слово.",
-            { inline_keyboard: [] }
-        );
-    } catch {
-        // Старе повідомлення могло бути видалене — це не проблема.
-    }
-}
-
-async function saveAndSendWord(env, chatId, userId, word, context) {
-    const card = await generateWordCard(env, word, context);
-
-    const insertedWord = await env.DB
-        .prepare(`
-      INSERT INTO words (
-        user_id,
-        source_text,
-        source_language,
-        translation_uk,
-        context_note
-      )
-      VALUES (?, ?, 'en', ?, ?)
-    `)
-        .bind(userId, word, card.translation_uk, context)
-        .run();
-
-    const wordId = insertedWord.meta.last_row_id;
-
-    for (let index = 0; index < card.examples.length; index += 1) {
-        const example = card.examples[index];
-
-        await env.DB
-            .prepare(`
-        INSERT INTO examples (
-          word_id,
-          sentence_source,
-          sentence_uk,
-          position
-        )
-        VALUES (?, ?, ?, ?)
-      `)
-            .bind(wordId, example.source, example.uk, index + 1)
-            .run();
-    }
-
-    await sendMessage(
-        env,
-        chatId,
-        `✅ ${word} — ${card.translation_uk}\n\n1. ${card.examples[0].source}\n${card.examples[0].uk}\n\n2. ${card.examples[1].source}\n${card.examples[1].uk}`
-    );
-}
 
 // User-facing reply/inline keyboards and the admin-only user directory.
 // Authorization itself stays in helpers.js so every entry path compares IDs consistently.
@@ -537,81 +301,6 @@ async function sendDonationInstructions(env, chatId, userId) {
         `Дякую за підтримку! Відкрий банку й, будь ласка, додай цей код у коментар до платежу:\n\n${request.support_code}\n\nПісля переказу натисни «🎁 Отримати бонус». Код допоможе мені точно знайти твій донат.`,
         supportKeyboard()
     );
-}
-
-async function getAdminChatId(env) {
-    if (!env.ADMIN_TELEGRAM_USER_ID) {
-        return null;
-    }
-
-    const admin = await env.DB
-        .prepare("SELECT chat_id FROM users WHERE telegram_user_id = ?")
-        .bind(env.ADMIN_TELEGRAM_USER_ID)
-        .first();
-
-    return admin?.chat_id ?? null;
-}
-
-async function getUserAccessLevel(env, userId) {
-    if (isAdmin(env, userId)) return 3;
-
-    const [permanent, temporary] = await Promise.all([
-        env.DB
-            .prepare("SELECT access_level FROM user_access_levels WHERE user_id = ?")
-            .bind(userId)
-            .first(),
-        env.DB
-            .prepare("SELECT MAX(access_level) AS access_level FROM user_temporary_access_grants WHERE user_id = ? AND expires_at > CURRENT_TIMESTAMP")
-            .bind(userId)
-            .first(),
-    ]);
-
-    return Math.max(
-        normalizeAccessLevel(permanent?.access_level),
-        normalizeAccessLevel(temporary?.access_level)
-    );
-}
-
-async function grantAccessLevel(env, userId, accessLevel, source, donationRequestId = null) {
-    const level = normalizeAccessLevel(accessLevel);
-    const previousLevel = await getUserAccessLevel(env, userId);
-
-    if (level <= previousLevel && !isAdmin(env, userId)) {
-        return { changed: false, accessLevel: previousLevel };
-    }
-
-    await env.DB
-        .prepare(`
-          INSERT INTO user_access_levels (user_id, access_level, donation_request_id, source)
-          VALUES (?, ?, ?, ?)
-          ON CONFLICT(user_id) DO UPDATE SET
-            access_level = MAX(user_access_levels.access_level, excluded.access_level),
-            donation_request_id = excluded.donation_request_id,
-            source = excluded.source,
-            updated_at = CURRENT_TIMESTAMP
-        `)
-        .bind(userId, level, donationRequestId, source)
-        .run();
-
-    return { changed: level > previousLevel, accessLevel: Math.max(level, previousLevel) };
-}
-
-/** Temporary access never changes a user's permanent base level. */
-async function grantTemporaryAccessLevel(env, userId, accessLevel, source, duration, donationRequestId = null) {
-    const previousLevel = await getUserAccessLevel(env, userId);
-
-    await env.DB
-        .prepare(`
-          INSERT INTO user_temporary_access_grants (
-            user_id, access_level, donation_request_id, source, expires_at
-          )
-          VALUES (?, ?, ?, ?, datetime('now', ?))
-        `)
-        .bind(userId, normalizeAccessLevel(accessLevel), donationRequestId, source, duration)
-        .run();
-
-    const currentLevel = await getUserAccessLevel(env, userId);
-    return { changed: currentLevel > previousLevel, accessLevel: currentLevel };
 }
 
 async function grantTestLevelOne(env, userId) {

@@ -6,17 +6,18 @@ each coherent delivery slice.
 
 ## Current work
 
-- **Stage:** daily-card flow — test contracts and module extraction
-- **State:** queued as the next complete delivery slice
-- **Next concrete action:** add isolated D1/Telegram tests for pending cards,
-  `know`/`learn`, and independent daily limits before moving code from
-  `worker.js` to `daily-words.js`.
+- **Stage:** incremental Worker decomposition
+- **State:** vocabulary-card and access-level boundaries extracted and verified
+- **Next concrete action:** add missing D1/Telegram contracts for the daily-card
+  flow, then extract its callback routing without changing callback formats.
 
 ## Plan
 
 - [x] Requirements test matrix and baseline Worker HTTP tests
 - [x] Local test command and GitHub Actions workflow
 - [x] Extract daily settings with tests
+- [x] Extract vocabulary-card generation, sense selection, and persistence
+- [x] Extract access-level reads and monotonic grant operations
 - [ ] Test and extract daily-card delivery
 - [ ] Test and extract donation / Monobank service
 - [ ] Route callbacks by feature
@@ -25,6 +26,6 @@ each coherent delivery slice.
 
 ## Latest verified result
 
-- `npm run test:local`: 18 tests passed
+- `npm run check:syntax && npm test`: 25 tests passed
 - Worker dry-run build: passed
 - Last deployed Worker status: HTTP 200

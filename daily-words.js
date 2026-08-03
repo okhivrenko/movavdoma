@@ -1,5 +1,27 @@
+import { openAIJson } from "./openai.js";
+
 // Daily-card persistence and delivery flow. Network and access dependencies are
 // passed in explicitly so the Worker remains the composition root.
+
+/** Generates one coherent two-example card for the supplied CEFR level. */
+export async function generateDailyWordCard(env, level) {
+    const result = await openAIJson(env, "daily_word_card", {
+        type: "object", additionalProperties: false,
+        properties: {
+            word: { type: "string" }, context_en: { type: "string" }, translation_uk: { type: "string" },
+            examples: { type: "array", items: {
+                type: "object", additionalProperties: false,
+                properties: { source: { type: "string" }, uk: { type: "string" } },
+                required: ["source", "uk"],
+            } },
+        }, required: ["word", "context_en", "translation_uk", "examples"],
+    }, "Create one useful English vocabulary card for a learner at the requested CEFR level. word must be a single English word or a short common phrase, not a proper noun. context_en must precisely state its meaning. Give a short Ukrainian translation and exactly two natural English example sentences, each 8–18 words, with fluent Ukrainian translations. Both examples must use exactly the stated meaning.", `CEFR level: ${level}`);
+
+    if (!Array.isArray(result.examples) || result.examples.length !== 2) {
+        throw new Error("Invalid daily word examples response.");
+    }
+    return result;
+}
 
 export function dailyWordKeyboard(pendingId) {
     return {
