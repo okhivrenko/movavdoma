@@ -18,7 +18,7 @@ export const messages = Object.freeze({
 
     welcome(settings) {
         const reminder = settings.daily_enabled ? `щодня о ${settings.daily_time}` : "зараз вимкнені";
-        return `Привіт! MovaVDoma — бот для щоденного вивчення англійських слів.\n\nТвої поточні налаштування:\n• Рівень щоденних слів: ${settings.daily_level}\n• Нагадування: ${reminder}\n\nЗмінити їх можна в «⏰ Розклад і рівень».\n\nПросто надішли мені слово або фразу — наприклад: resilient\n\nЯкщо знаєш потрібне значення, можеш додати його після / (також працюють | та \\):\ncharge / payment for a service`;
+        return `Привіт! MovaYakVDoma — бот для щоденного вивчення англійських слів.\n\nТвої поточні налаштування:\n• Рівень щоденних слів: ${settings.daily_level}\n• Нагадування: ${reminder}\n\nЗмінити їх можна в «⏰ Розклад і рівень».\n\nПросто надішли мені слово або фразу — наприклад: resilient\n\nЯкщо знаєш потрібне значення, можеш додати його після / (також працюють | та \\):\ncharge / payment for a service`;
     },
 
     adminSettingsUpdated(dailyAdditionLimit, dailyCardLimit) {

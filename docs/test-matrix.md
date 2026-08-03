@@ -1,4 +1,4 @@
-# MovaVDoma — test matrix
+# MovaYakVDoma — test matrix
 
 This matrix is the regression contract for product requirements. A row is
 **covered** only when its named automated test exists and runs in `npm test`.

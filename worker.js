@@ -1,4 +1,4 @@
-// MovaVDoma Telegram Bot — Copyright (c) 2026 Oleksii Khivrenko.
+// MovaYakVDoma Telegram Bot — Copyright (c) 2026 Oleksii Khivrenko.
 // Publicly viewable under the proprietary terms in LICENSE.
 
 import {
@@ -89,7 +89,7 @@ import {
 const DAILY_ADD_LIMIT = 10;
 // Daily-card quota is separate from the learning-list quota and depends on access.
 const MONOBANK_JAR_SEND_ID = "9vp8W5V9nQ";
-const BOT_BRAND_NAME = "MovaVDoma";
+const BOT_BRAND_NAME = "MovaYakVDoma";
 // The Worker name is still technical for now. Keep this URL aligned with its
 // active workers.dev route; it also lets the cron repair Telegram's webhook
 // after an account-subdomain or Worker-name change.

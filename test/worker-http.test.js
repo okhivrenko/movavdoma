@@ -28,7 +28,7 @@ test("Worker exposes privacy without accepting an unauthenticated webhook", asyn
 
     const privacy = await worker.fetch(new Request("https://example.test/privacy"), env);
     assert.equal(privacy.status, 200);
-    assert.match(await privacy.text(), /Privacy Policy for MovaVDoma/);
+    assert.match(await privacy.text(), /Privacy Policy for MovaYakVDoma/);
 
     const denied = await worker.fetch(
         webhookRequest(privateMessageUpdate({ text: "/start" }), "wrong-secret"),

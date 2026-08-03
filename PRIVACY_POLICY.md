@@ -1,8 +1,8 @@
-# Privacy Policy for MovaVDoma
+# Privacy Policy for MovaYakVDoma
 
 Effective date: 2 August 2026
 
-MovaVDoma is a Telegram bot for learning vocabulary. This policy explains what
+MovaYakVDoma is a Telegram bot for learning vocabulary. This policy explains what
 information the bot processes, why it is needed, and how to contact the bot
 operator about your data.
 

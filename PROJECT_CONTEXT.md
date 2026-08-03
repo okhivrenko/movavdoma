@@ -1,4 +1,4 @@
-# MovaVDoma — project context
+# MovaYakVDoma — project context
 
 ## Purpose
 
@@ -16,7 +16,7 @@ Users add words through Telegram. The bot:
 
 - Hosting/runtime: Cloudflare Workers
 - Database: Cloudflare D1 (SQLite)
-- Worker name: `movavdoma`
+- Worker name: `movavdoma` (legacy technical identifier; unchanged by brand rename)
 - Public URL: `https://movavdoma.oleksiikhivrenko.workers.dev/`
 - D1 database name: `vocab-words-db`
 - D1 database ID: `62ded422-e125-42b3-99de-a86fdcf5f9f8`
