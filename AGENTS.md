@@ -72,6 +72,12 @@ returns HTTP 200 after deployment.
   product requirements, and existing deployment authority. Pause only for a
   material product choice, missing access, or a safety boundary that needs the
   owner's direction.
+- Do not end a turn merely because one intermediate slice was committed. Keep
+  executing the accepted plan until its completion criteria are met or a valid
+  pause condition applies.
+- At the end of a completed multi-slice objective, perform a final independent
+  analysis of the resulting change, update `IMPLEMENTATION_STATUS.md`, and
+  create a follow-up plan when residual work or risks remain.
 
 ## Senior engineering quality gate
 
