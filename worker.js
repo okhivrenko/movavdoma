@@ -39,6 +39,7 @@ import {
 } from "./admin-access.js";
 import { adminHelpText, adminKeyboard } from "./admin-panel.js";
 import { handleAdminCallback } from "./admin-callbacks.js";
+import { handleAdminCommand } from "./admin-commands.js";
 import { ADD_WORD_HINT, messages } from "./messages.js";
 import {
     getDailySettings,
@@ -543,154 +544,14 @@ export default {
             return new Response("ok");
         }
 
-        const grantMatch = text.match(/^\/grant(?:\s+(.+))?$/i);
-
-        if (grantMatch) {
-            if (!isAdmin(env, userId)) {
-                await sendMessage(env, chatId, "Ця команда доступна лише адміну.");
-                return new Response("ok");
-            }
-
-            const parts = grantMatch[1]?.trim().split(/\s+/) ?? [];
-
-            if (parts.length !== 2 || !/^\d+$/.test(parts[0]) || !/^\d+$/.test(parts[1])) {
-                await sendMessage(
-                    env,
-                    chatId,
-                    "Використай: /grant userId ліміт\nНаприклад: /grant 123456789 45"
-                );
-                return new Response("ok");
-            }
-
-            const targetUserId = Number(parts[0]);
-            const dailyLimit = Number(parts[1]);
-
-            if (
-                !Number.isSafeInteger(targetUserId) ||
-                !Number.isSafeInteger(dailyLimit) ||
-                targetUserId <= 0 ||
-                dailyLimit <= 0
-            ) {
-                await sendMessage(
-                    env,
-                    chatId,
-                    "userId і ліміт мають бути додатними цілими числами."
-                );
-                return new Response("ok");
-            }
-
-            try {
-                const granted = await grantManualDailyLimitFlow(
-                    env,
-                    targetUserId,
-                    dailyLimit,
-                    { getUserAccessLevel, dailyWordCardLimitForLevel, adminSettingsUpdated: messages.adminSettingsUpdated }
-                );
-
-                await sendMessage(
-                    env,
-                    chatId,
-                    granted
-                        ? `✅ Видано ${dailyLimit} ${wordCountLabel(dailyLimit)} на день користувачу ${targetUserId} на 1 місяць.`
-                        : "Користувача не знайдено. Він має спершу написати боту /start."
-                );
-            } catch (error) {
-                console.error({
-                    event: "manual_grant_failed",
-                    message: error instanceof Error ? error.message : "Unknown error",
-                });
-                await sendMessage(
-                    env,
-                    chatId,
-                    "Не вдалося видати ліміт. Спробуй ще раз за хвилину."
-                );
-            }
-
-            return new Response("ok");
-        }
-
-        const levelMatch = text.match(/^\/level(?:\s+(.+))?$/i);
-
-        if (levelMatch) {
-            if (!isAdmin(env, userId)) {
-                await sendMessage(env, chatId, "Ця команда доступна лише адміну.");
-                return new Response("ok");
-            }
-
-            const parts = levelMatch[1]?.trim().split(/\s+/) ?? [];
-
-            if (parts.length !== 2 || !/^\d+$/.test(parts[0]) || !/^[0-3]$/.test(parts[1])) {
-                await sendMessage(
-                    env,
-                    chatId,
-                    "Використай: /level userId рівень\nРівні: 0→5, 1→10, 2→15, 3→20 щоденних карток.\nНаприклад: /level 123456789 2"
-                );
-                return new Response("ok");
-            }
-
-            const targetUserId = Number(parts[0]);
-            const accessLevel = Number(parts[1]);
-
-            if (!Number.isSafeInteger(targetUserId) || targetUserId <= 0) {
-                await sendMessage(env, chatId, "userId має бути додатним цілим числом.");
-                return new Response("ok");
-            }
-
-            try {
-                const access = await grantManualAccessLevelFlow(env, targetUserId, accessLevel, {
-                    grantAccessLevel, getDailyAdditionLimit, dailyAddLimit: DAILY_ADD_LIMIT,
-                    dailyWordCardLimitForLevel, adminSettingsUpdated: messages.adminSettingsUpdated,
-                });
-                await sendMessage(
-                    env,
-                    chatId,
-                    !access
-                        ? "Користувача не знайдено. Він має спершу написати боту /start."
-                        : access.changed
-                          ? `✅ Рівень користувача ${targetUserId} підвищено до ${access.accessLevel}. Ліміт щоденних карток: ${dailyWordCardLimitForLevel(access.accessLevel)}.`
-                          : `У користувача ${targetUserId} вже рівень ${access.accessLevel} або вищий.`
-                );
-            } catch (error) {
-                console.error({
-                    event: "manual_access_level_failed",
-                    message: error instanceof Error ? error.message : "Unknown error",
-                });
-                await sendMessage(env, chatId, "Не вдалося змінити рівень. Спробуй ще раз за хвилину.");
-            }
-
-            return new Response("ok");
-        }
-
-        const testLevelMatch = text.match(/^\/testlevel(?:\s+(.+))?$/i);
-
-        if (testLevelMatch) {
-            if (!isAdmin(env, userId)) {
-                await sendMessage(env, chatId, "Ця команда доступна лише адміну.");
-                return new Response("ok");
-            }
-
-            const targetUserId = Number(testLevelMatch[1]?.trim());
-            if (!Number.isSafeInteger(targetUserId) || targetUserId <= 0) {
-                await sendMessage(env, chatId, "Використай: /testlevel userId\nНаприклад: /testlevel 123456789");
-                return new Response("ok");
-            }
-
-            try {
-                const access = await grantTestLevelOneFlow(env, targetUserId, {
-                    grantTemporaryAccessLevel, getDailyAdditionLimit, dailyAddLimit: DAILY_ADD_LIMIT,
-                    dailyWordCardLimitForLevel, adminSettingsUpdated: messages.adminSettingsUpdated,
-                });
-                await sendMessage(
-                    env,
-                    chatId,
-                    access
-                        ? `✅ Користувачу ${targetUserId} видано тестовий рівень ${access.accessLevel} на 1 день.`
-                        : "Користувача не знайдено. Він має спершу написати боту /start."
-                );
-            } catch (error) {
-                console.error({ event: "test_level_failed", message: error instanceof Error ? error.message : "Unknown error" });
-                await sendMessage(env, chatId, "Не вдалося видати тестовий рівень. Спробуй ще раз за хвилину.");
-            }
+        if (await handleAdminCommand(env, text, { chatId, userId }, {
+            isAdmin,
+            wordCountLabel,
+            dailyWordCardLimitForLevel,
+            grantManualDailyLimit: (targetEnv, targetUserId, dailyLimit) => grantManualDailyLimitFlow(targetEnv, targetUserId, dailyLimit, { getUserAccessLevel, dailyWordCardLimitForLevel, adminSettingsUpdated: messages.adminSettingsUpdated }),
+            grantManualAccessLevel: (targetEnv, targetUserId, accessLevel) => grantManualAccessLevelFlow(targetEnv, targetUserId, accessLevel, { grantAccessLevel, getDailyAdditionLimit, dailyAddLimit: DAILY_ADD_LIMIT, dailyWordCardLimitForLevel, adminSettingsUpdated: messages.adminSettingsUpdated }),
+            grantTestLevelOne: (targetEnv, targetUserId) => grantTestLevelOneFlow(targetEnv, targetUserId, { grantTemporaryAccessLevel, getDailyAdditionLimit, dailyAddLimit: DAILY_ADD_LIMIT, dailyWordCardLimitForLevel, adminSettingsUpdated: messages.adminSettingsUpdated }),
+        })) {
             return new Response("ok");
         }
 
