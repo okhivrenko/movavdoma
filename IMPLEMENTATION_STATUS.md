@@ -7,10 +7,10 @@ each coherent delivery slice.
 ## Current work
 
 - **Stage:** incremental Worker decomposition
-- **State:** vocabulary callbacks, daily-card, feedback, donation request/grant,
-  and learned-word cleanup flows extracted and verified
-- **Next concrete action:** extract scheduled daily-word delivery with focused
-  D1 contracts, then route the remaining callbacks by feature.
+- **State:** vocabulary, daily-card delivery, feedback, donation lifecycle,
+  learned-word cleanup, and admin access operations are extracted and verified.
+- **Next concrete action:** extract daily-addition quota operations, then reduce
+  the remaining webhook routing by feature boundaries.
 
 ## Plan
 
@@ -22,13 +22,14 @@ each coherent delivery slice.
 - [x] Test and extract daily-card delivery
 - [x] Extract feedback state and delivery flow
 - [x] Extract donation grant operation
-- [ ] Extract donation notifications and review operations
-- [ ] Route callbacks by feature
-- [ ] Cover remaining admin, feedback, learned-word, and scheduled-job flows
+- [x] Extract donation notifications and review operations
+- [x] Cover remaining admin, feedback, learned-word, and scheduled-job flows
+- [ ] Extract daily-addition quota operations
+- [ ] Route callbacks and commands by feature
 - [ ] Final security, performance, and release review
 
 ## Latest verified result
 
-- `npm run check`: 35 tests passed, migrations validated, Worker dry-run built
+- `npm run check`: 40 tests passed, migrations validated, Worker dry-run built
 - Worker dry-run build: passed
 - Last deployed Worker status: HTTP 200
