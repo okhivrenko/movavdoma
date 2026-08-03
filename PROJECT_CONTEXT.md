@@ -53,12 +53,13 @@ the current time and level, then leads to:
 - `❓ Допомога`
 - `💬 Відгук`
 - `➡️ Далі` / `⬅️ Назад` split the persistent menu into two pages. The second
-  page has support, bonus, feedback, contact, and the admin entry point.
+  page has support, bonus, feedback, contact, a share-bot action, and the admin entry point.
 
 The admin also sees `🛠 Адмін`, which opens an admin-only panel with a paginated
 user list, the `/grant <userId> <dailyLimit>` format, and a summary of
 admin-only commands. It can also show a copyable direct bot link. The user
-list includes Telegram IDs, active-word count, and the current daily limit.
+list includes Telegram IDs, names, usernames, active-word count, and the
+current daily limit (25 users per page).
 
 Users can simply send an English word or phrase; `/add` remains supported.
 The currently active card direction is English → Ukrainian. The architecture also
@@ -207,6 +208,8 @@ DB
 CREATE TABLE IF NOT EXISTS users (
   telegram_user_id INTEGER PRIMARY KEY,
   chat_id INTEGER NOT NULL,
+  telegram_username TEXT,
+  telegram_first_name TEXT,
   timezone TEXT NOT NULL DEFAULT 'Europe/Warsaw',
   daily_time TEXT NOT NULL DEFAULT '09:00',
   daily_enabled INTEGER NOT NULL DEFAULT 1,

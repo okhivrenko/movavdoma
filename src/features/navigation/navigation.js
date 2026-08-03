@@ -14,6 +14,7 @@ export const MENU_ACTION = Object.freeze({
     BONUS: "bonus",
     FEEDBACK: "feedback",
     CONTACT: "contact",
+    SHARE_BOT: "share_bot",
     ADMIN: "admin",
 });
 
@@ -28,6 +29,7 @@ const buttonAction = Object.freeze({
     bonus: MENU_ACTION.BONUS,
     feedback: MENU_ACTION.FEEDBACK,
     contact: MENU_ACTION.CONTACT,
+    shareBot: MENU_ACTION.SHARE_BOT,
     admin: MENU_ACTION.ADMIN,
     previousPage: MENU_ACTION.PREVIOUS_PAGE,
 });
@@ -62,6 +64,7 @@ export function mainKeyboard(showAdmin = false, page = 1, dailySettings, locale 
     const secondPage = [
         [{ text: buttons.support }, { text: buttons.bonus }],
         [{ text: buttons.feedback }, { text: buttons.contact }],
+        [{ text: buttons.shareBot }],
     ];
 
     if (showAdmin) {
@@ -178,6 +181,20 @@ export async function handleNavigationMessage(env, text, context, dependencies) 
 
     if (action === MENU_ACTION.FEEDBACK || action === MENU_ACTION.CONTACT) {
         await startFeedback(env, chatId, userId, action === MENU_ACTION.CONTACT ? dependencies.contactPrompt : undefined);
+        return true;
+    }
+
+    if (action === MENU_ACTION.SHARE_BOT) {
+        try {
+            const botLink = await dependencies.getBotLink(env);
+            const shareLink = `https://t.me/share/url?url=${encodeURIComponent(botLink)}&text=${encodeURIComponent("Спробуй бот MovaYakVDoma для вивчення слів!")}`;
+            await sendMessage(env, chatId, `📤 Поділися ботом з друзями:\n${botLink}`, {
+                inline_keyboard: [[{ text: "Поділитися ботом", url: shareLink }]],
+            });
+        } catch (error) {
+            logError("share_bot_link_failed", error);
+            await sendMessage(env, chatId, copy.shareBotFailed);
+        }
         return true;
     }
 

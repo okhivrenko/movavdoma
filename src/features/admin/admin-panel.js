@@ -1,6 +1,8 @@
 import { editMessage, sendMessage } from "../../platform/telegram.js";
 
-const ADMIN_USER_LIST_LIMIT = 50;
+// Profile fields increase each row's length; 25 rows stay safely below
+// Telegram's 4,096-character message limit even with long names.
+const ADMIN_USER_LIST_LIMIT = 25;
 
 export function adminKeyboard() {
     return { inline_keyboard: [
@@ -14,13 +16,19 @@ export function adminKeyboard() {
 }
 
 export function adminHelpText() {
-    return "🛠 Адмін-панель\n\n• 👥 Список користувачів — усі користувачі, по 50 на сторінці, з ID, лімітами та кількістю активних слів.\n• 🔗 Посилання на бота — показує пряме посилання, яке можна скопіювати або переслати.\n• /grant <userId> <ліміт> — встановити ліміт додавання слів на 1 місяць.\n  Приклад: /grant 123456789 45\n• /level <userId> <0-3> — постійно підвищити рівень доступу. Щоденні картки: 0→5, 1→10, 2→15, 3→20.\n  Приклад: /level 123456789 2\n• /testlevel <userId> — видати тестовий рівень 1 на 1 день.\n  Приклад: /testlevel 123456789\n• 🎁 Заявки на донати приходять окремими картками з кнопками підтвердження.";
+    return "🛠 Адмін-панель\n\n• 👥 Список користувачів — усі користувачі, по 25 на сторінці, з ID, ім’ям, ніком, лімітами та кількістю активних слів.\n• 🔗 Посилання на бота — показує пряме посилання, яке можна скопіювати або переслати.\n• /grant <userId> <ліміт> — встановити ліміт додавання слів на 1 місяць.\n  Приклад: /grant 123456789 45\n• /level <userId> <0-3> — постійно підвищити рівень доступу. Щоденні картки: 0→5, 1→10, 2→15, 3→20.\n  Приклад: /level 123456789 2\n• /testlevel <userId> — видати тестовий рівень 1 на 1 день.\n  Приклад: /testlevel 123456789\n• 🎁 Заявки на донати приходять окремими картками з кнопками підтвердження.";
 }
 
 function compactAdminNumber(value) {
     const number = Number(value);
     if (!Number.isFinite(number) || number < 0) return "?";
     return number > 999 ? "999+" : String(Math.floor(number));
+}
+
+function compactProfileField(value, maxLength) {
+    const text = String(value ?? "").trim();
+    if (!text) return null;
+    return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
 }
 
 function adminUserListKeyboard(page, totalPages) {
@@ -41,7 +49,7 @@ export async function sendAdminUserList(env, chatId, requestedPage = 0, messageI
     const totalPages = Math.ceil(total / ADMIN_USER_LIST_LIMIT);
     const page = Math.min(Math.max(requestedPage, 0), totalPages - 1);
     const result = await env.DB.prepare(`
-      SELECT u.telegram_user_id,
+      SELECT u.telegram_user_id, u.telegram_username, u.telegram_first_name,
         (SELECT COUNT(*) FROM words w WHERE w.user_id = u.telegram_user_id AND w.is_active = 1) AS active_word_count,
         (SELECT daily_limit FROM user_daily_limits l WHERE l.user_id = u.telegram_user_id AND l.expires_at > CURRENT_TIMESTAMP) AS bonus_daily_limit,
         MAX(COALESCE((SELECT access_level FROM user_access_levels a WHERE a.user_id = u.telegram_user_id), 0), COALESCE((SELECT MAX(access_level) FROM user_temporary_access_grants g WHERE g.user_id = u.telegram_user_id AND g.expires_at > CURRENT_TIMESTAMP), 0)) AS access_level
@@ -50,7 +58,10 @@ export async function sendAdminUserList(env, chatId, requestedPage = 0, messageI
 
     const text = result.results.map((user, index) => {
         const dailyLimit = dependencies.isAdmin(env, user.telegram_user_id) ? "∞" : compactAdminNumber(user.bonus_daily_limit ?? dependencies.dailyAddLimit);
-        return `${page * ADMIN_USER_LIST_LIMIT + index + 1}. ID ${user.telegram_user_id} · слів: ${compactAdminNumber(user.active_word_count)} · ліміт: ${dailyLimit} · рівень: ${user.access_level}`;
+        const username = compactProfileField(user.telegram_username, 32);
+        const firstName = compactProfileField(user.telegram_first_name, 32);
+        const profile = [username && `@${username.replace(/^@/, "")}`, firstName].filter(Boolean).join(" · ");
+        return `${page * ADMIN_USER_LIST_LIMIT + index + 1}. ID ${user.telegram_user_id}${profile ? ` · ${profile}` : ""} · слів: ${compactAdminNumber(user.active_word_count)} · ліміт: ${dailyLimit} · рівень: ${user.access_level}`;
     }).join("\n");
     const listText = `👥 Користувачі: ${total}\nСторінка ${page + 1} з ${totalPages}\n\n${text}\n\nЩоб змінити ліміт: /grant userId ліміт`;
     const keyboard = adminUserListKeyboard(page, totalPages);

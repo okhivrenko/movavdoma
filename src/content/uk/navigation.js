@@ -10,6 +10,7 @@ export const navigation = Object.freeze({
         bonus: "🎁 Отримати бонус",
         feedback: "💬 Відгук",
         contact: "📩 Зв’язатися з нами",
+        shareBot: "📤 Поділитися ботом",
         admin: "🛠 Адмін",
         previousPage: "⬅️ Назад",
     }),
@@ -28,6 +29,7 @@ export const navigation = Object.freeze({
         dailyWordFailed: "Не вдалося показати щоденне слово. Спробуй ще раз за хвилину.",
         donationInstructionsFailed: "Не вдалося підготувати код для донату. Спробуй ще раз за хвилину.",
         donationBonusFailed: "Не вдалося надіслати заявку на бонус. Спробуй ще раз за хвилину.",
+        shareBotFailed: "Не вдалося підготувати посилання на бота. Спробуй ще раз за хвилину.",
         adminOnly: "Ця дія доступна лише адміну.",
         privacyPolicy(url) {
             return `🔒 Політика конфіденційності: ${url}`;

@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
  * keeps tests independent from Cloudflare and production data.
  */
 export class WorkerTestDb {
-    constructor({ dailySettings, interfaceVersion = 7 } = {}) {
+    constructor({ dailySettings, interfaceVersion = 8 } = {}) {
         this.dailySettings = dailySettings ?? {
             daily_time: "10:00",
             daily_enabled: 1,
