@@ -24,6 +24,7 @@ import {
     formatHryvnias,
     isAdmin,
     localDateAndTime,
+    parseVocabularyInput,
     wordCountLabel,
 } from "./helpers.js";
 import {
@@ -58,7 +59,7 @@ const LEARNED_WORD_RETENTION_DAYS = 30;
 // Increment only when the persistent reply keyboard changes for users.
 const INTERFACE_VERSION = 6;
 const ADD_WORD_HINT =
-    "Надішли англійське слово або фразу.\n\nЯкщо важливе конкретне значення, додай контекст після |:\ncharge | payment for a service\n\nПриклад без контексту: resilient";
+    "Надішли англійське слово або фразу — цього достатньо.\n\nНаприклад:\nresilient\n\nЯкщо важливе конкретне значення, додай контекст після / (також працюють | та \\):\ncharge / payment for a service";
 
 // Vocabulary card creation and a short-lived meaning-selection flow.
 async function suggestSenses(env, word) {
@@ -1603,7 +1604,7 @@ async function sendHelp(env, chatId, userId) {
     await sendMessage(
         env,
         chatId,
-        "Як користуватися ботом:\n\n1. Натисни «➕ Додати слово» або просто надішли англійське слово чи фразу.\n2. Якщо знаєш потрібне значення, напиши його після |:\ncharge | payment for a service\n3. Обери потрібне значення, якщо бот його уточнить.\n4. Відкрий «📚 Мої слова», щоб переглянути свій каталог.\n5. Відкрий «🎓 Вивчені слова», щоб повернути слово до навчання.\n6. Натисни «📚 Щоденне слово», щоб показати сьогоднішню картку, або «⏰ Розклад і рівень», щоб окремо вибрати час і рівень. У картці натисни «Знаю» або «Вчити».\n7. На другій сторінці меню є підтримка, бонуси, відгук і зв’язок із нами.\n8. Є ідея, запитання чи хочеш створити власного бота? Натисни «📩 Зв’язатися з нами» та надішли повідомлення.\n\nНаприклад: resilient",
+        "Як користуватися ботом:\n\n1. Натисни «➕ Додати слово» або просто надішли англійське слово чи фразу. Наприклад: resilient\n2. Якщо потрібне конкретне значення, це необов’язково, але можеш додати його після / (також працюють | та \\):\ncharge / payment for a service\n3. Обери потрібне значення, якщо бот його уточнить.\n4. Відкрий «📚 Мої слова», щоб переглянути свій каталог.\n5. Відкрий «🎓 Вивчені слова», щоб повернути слово до навчання.\n6. Натисни «📚 Щоденне слово», щоб показати сьогоднішню картку, або «⏰ Розклад і рівень», щоб окремо вибрати час і рівень. У картці натисни «Знаю» або «Вчити».\n7. На другій сторінці меню є підтримка, бонуси, відгук і зв’язок із нами.\n8. Є ідея, запитання чи хочеш створити власного бота? Натисни «📩 Зв’язатися з нами» та надішли повідомлення.",
         mainKeyboard(isAdmin(env, userId))
     );
 }
@@ -2303,7 +2304,7 @@ export default {
             await sendMessage(
                 env,
                 chatId,
-                "Привіт! Я допоможу запам’ятовувати англійські слова.\n\nПросто надішли мені слово або фразу. Якщо знаєш потрібне значення, додай його після |:\ncharge | payment for a service",
+                "Привіт! Я допоможу запам’ятовувати англійські слова.\n\nПросто надішли мені слово або фразу — наприклад: resilient\n\nЯкщо знаєш потрібне значення, можеш додати його після / (також працюють | та \\):\ncharge / payment for a service",
                 mainKeyboard(isAdmin(env, userId))
             );
             await markInterfaceVersion(env, userId);
@@ -2628,9 +2629,7 @@ export default {
               : text;
 
         if (addInput) {
-            const parts = addInput.split("|");
-            const word = parts[0].trim();
-            const explicitContext = parts.slice(1).join("|").trim();
+            const { word, explicitContext } = parseVocabularyInput(addInput);
 
             if (!word) {
                 await sendMessage(env, chatId, "Напиши слово після /add.");

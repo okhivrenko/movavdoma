@@ -60,10 +60,11 @@ list includes Telegram IDs, active-word count, and the current daily limit.
 Users can simply send an English word or phrase; `/add` remains supported.
 `/menu` shows the keyboard again if it was hidden.
 
-To specify an exact meaning, users can send `word | context`, for example:
+To specify an exact meaning, users can send `word / context`; `|` and `\` are
+also supported for compatibility, for example:
 
 ```text
-charge | payment for a service
+charge / payment for a service
 ```
 
 ### `/add resilient`
@@ -81,7 +82,7 @@ For a word without explicit context:
     - Ukrainian translation for each sentence.
 7. Save the word and examples to D1.
 
-### `/add charge | payment for a service`
+### `/add charge / payment for a service`
 
 When an explicit context is supplied, skip meaning selection and generate the card immediately for that context.
 

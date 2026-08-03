@@ -53,3 +53,25 @@ export function createSupportCode() {
     crypto.getRandomValues(values);
     return `V-${Array.from(values, (value) => alphabet[value % alphabet.length]).join("")}`;
 }
+
+/**
+ * Split an optional meaning hint from a vocabulary entry. A slash is the
+ * documented default; pipe and backslash stay supported for existing users.
+ */
+export function parseVocabularyInput(input) {
+    const separatorIndex = Math.min(
+        ...["/", "|", "\\"].map((separator) => {
+            const index = input.indexOf(separator);
+            return index === -1 ? Infinity : index;
+        })
+    );
+
+    if (!Number.isFinite(separatorIndex)) {
+        return { word: input.trim(), explicitContext: "" };
+    }
+
+    return {
+        word: input.slice(0, separatorIndex).trim(),
+        explicitContext: input.slice(separatorIndex + 1).trim(),
+    };
+}
