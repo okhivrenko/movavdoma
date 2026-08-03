@@ -67,6 +67,11 @@ returns HTTP 200 after deployment.
   change has been made.
 - Update `IMPLEMENTATION_STATUS.md` only after a completed slice or a genuine
   blocker; it is a result monitor, not a stream of intentions.
+- After a completed slice, automatically begin the next planned slice without
+  requesting confirmation when it stays within the accepted architecture,
+  product requirements, and existing deployment authority. Pause only for a
+  material product choice, missing access, or a safety boundary that needs the
+  owner's direction.
 
 ## Senior engineering quality gate
 
