@@ -7,11 +7,12 @@ each coherent delivery slice.
 ## Current work
 
 - **Stage:** incremental Worker decomposition
-- **State:** vocabulary, daily-card delivery, feedback, donation lifecycle,
-  learned-word cleanup, admin operations, daily-addition quota, and the
-  `admin:` callback namespace are extracted and verified.
-- **Next concrete action:** route the remaining callback and command branches by
-  feature while keeping private-chat and ownership checks at the Worker boundary.
+- **State:** all callback namespaces, donation lifecycle, daily settings and
+  delivery, word-list actions, quotas, and admin commands are feature modules;
+  `worker.js` is the authenticated HTTP/webhook composition root.
+- **Next concrete action:** make a dedicated, test-backed extraction only when
+  changing one of the remaining text-command domains (menu, word ingestion,
+  archive/restore, or feedback), rather than risk a broad router rewrite.
 
 ## Plan
 
@@ -26,11 +27,13 @@ each coherent delivery slice.
 - [x] Extract donation notifications and review operations
 - [x] Cover remaining admin, feedback, learned-word, and scheduled-job flows
 - [x] Extract daily-addition quota operations
-- [ ] Route remaining callbacks and commands by feature
-- [ ] Final security, performance, and release review
+- [x] Route callbacks and stable admin commands by feature
+- [x] Final decomposition security and reliability review
+- [ ] Follow-up: extract one remaining text-command domain at a time when it is
+  changed for product work; add a direct Worker test for that domain first.
 
 ## Latest verified result
 
-- `npm run check`: 44 tests passed, migrations validated, Worker dry-run built
+- `npm run check`: 45 tests passed, migrations validated, Worker dry-run built
 - Worker dry-run build: passed
 - Last deployed Worker status: HTTP 200
