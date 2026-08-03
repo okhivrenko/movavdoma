@@ -71,6 +71,7 @@ import {
 import { handleDailyWordCallback } from "./daily-word-callbacks.js";
 import { clearPendingFeedback, startFeedback, submitFeedback } from "./feedback.js";
 import { removeExpiredLearnedWords as cleanupLearnedWords } from "./learned-word-cleanup.js";
+import { sendTodayDailyWord as deliverTodayDailyWord } from "./daily-delivery.js";
 
 // Default daily quota for newly saved words; individual bonuses may raise it.
 const DAILY_ADD_LIMIT = 10;
@@ -596,66 +597,6 @@ const syncMonobankDonations = createMonobankDonationSync({
     notifyPendingDonationRequests,
     notifyUnmatchedDonations,
 });
-
-async function sendTodayDailyWord(env, chatId, userId) {
-    const user = await env.DB
-        .prepare(`
-          SELECT timezone, daily_level
-          FROM users
-          WHERE telegram_user_id = ?
-        `)
-        .bind(userId)
-        .first();
-    const localTime = localDateAndTime(user?.timezone ?? "Europe/Warsaw", Date.now());
-
-    if (!localTime) {
-        throw new Error("Unable to calculate local date for daily word.");
-    }
-
-    const pending = await getPendingDailyWord(env, userId, localTime.date);
-
-    if (pending) {
-        await sendMessage(
-            env,
-            chatId,
-            dailyWordText(pending.card, user?.daily_level ?? "B1"),
-            dailyWordKeyboard(pending.id)
-        );
-        return;
-    }
-
-    if (!(await claimDailyWordCard(env, userId, localTime.date, {
-        isAdmin, getUserAccessLevel, dailyWordCardLimitForLevel,
-    }))) {
-        const limit = dailyWordCardLimitForLevel(await getUserAccessLevel(env, userId));
-        await sendMessage(
-            env,
-            chatId,
-            `На сьогодні вже показано ${limit} нових карток. Завтра можна буде відкрити ще.`
-        );
-        return;
-    }
-
-    let pendingId = null;
-
-    try {
-        const level = user?.daily_level ?? "B1";
-        const card = await generateNewDailyWord(
-            env, userId, level, generateDailyWordCard, MAX_DAILY_WORD_ATTEMPTS
-        );
-        pendingId = await savePendingDailyWord(env, userId, card, localTime.date);
-        await sendMessage(env, chatId, dailyWordText(card, level), dailyWordKeyboard(pendingId));
-    } catch (error) {
-        if (pendingId) {
-            await env.DB
-                .prepare("DELETE FROM pending_daily_words WHERE id = ? AND user_id = ?")
-                .bind(pendingId, userId)
-                .run();
-        }
-
-        throw error;
-    }
-}
 
 async function sendDueDailyWords(env, scheduledTime) {
     const users = await env.DB
@@ -1381,7 +1322,15 @@ export default {
 
         if (text === "📚 Щоденне слово") {
             try {
-                await sendTodayDailyWord(env, chatId, userId);
+                await deliverTodayDailyWord(env, chatId, userId, {
+                    claimDailyWordCard,
+                    access: { isAdmin, getUserAccessLevel, dailyWordCardLimitForLevel },
+                    dailyWordCardLimitForLevel,
+                    getUserAccessLevel,
+                    generateNewDailyWord,
+                    generateDailyWordCard,
+                    maxAttempts: MAX_DAILY_WORD_ATTEMPTS,
+                });
             } catch (error) {
                 console.error({
                     event: "manual_daily_word_failed",
