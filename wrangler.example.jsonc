@@ -3,9 +3,9 @@
   "main": "worker.js",
   "compatibility_date": "2026-07-31",
   "vars": {
-    "BOT_BRAND_NAME": "MovaYakVDoma",
-    "PUBLIC_WORKER_URL": "https://movavdoma.oleksiikhivrenko.workers.dev",
-    "MONOBANK_JAR_SEND_ID": "9vp8W5V9nQ"
+    "BOT_BRAND_NAME": "ExampleBot",
+    "PUBLIC_WORKER_URL": "https://example.invalid",
+    "MONOBANK_JAR_SEND_ID": "test-jar-id"
   },
   "triggers": {
     "crons": ["* * * * *", "0 3 * * *"]
@@ -13,8 +13,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "vocab-words-db",
-      "database_id": "62ded422-e125-42b3-99de-a86fdcf5f9f8",
+      "database_name": "example-db",
+      "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
   ]

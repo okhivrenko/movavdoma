@@ -19,7 +19,6 @@ Users add words through Telegram. The bot:
 - Worker name: `movavdoma` (legacy technical identifier; unchanged by brand rename)
 - Public URL: `https://movavdoma.oleksiikhivrenko.workers.dev/`
 - D1 database name: `vocab-words-db`
-- D1 database ID: `62ded422-e125-42b3-99de-a86fdcf5f9f8`
 - Telegram receives updates through a webhook.
 - The webhook must accept both `message` and `callback_query` updates.
 - The scheduled Worker configures the current public webhook URL once through
@@ -36,10 +35,13 @@ Never commit or print these values:
 - `DEEPL_API_KEY` — currently no longer used by the latest card-generation flow, but remains configured in Cloudflare.
 - `MONOBANK_API_TOKEN` — personal Monobank API token used only to read the configured jar statement.
 
-Public runtime configuration lives in the version-controlled `vars` section of
-`wrangler.jsonc`: `BOT_BRAND_NAME`, `PUBLIC_WORKER_URL`, and
-`MONOBANK_JAR_SEND_ID`. These values are public identifiers, not credentials;
-tokens and API keys remain Worker Secrets.
+Cloudflare runtime configuration is kept in the local, Git-ignored
+`wrangler.jsonc`, including `BOT_BRAND_NAME`, `PUBLIC_WORKER_URL`, and
+`MONOBANK_JAR_SEND_ID`. A fresh clone therefore needs its own local Wrangler
+configuration based on `wrangler.example.jsonc` before development or
+deployment. The example contains only non-production placeholders and is used
+by CI for dry-run builds. Tokens and API keys remain Cloudflare Worker Secrets
+and local `.dev.vars` values.
 
 ## Current Worker behavior
 

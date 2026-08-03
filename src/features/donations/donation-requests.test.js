@@ -31,14 +31,14 @@ test("open donation requests are scoped to their owner and reused for instructio
         TELEGRAM_BOT_TOKEN: "test-token",
         BOT_BRAND_NAME: "MovaYakVDoma",
         PUBLIC_WORKER_URL: "https://example.test",
-        MONOBANK_JAR_SEND_ID: "9vp8W5V9nQ",
+        MONOBANK_JAR_SEND_ID: "test-jar-id",
     };
 
     assert.equal((await getOpenDonationRequest(env, 123)).id, 41);
     const { calls } = await captureTelegramCalls(() => sendDonationInstructions(env, 123, 123));
     const message = telegramCall(calls, "sendMessage");
     assert.match(message.text, /MOV-ABCD/);
-    assert.equal(message.reply_markup.inline_keyboard[0][0].url, "https://send.monobank.ua/jar/9vp8W5V9nQ");
+    assert.equal(message.reply_markup.inline_keyboard[0][0].url, "https://send.monobank.ua/jar/test-jar-id");
     assert.ok(db.calls.every((call) => call.query.includes("user_id = ?") && call.parameters[0] === 123));
 });
 

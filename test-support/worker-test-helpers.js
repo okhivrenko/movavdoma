@@ -91,7 +91,7 @@ export function workerEnv(db) {
         ADMIN_TELEGRAM_USER_ID: "999",
         BOT_BRAND_NAME: "MovaYakVDoma",
         PUBLIC_WORKER_URL: "https://example.test",
-        MONOBANK_JAR_SEND_ID: "9vp8W5V9nQ",
+        MONOBANK_JAR_SEND_ID: "test-jar-id",
     };
 }
 

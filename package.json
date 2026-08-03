@@ -1,6 +1,6 @@
 {
   "name": "movayakvdoma",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,7 @@
     "test:worker": "node --test worker.test.js",
     "test:local": "npm run check:syntax && npm run test:all && npm run check:migrations",
     "check:migrations": "sh scripts/check-migrations.sh",
-    "build": "npx --yes wrangler@latest deploy --dry-run --outdir dist",
+    "build": "npx --yes wrangler@latest deploy --dry-run --config wrangler.example.jsonc --outdir dist",
     "deploy": "npx --yes wrangler@latest deploy"
   }
 }

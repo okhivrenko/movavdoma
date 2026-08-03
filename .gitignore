@@ -5,3 +5,5 @@ dist/
 .dev.vars
 .env
 .env.*
+wrangler.json
+wrangler.jsonc
