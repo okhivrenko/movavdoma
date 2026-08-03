@@ -9,6 +9,7 @@ import {
     telegramApi,
 } from "./telegram.js";
 import { openAIJson } from "./openai.js";
+import { createMonobankDonationSync } from "./monobank-donations.js";
 import { ADD_WORD_HINT, messages } from "./messages.js";
 import {
     DAILY_LEVEL_OPTIONS,
@@ -44,6 +45,16 @@ import {
     donationAccessLevel,
     normalizeAccessLevel,
 } from "./policies.js";
+import {
+    claimDailyWordCard,
+    dailyWordKeyboard,
+    dailyWordText,
+    generateNewDailyWord,
+    getPendingDailyWord,
+    hasPendingDailyWord,
+    savePendingDailyWord,
+    savePendingDailyWordToLearning,
+} from "./daily-words.js";
 
 const SENSES_PER_PAGE = 3;
 const MAX_SENSES = 9;
@@ -52,8 +63,6 @@ const DAILY_ADD_LIMIT = 10;
 // Daily-card quota is separate from the learning-list quota and depends on access.
 const MONOBANK_JAR_URL = "https://send.monobank.ua/jar/9vp8W5V9nQ";
 const MONOBANK_JAR_SEND_ID = "9vp8W5V9nQ";
-const MONOBANK_MIN_SYNC_INTERVAL_SECONDS = 60;
-const MONOBANK_STATEMENT_OVERLAP_SECONDS = 5 * 60;
 const BOT_BRAND_NAME = "MovaVDoma";
 // The Worker name is still technical for now. Keep this URL aligned with its
 // active workers.dev route; it also lets the cron repair Telegram's webhook
@@ -1048,295 +1057,11 @@ async function getDailyAdditionLimit(env, userId) {
     return limit?.daily_limit ?? DAILY_ADD_LIMIT;
 }
 
-async function claimDailyWordCard(env, userId, localDate) {
-    if (isAdmin(env, userId)) {
-        return true;
-    }
-
-    const limit = dailyWordCardLimitForLevel(await getUserAccessLevel(env, userId));
-
-    const claimed = await env.DB
-        .prepare(`
-          INSERT INTO daily_word_card_views (user_id, local_date, views)
-          VALUES (?, ?, 1)
-          ON CONFLICT(user_id, local_date) DO UPDATE
-          SET views = views + 1
-          WHERE views < ?
-        `)
-        .bind(userId, localDate, limit)
-        .run();
-
-    return claimed.meta.changes > 0;
-}
-
-async function claimMonobankSync(env, nowSeconds) {
-    const claimed = await env.DB
-        .prepare(`
-          UPDATE monobank_sync_state
-          SET last_attempt_at = ?
-          WHERE id = 1 AND last_attempt_at <= ?
-        `)
-        .bind(nowSeconds, nowSeconds - MONOBANK_MIN_SYNC_INTERVAL_SECONDS)
-        .run();
-
-    return claimed.meta.changes > 0;
-}
-
-async function getMonobankJarId(env) {
-    const state = await env.DB
-        .prepare("SELECT jar_id, jar_send_id FROM monobank_sync_state WHERE id = 1")
-        .first();
-
-    // A jar ID belongs to the sendId that produced it. Re-resolve it whenever
-    // the configured public jar changes instead of reading another jar's statement.
-    if (state?.jar_id && state.jar_send_id === MONOBANK_JAR_SEND_ID) {
-        return state.jar_id;
-    }
-
-    const response = await fetch("https://api.monobank.ua/personal/client-info", {
-        headers: { "X-Token": env.MONOBANK_API_TOKEN },
-    });
-
-    if (!response.ok) {
-        throw new Error(`Monobank client info ${response.status}`);
-    }
-
-    const clientInfo = await response.json();
-    const jars = Array.isArray(clientInfo.jars) ? clientInfo.jars : [];
-    const jar = jars.find(
-        (candidate) => candidate?.sendId === MONOBANK_JAR_SEND_ID
-    );
-
-    if (!jar?.id) {
-        // Only the count is logged. Jar names, balances, IDs, and payment
-        // details are intentionally never sent to Worker logs.
-        throw new Error(`Monobank jar was not found for configured public link (visible jars: ${jars.length}).`);
-    }
-
-    await env.DB
-        .prepare("UPDATE monobank_sync_state SET jar_id = ?, jar_send_id = ? WHERE id = 1")
-        .bind(jar.id, MONOBANK_JAR_SEND_ID)
-        .run();
-
-    return jar.id;
-}
-
-async function findDonationRequestByComment(env, comment) {
-    if (!comment) {
-        return null;
-    }
-
-    return env.DB
-        .prepare(`
-          SELECT id
-          FROM donation_requests
-          WHERE status IN ('awaiting_payment', 'awaiting_review')
-            AND instr(upper(?), support_code) > 0
-          ORDER BY id DESC
-          LIMIT 1
-        `)
-        .bind(comment)
-        .first();
-}
-
-async function saveMonobankTransactions(env, transactions) {
-    for (const transaction of transactions) {
-        if (
-            !transaction?.id ||
-            !Number.isInteger(transaction.amount) ||
-            transaction.amount <= 0 ||
-            transaction.currencyCode !== 980
-        ) {
-            continue;
-        }
-
-        const request = await findDonationRequestByComment(
-            env,
-            transaction.comment ?? ""
-        );
-        const inserted = await env.DB
-            .prepare(`
-              INSERT OR IGNORE INTO bank_transactions (
-                transaction_id,
-                amount_kopiykas,
-                transaction_time,
-                comment,
-                matched_request_id
-              )
-              VALUES (?, ?, ?, ?, ?)
-            `)
-            .bind(
-                transaction.id,
-                transaction.amount,
-                transaction.time ?? 0,
-                transaction.comment ?? "",
-                request?.id ?? null
-            )
-            .run();
-
-        if (inserted.meta.changes > 0 && request) {
-            await env.DB
-                .prepare(`
-                  UPDATE donation_requests
-                  SET status = 'awaiting_review',
-                      matched_transaction_id = ?
-                  WHERE id = ? AND status IN ('awaiting_payment', 'awaiting_review')
-                `)
-                .bind(transaction.id, request.id)
-                .run();
-        }
-    }
-}
-
-async function syncMonobankDonations(env, scheduledTime) {
-    if (!env.MONOBANK_API_TOKEN) {
-        return;
-    }
-
-    const nowSeconds = Math.floor(scheduledTime / 1000);
-
-    if (!(await claimMonobankSync(env, nowSeconds))) {
-        return;
-    }
-
-    const jarId = await getMonobankJarId(env);
-    const state = await env.DB
-        .prepare("SELECT last_successful_sync_at FROM monobank_sync_state WHERE id = 1")
-        .first();
-    const from = Math.max(
-        state?.last_successful_sync_at
-            ? state.last_successful_sync_at - MONOBANK_STATEMENT_OVERLAP_SECONDS
-            : nowSeconds - MONOBANK_STATEMENT_OVERLAP_SECONDS,
-        nowSeconds - 2_682_000
-    );
-    const response = await fetch(
-        `https://api.monobank.ua/personal/statement/${encodeURIComponent(jarId)}/${from}/${nowSeconds}`,
-        { headers: { "X-Token": env.MONOBANK_API_TOKEN } }
-    );
-
-    if (!response.ok) {
-        throw new Error(`Monobank statement ${response.status}`);
-    }
-
-    const transactions = await response.json();
-
-    if (!Array.isArray(transactions)) {
-        throw new Error("Monobank statement response is invalid.");
-    }
-
-    await saveMonobankTransactions(env, transactions);
-    await env.DB
-        .prepare("UPDATE monobank_sync_state SET last_successful_sync_at = ? WHERE id = 1")
-        .bind(nowSeconds)
-        .run();
-    await notifyPendingDonationRequests(env);
-    await notifyUnmatchedDonations(env);
-}
-
-// Daily cards remain pending until the user explicitly knows or saves the word.
-// After either choice, the button can generate another card while quota remains.
-function dailyWordKeyboard(pendingId) {
-    return {
-        inline_keyboard: [[
-            { text: "✅ Знаю", callback_data: `daily:know:${pendingId}` },
-            { text: "📖 Вчити", callback_data: `daily:learn:${pendingId}` },
-        ]],
-    };
-}
-
-function dailyWordText(card, level) {
-    return `📚 Нове слово · ${level}\n\n${card.word} — ${card.translation_uk}\n\n1. ${card.examples[0].source}\n${card.examples[0].uk}\n\n2. ${card.examples[1].source}\n${card.examples[1].uk}\n\nЯкщо хочеш додати його до свого списку, натисни «Вчити».`;
-}
-
-async function generateNewDailyWord(env, userId, level) {
-    for (let attempt = 0; attempt < MAX_DAILY_WORD_ATTEMPTS; attempt += 1) {
-        const card = await generateDailyWordCard(env, level);
-        const existing = await env.DB
-            .prepare(`
-              SELECT 1 FROM words WHERE user_id = ? AND lower(source_text) = lower(?)
-              UNION ALL
-              SELECT 1 FROM pending_daily_words WHERE user_id = ? AND lower(source_text) = lower(?)
-              LIMIT 1
-            `)
-            .bind(userId, card.word.trim(), userId, card.word.trim())
-            .first();
-
-        if (!existing) {
-            return card;
-        }
-    }
-
-    throw new Error("Could not generate a new daily word.");
-}
-
-async function savePendingDailyWord(env, userId, card, localDate) {
-    await env.DB
-        .prepare("DELETE FROM pending_daily_words WHERE user_id = ? AND local_date <> ?")
-        .bind(userId, localDate)
-        .run();
-
-    const inserted = await env.DB
-        .prepare(`
-          INSERT INTO pending_daily_words (
-            user_id, source_text, translation_uk, context_note, examples_json, local_date
-          )
-          VALUES (?, ?, ?, ?, ?, ?)
-        `)
-        .bind(
-            userId,
-            card.word.trim(),
-            card.translation_uk,
-            card.context_en,
-            JSON.stringify(card.examples),
-            localDate
-        )
-        .run();
-
-    return inserted.meta.last_row_id;
-}
-
-async function getPendingDailyWord(env, userId, localDate) {
-    const pending = await env.DB
-        .prepare(`
-          SELECT id, source_text, translation_uk, context_note, examples_json
-          FROM pending_daily_words
-          WHERE user_id = ? AND local_date = ?
-          LIMIT 1
-        `)
-        .bind(userId, localDate)
-        .first();
-
-    if (!pending) {
-        return null;
-    }
-
-    try {
-        const examples = JSON.parse(pending.examples_json);
-
-        if (!Array.isArray(examples) || examples.length !== 2) {
-            return null;
-        }
-
-        return {
-            id: pending.id,
-            card: {
-                word: pending.source_text,
-                translation_uk: pending.translation_uk,
-                context_en: pending.context_note,
-                examples,
-            },
-        };
-    } catch {
-        return null;
-    }
-}
-
-async function hasPendingDailyWord(env, userId, pendingId) {
-    return Boolean(await env.DB
-        .prepare("SELECT 1 FROM pending_daily_words WHERE id = ? AND user_id = ?")
-        .bind(pendingId, userId)
-        .first());
-}
+const syncMonobankDonations = createMonobankDonationSync({
+    jarSendId: MONOBANK_JAR_SEND_ID,
+    notifyPendingDonationRequests,
+    notifyUnmatchedDonations,
+});
 
 async function sendTodayDailyWord(env, chatId, userId) {
     const user = await env.DB
@@ -1365,7 +1090,9 @@ async function sendTodayDailyWord(env, chatId, userId) {
         return;
     }
 
-    if (!(await claimDailyWordCard(env, userId, localTime.date))) {
+    if (!(await claimDailyWordCard(env, userId, localTime.date, {
+        isAdmin, getUserAccessLevel, dailyWordCardLimitForLevel,
+    }))) {
         const limit = dailyWordCardLimitForLevel(await getUserAccessLevel(env, userId));
         await sendMessage(
             env,
@@ -1379,7 +1106,9 @@ async function sendTodayDailyWord(env, chatId, userId) {
 
     try {
         const level = user?.daily_level ?? "B1";
-        const card = await generateNewDailyWord(env, userId, level);
+        const card = await generateNewDailyWord(
+            env, userId, level, generateDailyWordCard, MAX_DAILY_WORD_ATTEMPTS
+        );
         pendingId = await savePendingDailyWord(env, userId, card, localTime.date);
         await sendMessage(env, chatId, dailyWordText(card, level), dailyWordKeyboard(pendingId));
     } catch (error) {
@@ -1392,51 +1121,6 @@ async function sendTodayDailyWord(env, chatId, userId) {
 
         throw error;
     }
-}
-
-async function savePendingDailyWordToLearning(env, userId, pendingId) {
-    const pending = await env.DB
-        .prepare(`
-          SELECT source_text, translation_uk, context_note, examples_json
-          FROM pending_daily_words
-          WHERE id = ? AND user_id = ?
-        `)
-        .bind(pendingId, userId)
-        .first();
-
-    if (!pending) {
-        return false;
-    }
-
-    const examples = JSON.parse(pending.examples_json);
-    if (!Array.isArray(examples) || examples.length !== 2) {
-        throw new Error("Invalid pending daily word.");
-    }
-
-    const insertedWord = await env.DB
-        .prepare(`
-          INSERT INTO words (user_id, source_text, source_language, translation_uk, context_note)
-          VALUES (?, ?, 'en', ?, ?)
-        `)
-        .bind(userId, pending.source_text, pending.translation_uk, pending.context_note)
-        .run();
-
-    for (let index = 0; index < examples.length; index += 1) {
-        await env.DB
-            .prepare(`
-              INSERT INTO examples (word_id, sentence_source, sentence_uk, position)
-              VALUES (?, ?, ?, ?)
-            `)
-            .bind(insertedWord.meta.last_row_id, examples[index].source, examples[index].uk, index + 1)
-            .run();
-    }
-
-    await env.DB
-        .prepare("DELETE FROM pending_daily_words WHERE id = ? AND user_id = ?")
-        .bind(pendingId, userId)
-        .run();
-
-    return true;
 }
 
 async function sendDueDailyWords(env, scheduledTime) {
@@ -1469,7 +1153,9 @@ async function sendDueDailyWords(env, scheduledTime) {
             continue;
         }
 
-        if (!(await claimDailyWordCard(env, user.telegram_user_id, localTime.date))) {
+        if (!(await claimDailyWordCard(env, user.telegram_user_id, localTime.date, {
+            isAdmin, getUserAccessLevel, dailyWordCardLimitForLevel,
+        }))) {
             continue;
         }
 
@@ -1478,9 +1164,8 @@ async function sendDueDailyWords(env, scheduledTime) {
 
         try {
             const card = await generateNewDailyWord(
-                env,
-                user.telegram_user_id,
-                user.daily_level
+                env, user.telegram_user_id, user.daily_level,
+                generateDailyWordCard, MAX_DAILY_WORD_ATTEMPTS
             );
 
             const claimed = await env.DB
