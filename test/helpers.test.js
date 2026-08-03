@@ -1,7 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { parseVocabularyInput } from "../helpers.js";
+import {
+    dailyScheduleKeyboardLabel,
+    DEFAULT_DAILY_SETTINGS,
+    parseVocabularyInput,
+} from "../helpers.js";
+
+test("schedule menu label shows the current time and level", () => {
+    assert.equal(
+        dailyScheduleKeyboardLabel({ daily_time: "10:00", daily_enabled: 1, daily_level: "A0" }),
+        "⏰ Розклад і рівень (10:00 — Рівень A0)"
+    );
+    assert.equal(dailyScheduleKeyboardLabel(DEFAULT_DAILY_SETTINGS), "⏰ Розклад і рівень (10:00 — Рівень A0)");
+    assert.equal(
+        dailyScheduleKeyboardLabel({ daily_time: "10:00", daily_enabled: 0, daily_level: "B2" }),
+        "⏰ Розклад і рівень (вимкнено — Рівень B2)"
+    );
+});
 
 test("vocabulary input accepts a plain word without context", () => {
     assert.deepEqual(parseVocabularyInput(" resilient "), {

@@ -40,7 +40,10 @@ Never commit or print these values:
 
 ### `/start`
 
-Welcomes the user and shows a persistent reply keyboard with:
+Welcomes the user with their current daily-card settings and shows a persistent
+reply keyboard. New users begin with level `A0` and enabled reminders at
+`10:00`; existing users retain their saved choices. The schedule button shows
+the current time and level, then leads to:
 
 - `➕ Додати слово`
 - `📚 Мої слова`

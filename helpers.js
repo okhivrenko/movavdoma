@@ -1,4 +1,19 @@
 /** Shared formatting, authorization, and time helpers with no database access. */
+export const DEFAULT_DAILY_SETTINGS = Object.freeze({
+    daily_time: "10:00",
+    daily_enabled: 1,
+    daily_level: "A0",
+});
+
+/** Formats the compact schedule summary shown in the persistent menu. */
+export function dailyScheduleKeyboardLabel(settings) {
+    const time = settings?.daily_enabled
+        ? settings.daily_time ?? DEFAULT_DAILY_SETTINGS.daily_time
+        : "вимкнено";
+    const level = settings?.daily_level ?? DEFAULT_DAILY_SETTINGS.daily_level;
+    return `⏰ Розклад і рівень (${time} — Рівень ${level})`;
+}
+
 export function wordCountLabel(count) {
     const lastTwoDigits = count % 100;
     const lastDigit = count % 10;

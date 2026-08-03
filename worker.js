@@ -20,6 +20,8 @@ import {
 } from "./word-list.js";
 import {
     createSupportCode,
+    dailyScheduleKeyboardLabel,
+    DEFAULT_DAILY_SETTINGS,
     dailyLimitReachedText,
     formatHryvnias,
     isAdmin,
@@ -57,7 +59,7 @@ const MAX_DAILY_WORD_ATTEMPTS = 3;
 const ADMIN_USER_LIST_LIMIT = 50;
 const LEARNED_WORD_RETENTION_DAYS = 30;
 // Increment only when the persistent reply keyboard changes for users.
-const INTERFACE_VERSION = 6;
+const INTERFACE_VERSION = 7;
 const ADD_WORD_HINT =
     "Надішли англійське слово або фразу — цього достатньо.\n\nНаприклад:\nresilient\n\nЯкщо важливе конкретне значення, додай контекст після / (також працюють | та \\):\ncharge / payment for a service";
 
@@ -311,11 +313,11 @@ async function saveAndSendWord(env, chatId, userId, word, context) {
 
 // User-facing reply/inline keyboards and the admin-only user directory.
 // Authorization itself stays in helpers.js so every entry path compares IDs consistently.
-function mainKeyboard(showAdmin = false, page = 1) {
+function mainKeyboard(showAdmin = false, page = 1, dailySettings = DEFAULT_DAILY_SETTINGS) {
     const firstPage = [
         [{ text: "➕ Додати слово" }, { text: "📚 Мої слова" }],
         [{ text: "📚 Щоденне слово" }, { text: "🎓 Вивчені слова" }],
-        [{ text: "⏰ Розклад і рівень" }],
+        [{ text: dailyScheduleKeyboardLabel(dailySettings) }],
         [{ text: "❓ Допомога" }, { text: "➡️ Далі" }],
     ];
     const secondPage = [
@@ -334,6 +336,12 @@ function mainKeyboard(showAdmin = false, page = 1) {
         resize_keyboard: true,
         is_persistent: true,
     };
+}
+
+/** Builds a current reply keyboard without hard-coding a user's schedule. */
+async function mainKeyboardForUser(env, userId, page = 1) {
+    const settings = await getDailySettings(env, userId);
+    return mainKeyboard(isAdmin(env, userId), page, settings ?? DEFAULT_DAILY_SETTINGS);
 }
 
 /**
@@ -355,7 +363,7 @@ async function refreshInterfaceIfNeeded(env, chatId, userId) {
         env,
         chatId,
         "✨ Меню оновлено. Можеш користуватися новими кнопками нижче.",
-        mainKeyboard(isAdmin(env, userId))
+        await mainKeyboardForUser(env, userId)
     );
 
     await markInterfaceVersion(env, userId);
@@ -527,13 +535,13 @@ async function sendDailySettings(env, chatId, userId) {
         env,
         chatId,
         dailySettingsText(user),
-        dailySettingsMenuKeyboard(user ?? { daily_time: "09:00", daily_enabled: 1, daily_level: "B1" })
+        dailySettingsMenuKeyboard(user ?? DEFAULT_DAILY_SETTINGS)
     );
 }
 
 async function refreshDailySettings(env, chatId, messageId, userId) {
     const user = await getDailySettings(env, userId);
-    const settings = user ?? { daily_time: "09:00", daily_enabled: 1, daily_level: "B1" };
+    const settings = user ?? DEFAULT_DAILY_SETTINGS;
 
     await editMessage(
         env,
@@ -906,7 +914,7 @@ async function notifyExpiredDonationAccessGrants(env) {
                 env,
                 grant.chat_id,
                 "🎁 Дякуємо, що користуєшся ботом! На жаль, твій бонусний період завершився.\n\nБудемо вдячні за подальшу підтримку: навіть одна кавуська мотивує нас робити бот кращим.\n\nЯкщо маєш зауваження, ідеї або просто хочеш поділитися враженням — натисни «➡️ Далі», а потім «💬 Відгук». Це допомагає нам ставати кращими.",
-                mainKeyboard(isAdmin(env, grant.user_id))
+                await mainKeyboardForUser(env, grant.user_id)
             );
         } catch (error) {
             await env.DB
@@ -1605,7 +1613,7 @@ async function sendHelp(env, chatId, userId) {
         env,
         chatId,
         "Як користуватися ботом:\n\n1. Натисни «➕ Додати слово» або просто надішли англійське слово чи фразу. Наприклад: resilient\n2. Якщо потрібне конкретне значення, це необов’язково, але можеш додати його після / (також працюють | та \\):\ncharge / payment for a service\n3. Обери потрібне значення, якщо бот його уточнить.\n4. Відкрий «📚 Мої слова», щоб переглянути свій каталог.\n5. Відкрий «🎓 Вивчені слова», щоб повернути слово до навчання.\n6. Натисни «📚 Щоденне слово», щоб показати сьогоднішню картку, або «⏰ Розклад і рівень», щоб окремо вибрати час і рівень. У картці натисни «Знаю» або «Вчити».\n7. На другій сторінці меню є підтримка, бонуси, відгук і зв’язок із нами.\n8. Є ідея, запитання чи хочеш створити власного бота? Натисни «📩 Зв’язатися з нами» та надішли повідомлення.",
-        mainKeyboard(isAdmin(env, userId))
+        await mainKeyboardForUser(env, userId)
     );
 }
 
@@ -2277,12 +2285,17 @@ export default {
 
         await env.DB
             .prepare(`
-        INSERT INTO users (telegram_user_id, chat_id)
-        VALUES (?, ?)
+        INSERT INTO users (telegram_user_id, chat_id, daily_time, daily_level)
+        VALUES (?, ?, ?, ?)
         ON CONFLICT(telegram_user_id)
         DO UPDATE SET chat_id = excluded.chat_id, is_active = 1
       `)
-            .bind(userId, chatId)
+            .bind(
+                userId,
+                chatId,
+                DEFAULT_DAILY_SETTINGS.daily_time,
+                DEFAULT_DAILY_SETTINGS.daily_level
+            )
             .run();
 
         if (text !== "/start" && text !== "/menu") {
@@ -2291,7 +2304,7 @@ export default {
 
         // Any command or menu action abandons a feedback draft, so a later
         // vocabulary word cannot accidentally be forwarded as feedback.
-        if (text !== "💬 Відгук" && (text.startsWith("/") || [
+        if (text !== "💬 Відгук" && (text.startsWith("/") || text.startsWith("⏰ Розклад і рівень") || [
             "➕ Додати слово", "📚 Мої слова", "🎓 Вивчені слова",
             "⚙️ Налаштувати", "⚙️ Налаштувати щоденне слово", "⏰ Нагадування", "⏰ Розклад і рівень", "⏰ Щоденне слово", "📚 Щоденне слово",
             "☕ Підтримати бот", "🎁 Отримати бонус", "📩 Зв’язатися з нами", "🛠 Адмін", "❓ Допомога",
@@ -2301,18 +2314,22 @@ export default {
         }
 
         if (text === "/start") {
+            const settings = await getDailySettings(env, userId) ?? DEFAULT_DAILY_SETTINGS;
+            const reminder = settings.daily_enabled
+                ? `щодня о ${settings.daily_time}`
+                : "зараз вимкнені";
             await sendMessage(
                 env,
                 chatId,
-                "Привіт! Я допоможу запам’ятовувати англійські слова.\n\nПросто надішли мені слово або фразу — наприклад: resilient\n\nЯкщо знаєш потрібне значення, можеш додати його після / (також працюють | та \\):\ncharge / payment for a service",
-                mainKeyboard(isAdmin(env, userId))
+                `Привіт! MovaVDoma — бот для щоденного вивчення англійських слів.\n\nТвої поточні налаштування:\n• Рівень щоденних слів: ${settings.daily_level}\n• Нагадування: ${reminder}\n\nЗмінити їх можна в «⏰ Розклад і рівень».\n\nПросто надішли мені слово або фразу — наприклад: resilient\n\nЯкщо знаєш потрібне значення, можеш додати його після / (також працюють | та \\):\ncharge / payment for a service`,
+                mainKeyboard(isAdmin(env, userId), 1, settings)
             );
             await markInterfaceVersion(env, userId);
             return new Response("ok");
         }
 
         if (text === "/menu") {
-            await sendMessage(env, chatId, "Ось меню:", mainKeyboard(isAdmin(env, userId)));
+            await sendMessage(env, chatId, "Ось меню:", await mainKeyboardForUser(env, userId));
             await markInterfaceVersion(env, userId);
             return new Response("ok");
         }
@@ -2327,12 +2344,12 @@ export default {
         }
 
         if (text === "➡️ Далі") {
-            await sendMessage(env, chatId, "Додаткові можливості:", mainKeyboard(isAdmin(env, userId), 2));
+            await sendMessage(env, chatId, "Додаткові можливості:", await mainKeyboardForUser(env, userId, 2));
             return new Response("ok");
         }
 
         if (text === "⬅️ Назад") {
-            await sendMessage(env, chatId, "Основне меню:", mainKeyboard(isAdmin(env, userId), 1));
+            await sendMessage(env, chatId, "Основне меню:", await mainKeyboardForUser(env, userId));
             return new Response("ok");
         }
 
@@ -2350,7 +2367,7 @@ export default {
             text === "⚙️ Налаштувати" ||
             text === "⚙️ Налаштувати щоденне слово" ||
             text === "⏰ Нагадування" ||
-            text === "⏰ Розклад і рівень" ||
+            text.startsWith("⏰ Розклад і рівень") ||
             text === "⏰ Щоденне слово"
         ) {
             await sendDailySettings(env, chatId, userId);
@@ -2448,7 +2465,7 @@ export default {
                 env,
                 chatId,
                 `🔒 Політика конфіденційності: ${PRIVACY_POLICY_URL}`,
-                mainKeyboard(isAdmin(env, userId))
+                await mainKeyboardForUser(env, userId)
             );
             return new Response("ok");
         }
