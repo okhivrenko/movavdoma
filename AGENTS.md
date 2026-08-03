@@ -9,6 +9,7 @@
 - Product behavior and schema: `PROJECT_CONTEXT.md`.
 - Release process: `RELEASING.md`.
 - Cloudflare config: `wrangler.jsonc`; SQL changes: `migrations/`.
+- Senior JavaScript review role: `agents/senior-javascript-engineer.md`.
 - For reusable Cloudflare-bot architecture and release practice, use the shared
   `$cloudflare-worker-bot` skill. These project-specific rules take priority.
 
@@ -57,3 +58,11 @@ npm run check
 
 For a production release, follow `RELEASING.md` and verify the public Worker
 returns HTTP 200 after deployment.
+
+## Senior engineering quality gate
+
+For every non-trivial feature, refactor, migration, security-sensitive change,
+or Cloudflare configuration change, load and apply
+`agents/senior-javascript-engineer.md` before committing. The role owns the
+quality review; it does not replace the product invariants above. Simple copy
+edits and documentation-only changes do not require the full review.
