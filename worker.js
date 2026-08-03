@@ -11,6 +11,15 @@ import {
 import { openAIJson } from "./openai.js";
 import { ADD_WORD_HINT, messages } from "./messages.js";
 import {
+    DAILY_LEVEL_OPTIONS,
+    DAILY_TIME_OPTIONS,
+    dailyLevelKeyboard,
+    dailyTimeKeyboard,
+    getDailySettings,
+    refreshDailySettings,
+    sendDailySettings,
+} from "./daily-settings.js";
+import {
     getRecentActiveWords,
     LIST_LIMIT,
     refreshArchivedMessage,
@@ -51,11 +60,6 @@ const BOT_BRAND_NAME = "MovaVDoma";
 // after an account-subdomain or Worker-name change.
 const PUBLIC_WORKER_URL = "https://movavdoma.oleksiikhivrenko.workers.dev";
 const PRIVACY_POLICY_URL = `${PUBLIC_WORKER_URL}/privacy`;
-const DAILY_TIME_OPTIONS = Array.from(
-    { length: 24 },
-    (_, hour) => `${String(hour).padStart(2, "0")}:00`
-);
-const DAILY_LEVEL_OPTIONS = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
 const MAX_DAILY_WORD_ATTEMPTS = 3;
 const ADMIN_USER_LIST_LIMIT = 50;
 const LEARNED_WORD_RETENTION_DAYS = 30;
@@ -465,90 +469,6 @@ async function sendAdminUserList(env, chatId, requestedPage = 0, messageId = nul
     }
 
     await sendMessage(env, chatId, listText, keyboard);
-}
-
-// Daily-word settings are split into two consecutive choices: time and level.
-// The UI only changes user preferences; scheduled delivery consumes them later.
-function dailySettingsMenuKeyboard(user) {
-    return {
-        inline_keyboard: [
-            [{ text: `🕒 Час: ${user.daily_time}`, callback_data: "dailysettings:time" }],
-            [{ text: `🎚 Рівень: ${user.daily_level}`, callback_data: "dailysettings:level" }],
-            [{
-                text: user.daily_enabled ? "🔕 Вимкнути нагадування" : "🔔 Увімкнути нагадування",
-                callback_data: "daily:off",
-            }],
-        ],
-    };
-}
-
-function dailyTimeKeyboard() {
-    const rows = [];
-
-    for (let index = 0; index < DAILY_TIME_OPTIONS.length; index += 4) {
-        rows.push(
-            DAILY_TIME_OPTIONS.slice(index, index + 4).map((dailyTime) => ({
-                text: dailyTime,
-                callback_data: `dailytime:${dailyTime}`,
-            }))
-        );
-    }
-
-    return { inline_keyboard: rows };
-}
-
-function dailyLevelKeyboard() {
-    return {
-        inline_keyboard: [
-            DAILY_LEVEL_OPTIONS.slice(0, 4).map((level) => ({
-                text: level,
-                callback_data: `dailylevel:${level}`,
-            })),
-            DAILY_LEVEL_OPTIONS.slice(4).map((level) => ({
-                text: level,
-                callback_data: `dailylevel:${level}`,
-            })),
-        ],
-    };
-}
-
-async function getDailySettings(env, userId) {
-    return env.DB
-        .prepare("SELECT daily_time, daily_enabled, daily_level FROM users WHERE telegram_user_id = ?")
-        .bind(userId)
-        .first();
-}
-
-function dailySettingsText(user) {
-    const status = user?.daily_enabled
-        ? `увімкнене о ${user.daily_time}`
-        : "вимкнене";
-
-    return `Щоденне слово зараз ${status}. Рівень: ${user?.daily_level ?? "B1"}.\n\nОбери, що налаштувати:`;
-}
-
-async function sendDailySettings(env, chatId, userId) {
-    const user = await getDailySettings(env, userId);
-
-    await sendMessage(
-        env,
-        chatId,
-        dailySettingsText(user),
-        dailySettingsMenuKeyboard(user ?? DEFAULT_DAILY_SETTINGS)
-    );
-}
-
-async function refreshDailySettings(env, chatId, messageId, userId) {
-    const user = await getDailySettings(env, userId);
-    const settings = user ?? DEFAULT_DAILY_SETTINGS;
-
-    await editMessage(
-        env,
-        chatId,
-        messageId,
-        dailySettingsText(settings),
-        dailySettingsMenuKeyboard(settings)
-    );
 }
 
 // Donation requests are reviewed by the admin before any personal limit changes.

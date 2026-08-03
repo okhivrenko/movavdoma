@@ -18,7 +18,7 @@ before a refactor changes that feature.
 | Active words | Users see only their own active words, ten per page | `word-list.test.js` + ownership contract | partial |
 | Active words | Examples and learned controls are two blocks of five; paging works | `word-list.test.js` | covered |
 | Learned words | Restore buttons/page work; cleanup removes only learned words after 30 days | Worker+D1 + scheduled contract | next |
-| Daily settings | Time and level are selected in separate steps; reminder can be toggled | `worker-http.test.js` + settings toggle contract | partial |
+| Daily settings | Time and level are selected in separate steps; reminder can be toggled | `worker-http.test.js`, `daily-settings.test.js` | covered |
 | Daily words | Pending card is reused; `know` discards; `learn` saves it | Worker+D1 contract | next |
 | Daily quota | New daily-card limits are 5/10/15/20 by effective access level | `policies.test.js` + Worker+D1 contract | partial |
 | Access | Access values are normalized and donation tiers map correctly | `policies.test.js` | covered |
