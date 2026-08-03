@@ -20,7 +20,7 @@ import {
     sendDonationInstructions,
 } from "./donation-requests.js";
 import { grantDonationBonus as grantDonationBonusRequest } from "./donation-grants.js";
-import { adminDonationKeyboard } from "./donation-notifications.js";
+import { adminDonationKeyboard, notifyPendingDonationRequests as notifyDonationReviews, notifyUnmatchedDonations as notifyUnmatchedDonationAlerts } from "./donation-notifications.js";
 import {
     getAdminChatId,
     getUserAccessLevel,
@@ -265,80 +265,13 @@ async function grantTestLevelOne(env, userId) {
 }
 
 async function notifyPendingDonationRequests(env) {
-    const adminChatId = await getAdminChatId(env);
-
-    if (!adminChatId) {
-        console.warn({ event: "donation_admin_chat_not_found" });
-        return;
-    }
-
-    const pending = await env.DB
-        .prepare(`
-          SELECT id, user_id, support_code, matched_transaction_id
-          FROM donation_requests
-          WHERE status = 'awaiting_review' AND admin_notified_at IS NULL
-          ORDER BY id ASC
-        `)
-        .all();
-
-    for (const request of pending.results) {
-        const transaction = request.matched_transaction_id
-            ? await env.DB
-                  .prepare("SELECT amount_kopiykas FROM bank_transactions WHERE transaction_id = ?")
-                  .bind(request.matched_transaction_id)
-                  .first()
-            : null;
-        const amount = transaction
-            ? `\nДонат знайдено: ${formatHryvnias(transaction.amount_kopiykas)}.`
-            : "\nПлатіж ще не знайдено автоматично — звір його у банці.";
-        const suggestedAccessLevel = transaction
-            ? donationAccessLevel(transaction.amount_kopiykas)
-            : null;
-
-        await sendMessage(
-            env,
-            adminChatId,
-            `🎁 Заявка на бонус\nКористувач: ${request.user_id}\nКод: ${request.support_code}${amount}${suggestedAccessLevel ? `\nРекомендований рівень: ${suggestedAccessLevel} (${dailyWordCardLimitForLevel(suggestedAccessLevel)} щоденних карток).` : ""}`,
-            adminDonationKeyboard(request.id, suggestedAccessLevel)
-        );
-
-        await env.DB
-            .prepare("UPDATE donation_requests SET admin_notified_at = CURRENT_TIMESTAMP WHERE id = ?")
-            .bind(request.id)
-            .run();
-    }
+    return notifyDonationReviews(env, getAdminChatId, {
+        donationAccessLevel, formatHryvnias, dailyWordCardLimitForLevel, sendMessage,
+    });
 }
 
 async function notifyUnmatchedDonations(env) {
-    const adminChatId = await getAdminChatId(env);
-
-    if (!adminChatId) {
-        return;
-    }
-
-    const unmatched = await env.DB
-        .prepare(`
-          SELECT transaction_id, amount_kopiykas, comment
-          FROM bank_transactions
-          WHERE matched_request_id IS NULL AND admin_notified_at IS NULL
-          ORDER BY transaction_time ASC
-        `)
-        .all();
-
-    for (const transaction of unmatched.results) {
-        const comment = transaction.comment ? `\nКоментар: ${transaction.comment}` : "\nБез коментаря.";
-
-        await sendMessage(
-            env,
-            adminChatId,
-            `☕ Новий донат без збігу із заявкою: ${formatHryvnias(transaction.amount_kopiykas)}.${comment}\n\nЯкщо людина напише тобі, звір платіж і видай бонус через її заявку.`
-        );
-
-        await env.DB
-            .prepare("UPDATE bank_transactions SET admin_notified_at = CURRENT_TIMESTAMP WHERE transaction_id = ?")
-            .bind(transaction.transaction_id)
-            .run();
-    }
+    return notifyUnmatchedDonationAlerts(env, getAdminChatId, { formatHryvnias, sendMessage });
 }
 
 async function submitDonationBonusRequest(env, chatId, userId) {
