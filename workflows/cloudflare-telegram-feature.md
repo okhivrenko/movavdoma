@@ -22,6 +22,15 @@ Use this workflow for a feature, refactor, migration, or multilingual change.
    after the slice is complete. Commit deliberately; deploy only when behavior,
    configuration, or production data changed and release gates are met.
 
+## Efficient context loop
+
+For a refactor, make a compact route map with `rg -n` before reading source.
+Read bounded file ranges and the matching feature tests, define one contiguous
+router block to replace, then implement the destination module and its focused
+tests first. Run focused tests after the patch; reserve `npm run check` for
+the completed vertical slice. This reduces repeated context without skipping
+security, ownership, migration, or release checks.
+
 ## Multilingual additions
 
 Treat a new translation direction as a data-contract change. It requires a

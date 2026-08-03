@@ -95,6 +95,27 @@ returns HTTP 200 after deployment.
   analysis of the resulting change, update `IMPLEMENTATION_STATUS.md`, and
   create a follow-up plan when residual work or risks remain.
 
+## Context and token discipline
+
+Use context deliberately without weakening investigation or verification.
+
+- Start with `rg`/`rg --files` and read only the exact route, module, test,
+  migration, and documentation relevant to the current vertical slice. Do not
+  print an entire large file when targeted line ranges answer the question.
+- Record the slice's source range, invariants, owner module, and required
+  tests before editing. Reuse that compact map rather than rediscovering the
+  same code after every patch.
+- Build and test the extracted feature module first; then replace one complete
+  contiguous router block in `worker.js`. Do not leave duplicate transition
+  logic after the slice is complete.
+- Use focused tests and syntax checks after each small patch. Run `npm run
+  check` once per completed slice and before its commit, rather than after
+  unrelated exploratory changes.
+- Keep command output bounded. Request only the needed diff, status, or line
+  range; use `git diff --stat` before a full diff.
+- Read skills and project rules once per task, then reopen only a specifically
+  relevant section when a new risk or release step requires it.
+
 ## Senior engineering quality gate
 
 For every non-trivial feature, refactor, migration, security-sensitive change,
