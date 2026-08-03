@@ -45,7 +45,8 @@ slices and genuine blockers. It is not a stream of intentions.
 
 - `npm run check`: 53 tests passed, migrations validated, Worker dry-run built
 - Worker dry-run build: passed
-- Version 1.3.3 deployed on 3 August 2026: production `wrangler.jsonc` is local
-  and Git-ignored, while the repository contains only a placeholder example
-  used for CI dry-runs. Tracked files passed the production ID/token scan, D1
-  has no pending migrations, and the production Worker returned HTTP 200.
+- Version 1.4.0 deployed on 3 August 2026: the Cloudflare Worker and public URL
+  are now `movayakvdoma`; health and privacy returned HTTP 200, Telegram
+  webhook repair completed for the new URL, all six Worker secrets remained
+  configured, and D1 has no pending migrations. The GitHub repository retains
+  its existing `okhivrenko/movavdoma` name until it is renamed separately.
