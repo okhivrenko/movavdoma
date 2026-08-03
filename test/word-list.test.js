@@ -37,15 +37,33 @@ async function captureTelegramMessage(action) {
     }
 }
 
-test("active-word list sends active controls", async () => {
+test("active-word list separates example and learned controls", async () => {
     const payload = await captureTelegramMessage(() => sendActiveWordList(
         envWithWords([{ id: 10, source_text: "resilient", translation_uk: "стійкий" }]),
         1,
         2
     ));
 
-    assert.match(payload.text, /Останні слова/);
-    assert.equal(payload.reply_markup.inline_keyboard[0][1].callback_data, "delete:10");
+    assert.match(payload.text, /Показати приклад/);
+    assert.match(payload.text, /Вже вивчив/);
+    assert.equal(payload.reply_markup.inline_keyboard[0][0].callback_data, "examples:10");
+    assert.equal(payload.reply_markup.inline_keyboard[1][0].callback_data, "delete:10:0");
+});
+
+test("active-word list groups both actions and adds pagination", async () => {
+    const words = Array.from({ length: 10 }, (_, index) => ({
+        id: index + 1,
+        source_text: `word-${index + 1}`,
+        translation_uk: `переклад-${index + 1}`,
+    }));
+    const payload = await captureTelegramMessage(() => sendActiveWordList(envWithWords(words, 11), 1, 2));
+
+    assert.equal(payload.reply_markup.inline_keyboard.length, 5);
+    assert.equal(payload.reply_markup.inline_keyboard[0][0].callback_data, "examples:1");
+    assert.equal(payload.reply_markup.inline_keyboard[1][4].callback_data, "examples:10");
+    assert.equal(payload.reply_markup.inline_keyboard[2][0].callback_data, "delete:1:0");
+    assert.equal(payload.reply_markup.inline_keyboard[3][4].callback_data, "delete:10:0");
+    assert.equal(payload.reply_markup.inline_keyboard[4][0].callback_data, "active-page:1");
 });
 
 test("learned-word list sends restore controls", async () => {

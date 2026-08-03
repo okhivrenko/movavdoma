@@ -2077,11 +2077,15 @@ export default {
                 callback.data.startsWith("delete:") ||
                 callback.data.startsWith("archive:")
             ) {
-                const wordId = Number(
-                    callback.data.replace(/^(?:delete|archive):/, "")
-                );
+                // New list buttons keep their page in callback data so a user
+                // stays on the same page after marking a word as learned.
+                // The optional page also preserves compatibility with older
+                // already-sent buttons that contain only the word ID.
+                const archiveMatch = callback.data.match(/^(?:delete|archive):(\d+)(?::(\d+))?$/);
+                const wordId = Number(archiveMatch?.[1]);
+                const page = Number(archiveMatch?.[2] ?? 0);
 
-                if (!Number.isInteger(wordId) || wordId <= 0) {
+                if (!Number.isInteger(wordId) || wordId <= 0 || !Number.isInteger(page) || page < 0) {
                     await answerCallbackQuery(env, callback.id, "Невірний вибір.");
                     return new Response("ok");
                 }
@@ -2103,7 +2107,20 @@ export default {
                         : "Це слово вже позначене як вивчене."
                 );
 
-                await refreshListMessage(env, chatId, messageId, userId);
+                await refreshListMessage(env, chatId, messageId, userId, page);
+                return new Response("ok");
+            }
+
+            if (callback.data.startsWith("active-page:")) {
+                const page = Number(callback.data.replace("active-page:", ""));
+
+                if (!Number.isInteger(page) || page < 0) {
+                    await answerCallbackQuery(env, callback.id, "Невірна сторінка.");
+                    return new Response("ok");
+                }
+
+                await answerCallbackQuery(env, callback.id);
+                await refreshListMessage(env, chatId, messageId, userId, page);
                 return new Response("ok");
             }
 

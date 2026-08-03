@@ -87,9 +87,10 @@ When an explicit context is supplied, skip meaning selection and generate the ca
 
 ### `/list`
 
-Shows the ten most recently added active words for the current Telegram user,
-with inline buttons to view examples or mark each word as learned. Examples are
-shown in a separate message to keep the list compact.
+Shows up to ten most recently added active words per page for the current
+Telegram user. Two separate numbered control blocks let the user view an
+example or mark a word as learned; next/previous navigation appears when more
+pages exist. Examples are shown in a separate message to keep the list compact.
 
 ### Legacy commands: `/delete 1`, `/delete 5-10`, `/delete all`
 
