@@ -24,3 +24,13 @@ export async function grantDonationBonus(env, requestId, accessLevel, grantTempo
     }
     return { request, access };
 }
+
+export async function rejectDonationBonus(env, requestId) {
+    const request = await env.DB.prepare("SELECT id, user_id, status FROM donation_requests WHERE id = ?").bind(requestId).first();
+    if (!request || request.status !== "awaiting_review") return null;
+    const rejected = await env.DB.prepare("UPDATE donation_requests SET status = 'rejected' WHERE id = ? AND status = 'awaiting_review'").bind(request.id).run();
+    if (rejected.meta.changes === 0) return null;
+    const user = await env.DB.prepare("SELECT chat_id FROM users WHERE telegram_user_id = ?").bind(request.user_id).first();
+    if (user?.chat_id) await sendMessage(env, user.chat_id, "Не вдалося підтвердити донат для бонусу. Натисни «☕ Підтримати бот», отримай новий код і додай його в коментар платежу.");
+    return request;
+}

@@ -39,3 +39,36 @@ export async function sendDonationInstructions(env, chatId, userId) {
         `Дякую за підтримку! Відкрий банку й, будь ласка, додай цей код у коментар до платежу:\n\n${request.support_code}\n\nПісля переказу натисни «🎁 Отримати бонус». Код допоможе мені точно знайти твій донат.`,
         supportKeyboard());
 }
+
+/** Marks an existing payment request for review and alerts the administrator. */
+export async function submitDonationBonusRequest(env, chatId, userId, notifyPendingDonationRequests) {
+    const request = await getOpenDonationRequest(env, userId);
+
+    if (!request) {
+        await sendMessage(
+            env,
+            chatId,
+            "Спершу натисни «☕ Підтримати бот»: я дам код, який треба додати в коментар до платежу."
+        );
+        return;
+    }
+
+    if (request.status === "awaiting_payment") {
+        await env.DB
+            .prepare(`
+              UPDATE donation_requests
+              SET status = 'awaiting_review', requested_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `)
+            .bind(request.id)
+            .run();
+    }
+
+    await sendMessage(
+        env,
+        chatId,
+        "🎁 Заявку на бонус прийнято! Ми постараємося підготувати для тебе щось цікаве найближчим часом."
+    );
+
+    await notifyPendingDonationRequests(env);
+}

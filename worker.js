@@ -16,10 +16,10 @@ import {
 } from "./vocabulary-cards.js";
 import { createMonobankDonationSync } from "./monobank-donations.js";
 import {
-    getOpenDonationRequest,
     sendDonationInstructions,
+    submitDonationBonusRequest as submitDonationBonusRequestFlow,
 } from "./donation-requests.js";
-import { grantDonationBonus as grantDonationBonusRequest } from "./donation-grants.js";
+import { grantDonationBonus as grantDonationBonusRequest, rejectDonationBonus as rejectDonationBonusRequest } from "./donation-grants.js";
 import { adminDonationKeyboard, notifyPendingDonationRequests as notifyDonationReviews, notifyUnmatchedDonations as notifyUnmatchedDonationAlerts } from "./donation-notifications.js";
 import {
     getAdminChatId,
@@ -274,38 +274,6 @@ async function notifyUnmatchedDonations(env) {
     return notifyUnmatchedDonationAlerts(env, getAdminChatId, { formatHryvnias, sendMessage });
 }
 
-async function submitDonationBonusRequest(env, chatId, userId) {
-    const request = await getOpenDonationRequest(env, userId);
-
-    if (!request) {
-        await sendMessage(
-            env,
-            chatId,
-            "Спершу натисни «☕ Підтримати бот»: я дам код, який треба додати в коментар до платежу."
-        );
-        return;
-    }
-
-    if (request.status === "awaiting_payment") {
-        await env.DB
-            .prepare(`
-              UPDATE donation_requests
-              SET status = 'awaiting_review', requested_at = CURRENT_TIMESTAMP
-              WHERE id = ?
-            `)
-            .bind(request.id)
-            .run();
-    }
-
-    await sendMessage(
-        env,
-        chatId,
-        "🎁 Заявку на бонус прийнято! Ми постараємося підготувати для тебе щось цікаве найближчим часом."
-    );
-
-    await notifyPendingDonationRequests(env);
-}
-
 async function notifyExpiredDonationAccessGrants(env) {
     const expired = await env.DB
         .prepare(`
@@ -410,45 +378,6 @@ async function grantManualDailyLimit(env, userId, dailyLimit) {
     );
 
     return true;
-}
-
-async function rejectDonationBonus(env, requestId) {
-    const request = await env.DB
-        .prepare(`
-          SELECT id, user_id, status
-          FROM donation_requests
-          WHERE id = ?
-        `)
-        .bind(requestId)
-        .first();
-
-    if (!request || request.status !== "awaiting_review") {
-        return null;
-    }
-
-    const rejected = await env.DB
-        .prepare("UPDATE donation_requests SET status = 'rejected' WHERE id = ? AND status = 'awaiting_review'")
-        .bind(request.id)
-        .run();
-
-    if (rejected.meta.changes === 0) {
-        return null;
-    }
-
-    const user = await env.DB
-        .prepare("SELECT chat_id FROM users WHERE telegram_user_id = ?")
-        .bind(request.user_id)
-        .first();
-
-    if (user?.chat_id) {
-        await sendMessage(
-            env,
-            user.chat_id,
-            "Не вдалося підтвердити донат для бонусу. Натисни «☕ Підтримати бот», отримай новий код і додай його в коментар платежу."
-        );
-    }
-
-    return request;
 }
 
 // This UPSERT is the quota enforcement point: it atomically claims a daily slot
@@ -764,7 +693,7 @@ export default {
 
                 try {
                     if (match[3] === "reject") {
-                        const rejected = await rejectDonationBonus(env, requestId);
+                        const rejected = await rejectDonationBonusRequest(env, requestId);
 
                         if (!rejected) {
                             await answerCallbackQuery(env, callback.id, "Заявку вже оброблено.");
@@ -1173,7 +1102,7 @@ export default {
 
         if (text === "🎁 Отримати бонус") {
             try {
-                await submitDonationBonusRequest(env, chatId, userId);
+                await submitDonationBonusRequestFlow(env, chatId, userId, notifyPendingDonationRequests);
             } catch (error) {
                 console.error({
                     event: "donation_bonus_request_failed",
