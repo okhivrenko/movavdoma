@@ -22,9 +22,15 @@ function webhookRequest(update, secret = "test-webhook-secret") {
     });
 }
 
-test("Worker exposes privacy without accepting an unauthenticated webhook", async () => {
+test("Worker exposes the landing and privacy page without accepting an unauthenticated webhook", async () => {
     const db = new WorkerTestDb();
     const env = workerEnv(db);
+
+    const landing = await worker.fetch(new Request("https://example.test/"), env);
+    assert.equal(landing.status, 200);
+    assert.match(await landing.text(), /Вивчай англійські слова легко та щодня — у Telegram/);
+    assert.match(landing.headers.get("content-security-policy"), /default-src 'none'/);
+    assert.equal(landing.headers.get("x-content-type-options"), "nosniff");
 
     const privacy = await worker.fetch(new Request("https://example.test/privacy"), env);
     assert.equal(privacy.status, 200);

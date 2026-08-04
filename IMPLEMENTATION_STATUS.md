@@ -46,6 +46,11 @@ slices and genuine blockers. It is not a stream of intentions.
 
 ## Latest verified result
 
+- Public landing-page slice completed locally on 4 August 2026: `GET /` now
+  serves a responsive Ukrainian, framework-free landing page with direct
+  Telegram CTAs, privacy link, SEO metadata, and restrictive public-page
+  security headers. It adds no tracking, forms, secrets, or D1 changes.
+  `npm run check` passed with 74 tests; deployment verification remains next.
 - Portable agent-orchestration framework completed on 4 August 2026: role
   contracts, shared behavioral rules, risk-based task/model routing,
   project-scoped Codex agent presets, a project profile, ADR, and a fail-closed

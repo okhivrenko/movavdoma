@@ -18,6 +18,9 @@ Users add words through Telegram. The bot:
 - Database: Cloudflare D1 (SQLite)
 - Worker name: `movayakvdoma`
 - Public URL: `https://movayakvdoma.oleksiikhivrenko.workers.dev/`
+- `GET /` serves the public Ukrainian landing page; `GET /privacy` serves the
+  privacy policy. Both pages are static server-rendered HTML with no trackers
+  or data collection; the Telegram webhook remains POST-only and authenticated.
 - D1 database name: `vocab-words-db`
 - Telegram receives updates through a webhook.
 - The webhook must accept both `message` and `callback_query` updates.

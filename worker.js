@@ -92,6 +92,7 @@ import {
     shouldClearPendingFeedback,
 } from "./src/features/navigation/navigation.js";
 import { privacyPolicyPage as renderPrivacyPolicyPage } from "./src/platform/privacy-policy.js";
+import { landingPage as renderLandingPage } from "./src/features/landing/landing-page.js";
 import { contentFor } from "./src/content/index.js";
 import { handleVocabularyTextCommand } from "./src/features/vocabulary/text-commands.js";
 import { publicRuntimeConfig } from "./src/platform/runtime-config.js";
@@ -189,19 +190,36 @@ function privacyPolicyPage(env) {
     });
 }
 
+function landingPage(env) {
+    const config = publicRuntimeConfig(env);
+    return renderLandingPage({
+        brandName: config.botBrandName,
+        publicWorkerUrl: config.publicWorkerUrl,
+        content: contentFor().landing,
+    });
+}
+
+function publicHtmlResponse(page) {
+    return new Response(page, {
+        headers: {
+            "content-type": "text/html; charset=UTF-8",
+            "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "x-content-type-options": "nosniff",
+        },
+    });
+}
+
 // Telegram webhook and scheduled delivery entry points. Callback actions are
 // validated in the router before any user-owned data is read or changed.
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
+        if (request.method === "GET" && url.pathname === "/") {
+            return publicHtmlResponse(landingPage(env));
+        }
         if (request.method === "GET" && url.pathname === "/privacy") {
-            return new Response(privacyPolicyPage(env), {
-                headers: {
-                    "content-type": "text/html; charset=UTF-8",
-                    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
-                    "x-content-type-options": "nosniff",
-                },
-            });
+            return publicHtmlResponse(privacyPolicyPage(env));
         }
 
         if (request.method !== "POST") {

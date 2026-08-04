@@ -11,7 +11,8 @@ edge or inside the corresponding feature handler.
 
 The Worker has two entry points:
 
-- `fetch(request, env)` — Telegram webhook and public privacy page.
+- `fetch(request, env)` — Telegram webhook, public landing page, and privacy
+  page. The landing is server-rendered HTML/CSS with no client-side state.
 - `scheduled(controller, env)` — webhook repair, daily delivery, cleanup,
   donation expiration notifications, and Monobank synchronization.
 
