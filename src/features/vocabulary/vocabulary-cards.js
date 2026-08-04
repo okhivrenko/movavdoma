@@ -4,8 +4,8 @@ import { answerCallbackQuery, editMessage, sendMessage } from "../../platform/te
 import { getOrCreateSharedCard, getOrCreateSharedSenses } from "./shared-vocabulary.js";
 
 export const SENSES_PER_PAGE = 3;
-const MAX_SENSES = 9;
-const WORD_MODEL = "gpt-5.4-mini";
+import getVocabularyConfig from "../../config/vocabulary.js";
+const { MAX_SENSES, WORD_MODEL } = getVocabularyConfig();
 
 /** OpenAI generation and D1 persistence for one user-selected word meaning. */
 export async function suggestSenses(env, word) {
