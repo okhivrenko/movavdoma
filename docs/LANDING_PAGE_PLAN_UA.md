@@ -97,9 +97,10 @@ Automation & Quality Engineer** і **Accessibility Specialist** формують
 
 Першу версію додати як публічний маршрут `/` чинного Cloudflare Worker.
 Webhook залишиться доступним лише через `POST` і перевірку Telegram secret;
-`/privacy` збережеться. Сторінка залишається server-rendered HTML. Після
-окремого privacy-рішення Google Analytics завантажується лише за явною згодою;
-відмова не створює запиту до Google і не обмежує роботу сторінки.
+`/privacy` збережеться. Сторінка залишається server-rendered HTML. Google
+Analytics працює в Advanced Consent Mode: тег видимий для Google Tag Assistant,
+analytics storage за замовчуванням `denied`, а без згоди надсилаються лише
+вимірювання без cookies. Відмова не обмежує роботу сторінки.
 
 ## SEO та вимірювання
 
@@ -115,8 +116,8 @@ Webhook залишиться доступним лише через `POST` і п
   і `SoftwareApplication` JSON-LD без непідтверджених рейтингів.
 - Після релізу: відокремлювати органічні та кампанійні переходи, перевіряти
   Search Console і Core Web Vitals та формувати backlog з фактичних даних.
-  Google Analytics вимірює page views і Telegram CTA clicks лише для
-  користувачів, які дали згоду; вибір можна змінити через футер.
+  Google Analytics отримує cookieless measurements до згоди, а повні page views
+  і Telegram CTA clicks — після згоди; вибір можна змінити через футер.
 
 ## Definition of done
 

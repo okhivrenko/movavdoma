@@ -19,10 +19,11 @@ Users add words through Telegram. The bot:
 - Worker name: `movayakvdoma`
 - Public URL: `https://movayakvdoma.com/`
 - `GET /` serves the public Ukrainian landing page; `GET /privacy` serves the
-  privacy policy. Both pages use server-rendered HTML; the landing loads the
-  consent-managed Google Analytics tag `G-7S3RWCWPV3` only after an explicit
-  opt-in and records page views plus Telegram CTA clicks. The Telegram webhook
-  remains POST-only and authenticated.
+  privacy policy. Both pages use server-rendered HTML; the landing exposes the
+  Google Analytics tag `G-7S3RWCWPV3` in Advanced Consent Mode with analytics
+  storage denied by default. Without opt-in Google receives cookieless
+  measurements; after opt-in the site records full page views plus Telegram CTA
+  clicks. The Telegram webhook remains POST-only and authenticated.
 - Search discovery uses canonical/hreflang/social metadata, `robots.txt`, an
   XML sitemap, and truthful `WebSite` + `SoftwareApplication` JSON-LD. The
   official landing CTA is `https://t.me/MovaVDomaBot`.

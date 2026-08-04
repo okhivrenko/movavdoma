@@ -46,6 +46,15 @@ slices and genuine blockers. It is not a stream of intentions.
 
 ## Latest verified result
 
+- Version 1.9.1 released on 4 August 2026 fixes Google tag discovery: the canonical
+  page now contains the standard `gtag.js?id=G-7S3RWCWPV3` source and queues
+  Consent Mode v2 defaults before Google code loads. Analytics storage and all
+  advertising consent remain denied by default; cookieless measurements are
+  disclosed, full CTA events require opt-in, and withdrawal clears host- and
+  domain-scoped GA cookies. `npm run check` passed with 80 tests. Cloudflare
+  deployment `295eeba4-05e4-425e-b6a3-e7f4b97a1cbb` serves the tag source and
+  versioned consent controller as JavaScript with HTTP 200; the production D1
+  journal has no pending migrations.
 - Version 1.9.0 released on 4 August 2026: the landing now
   targets the Ukrainian search-intent cluster with canonical/hreflang/social
   metadata, crawl assets, and truthful `WebSite` + `SoftwareApplication`

@@ -42,7 +42,18 @@ function schemaJson({ brandName, canonicalUrl, description, botUrl }) {
     }).replaceAll("<", "\\u003c");
 }
 
-/** Server-rendered public page; analytics is loaded only after explicit consent. */
+function googleTagBootstrap() {
+    return `window.dataLayer=window.dataLayer||[];
+function gtag(){dataLayer.push(arguments);}
+window.gtag=gtag;
+let analyticsConsent="denied";
+try{if(window.localStorage.getItem("movayakvdoma_analytics_consent")==="granted")analyticsConsent="granted";}catch{}
+gtag("consent","default",{ad_storage:"denied",ad_user_data:"denied",ad_personalization:"denied",analytics_storage:analyticsConsent});
+gtag("js",new Date());
+gtag("config","G-7S3RWCWPV3",{allow_google_signals:false,allow_ad_personalization_signals:false});`;
+}
+
+/** Server-rendered public page; Google tag defaults to denied analytics storage. */
 export function landingPage({ brandName, publicWorkerUrl, content, scriptNonce }) {
     const brand = escapeHtml(brandName);
     const title = escapeHtml(content.title);
@@ -56,6 +67,7 @@ export function landingPage({ brandName, publicWorkerUrl, content, scriptNonce }
         description: content.description,
         botUrl: content.botUrl,
     });
+    const analyticsBootstrap = googleTagBootstrap();
 
     return `<!doctype html>
 <html lang="uk">
@@ -86,7 +98,9 @@ export function landingPage({ brandName, publicWorkerUrl, content, scriptNonce }
   <link rel="stylesheet" href="/assets/vendor/pico.min.css">
   <link rel="stylesheet" href="/assets/landing/landing.css">
   <script type="application/ld+json" nonce="${nonce}">${structuredData}</script>
-  <script defer src="/assets/landing/analytics.js"></script>
+  <script nonce="${nonce}">${analyticsBootstrap}</script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-7S3RWCWPV3"></script>
+  <script defer src="/assets/landing/analytics-consent-v2.js"></script>
   <title>${title}</title>
 </head>
 <body>
@@ -197,10 +211,10 @@ export function landingPage({ brandName, publicWorkerUrl, content, scriptNonce }
   <section class="consent-banner" data-consent-banner hidden role="dialog" aria-labelledby="consent-title" aria-describedby="consent-description">
     <div>
       <h2 id="consent-title">Допоможи нам покращувати сайт</h2>
-      <p id="consent-description">За твоєю згодою Google Analytics збиратиме узагальнену статистику відвідувань і переходів до Telegram. Докладніше — у <a href="/privacy">політиці конфіденційності</a>.</p>
+      <p id="consent-description">Google Analytics працює без cookies за замовчуванням і надсилає обмежені технічні сигнали. За твоєю згодою він вимірюватиме повні відвідування та переходи до Telegram. Докладніше — у <a href="/privacy">політиці конфіденційності</a>.</p>
     </div>
     <div class="consent-actions">
-      <button type="button" class="secondary" data-consent-reject>Лише необхідне</button>
+      <button type="button" class="secondary" data-consent-reject>Без analytics cookies</button>
       <button type="button" data-consent-accept>Дозволити аналітику</button>
     </div>
   </section>

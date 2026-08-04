@@ -31,7 +31,13 @@ test("landing has a canonical URL, official bot CTA, and privacy link", () => {
     assert.match(page, /\/assets\/landing\/field_waves\.svg/);
     assert.match(page, /\/assets\/landing\/hero_wheat\.svg/);
     assert.match(page, /\/assets\/landing\/landing\.css/);
-    assert.match(page, /\/assets\/landing\/analytics\.js/);
+    assert.match(page, /\/assets\/landing\/analytics-consent-v2\.js/);
+    assert.match(page, /https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=G-7S3RWCWPV3/);
+    assert.match(page, /gtag\("consent","default",\{ad_storage:"denied"/);
+    assert.ok(
+        page.indexOf('gtag("consent","default"')
+        < page.indexOf("https://www.googletagmanager.com/gtag/js?id=G-7S3RWCWPV3")
+    );
     assert.match(page, /data-consent-banner/);
     assert.match(page, /data-consent-settings/);
     assert.doesNotMatch(page, /QR|qr-code/i);

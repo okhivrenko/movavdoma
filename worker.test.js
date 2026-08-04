@@ -47,6 +47,8 @@ test("Worker exposes the landing and privacy page without accepting an unauthent
     const privacyPage = await privacy.text();
     assert.match(privacyPage, /Політика конфіденційності — MovaYakVDoma/);
     assert.match(privacyPage, /name="robots" content="noindex, follow"/);
+    assert.match(privacyPage, /без cookies збираються обмежені вимірювання/);
+    assert.match(privacyPage, /Consent Mode/);
 
     const denied = await worker.fetch(
         webhookRequest(privateMessageUpdate({ text: "/start" }), "wrong-secret"),

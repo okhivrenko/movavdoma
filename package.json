@@ -1,11 +1,11 @@
 {
   "name": "movayakvdoma",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "private": true,
   "type": "module",
   "scripts": {
     "check": "npm run check:syntax && npm test && npm run check:migrations && npm run build",
-    "check:syntax": "node --check worker.js worker.test.js public/assets/landing/analytics.js && find src test-support -name '*.js' -exec node --check {} \\;",
+    "check:syntax": "node --check worker.js worker.test.js public/assets/landing/analytics-consent-v2.js && find src test-support -name '*.js' -exec node --check {} \\;",
     "test": "npm run test:all",
     "test:all": "node --test",
     "test:worker": "node --test worker.test.js",
