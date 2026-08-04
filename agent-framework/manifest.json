@@ -1,6 +1,6 @@
 {
   "name": "portable-product-engineering-agent-framework",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "sourceRepository": "https://github.com/okhivrenko/codex-agent-framework",
   "entrypoint": "agent-framework/FRAMEWORK.md",
   "projectProfileTemplate": "agent-framework/templates/PROJECT_AGENT_PROFILE.template.md",
@@ -9,7 +9,8 @@
     "agents",
     ".codex/agents",
     ".codex/config.toml",
-    "scripts/install-agent-framework.sh"
+    "scripts/install-agent-framework.sh",
+    "scripts/audit-agent-token-budget.sh"
   ],
   "vendoredSources": [
     {

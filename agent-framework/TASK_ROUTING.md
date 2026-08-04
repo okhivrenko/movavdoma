@@ -1,6 +1,9 @@
 # Task-to-Role Router
 
 Select one lead DRI. Supporting roles must own a distinct deliverable or gate.
+Applying a role does not imply spawning an agent; keep roles in the primary
+thread unless parallel evidence or independent assurance is worth the extra
+context.
 
 | Task type | Lead role | Add when triggered | Typical tier |
 | --- | --- | --- | --- |

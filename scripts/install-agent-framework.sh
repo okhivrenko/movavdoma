@@ -23,7 +23,8 @@ fi
 for target_path in \
   "$target_repo/agent-framework" \
   "$target_repo/PROJECT_AGENT_PROFILE.md" \
-  "$target_repo/scripts/install-agent-framework.sh"
+  "$target_repo/scripts/install-agent-framework.sh" \
+  "$target_repo/scripts/audit-agent-token-budget.sh"
 do
   if [ -e "$target_path" ]; then
     echo "Refusing to overwrite existing path: $target_path" >&2
@@ -57,6 +58,8 @@ cp "$source_repo/agent-framework/templates/PROJECT_AGENT_PROFILE.template.md" \
   "$target_repo/PROJECT_AGENT_PROFILE.md"
 cp "$source_repo/scripts/install-agent-framework.sh" \
   "$target_repo/scripts/install-agent-framework.sh"
+cp "$source_repo/scripts/audit-agent-token-budget.sh" \
+  "$target_repo/scripts/audit-agent-token-budget.sh"
 
 if [ ! -e "$target_repo/.codex/config.toml" ]; then
   cp "$source_repo/.codex/config.toml" "$target_repo/.codex/config.toml"

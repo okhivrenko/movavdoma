@@ -1,6 +1,8 @@
 # Delegation Rules
 
 - Default to one agent.
+- Do not spawn for a single-file change, routine copy, formatting, a short
+  lookup, or a task the primary agent must immediately redo to integrate.
 - Delegate only a concrete, bounded subtask that can progress independently or
   provides necessary independent assurance.
 - Give each writing agent exclusive file or module ownership. Agents are not
@@ -14,3 +16,5 @@
 - The primary agent owns synthesis, conflicts, final verification, and user
   communication.
 - Stop delegation when coordination cost exceeds the remaining work.
+- Use at most two concurrent subagents by default. A third requires explicit
+  user direction or a documented high-risk need and a configuration change.

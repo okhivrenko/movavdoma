@@ -2,11 +2,14 @@
 
 ## Portable agent framework
 
-- For every non-trivial request, follow `agent-framework/FRAMEWORK.md`.
-- Route the lead role and triggered gates with
-  `agent-framework/TASK_ROUTING.md`.
-- Select the lowest sufficient model and agent count with
-  `agent-framework/MODEL_ROUTING.md`; one agent is the default.
+- For clear bounded work, use this file and the closest project instructions;
+  do not load the portable routers automatically.
+- For multi-step, ambiguous, cross-role, or risk-sensitive work, follow
+  `agent-framework/FRAMEWORK.md`. Open `TASK_ROUTING.md` only when ownership is
+  unclear and `MODEL_ROUTING.md` only when changing the Terra-medium default or
+  considering delegation.
+- Applying a role does not require a subagent. One agent is the default and the
+  project cap is two concurrent subagents.
 - Load only the selected files from `agent-framework/rules/` and `agents/`.
 - `PROJECT_AGENT_PROFILE.md` and this file contain app-specific overrides and
   take priority over portable defaults.
@@ -23,29 +26,13 @@
 - Product behavior and schema: `PROJECT_CONTEXT.md`.
 - Release process: `RELEASING.md`.
 - Cloudflare config: `wrangler.jsonc`; SQL changes: `migrations/`.
-- Senior JavaScript review role: `agents/senior-javascript-engineer.md`.
-- Senior React role: `agents/senior-react-engineer.md`; activate it only for
-  React/Next.js work and pair it with the pinned Vercel guidance at
-  `agent-framework/skills/react-best-practices/SKILL.md`.
-- Database role: `agents/database-engineer.md`; use it for schema, SQL, indexes,
-  transactions, migrations, backfills, retention, and recovery design.
-- Application and backend architecture role:
-  `agents/application-backend-architect.md`; use it before cross-application,
-  schema, API-contract, external-integration, service-boundary, or consequential
-  Cloudflare platform decisions.
-- Application security role: `agents/application-security-engineer.md`; use it
-  for public endpoints, authentication, authorization, user data, providers,
-  dependencies, secrets, abuse controls, and security-sensitive releases.
-- Platform, delivery, and reliability role:
-  `agents/platform-devops-sre-engineer.md`; use it for CI/CD, Cloudflare
-  environments, migrations, observability, incident response, rollback, and
-  production releases.
-- Quality engineering role: `agents/qa-automation-quality-engineer.md`; use it
-  to define risk-based verification, automation, regression coverage, and
-  release evidence for non-trivial behavior changes.
-- Accessibility assurance role: `agents/accessibility-specialist.md`; use it
-  for public UI, content, responsive experiences, core user journeys, and
-  pre-release accessibility review.
+- Runtime changes use `agents/senior-javascript-engineer.md`. Trigger React only
+  for React/Next.js; Database for schema/query/data-lifecycle work; Architect
+  for cross-app/schema/API/platform boundaries; Security for trust boundaries,
+  user data, secrets, dependencies, or abuse; SRE for CI/CD, migrations,
+  production, rollback, or incidents; QA for non-trivial behavior; and
+  Accessibility for public UI. Exact paths live in `TASK_ROUTING.md` and should
+  be opened only when a triggered role is needed.
 - For reusable Cloudflare-bot architecture and release practice, use the shared
   `$cloudflare-worker-bot` skill. These project-specific rules take priority.
 
@@ -110,23 +97,13 @@ returns HTTP 200 after deployment.
 
 ## Delivery cadence
 
-- Work in one small, complete vertical slice at a time: implementation or
-  extraction, focused tests, full check, then commit/push/deploy when required.
-- Do not report a planned action as started until a concrete code or test
-  change has been made.
-- Update `IMPLEMENTATION_STATUS.md` only after a completed slice or a genuine
-  blocker; it is a result monitor, not a stream of intentions.
-- After a completed slice, automatically begin the next planned slice without
-  requesting confirmation when it stays within the accepted architecture,
-  product requirements, and existing deployment authority. Pause only for a
-  material product choice, missing access, or a safety boundary that needs the
-  owner's direction.
-- Do not end a turn merely because one intermediate slice was committed. Keep
-  executing the accepted plan until its completion criteria are met or a valid
-  pause condition applies.
-- At the end of a completed multi-slice objective, perform a final independent
-  analysis of the resulting change, update `IMPLEMENTATION_STATUS.md`, and
-  create a follow-up plan when residual work or risks remain.
+- Deliver one complete vertical slice at a time: change, focused tests, full
+  gate, then commit/push/deploy when required. Continue accepted slices without
+  confirmation; pause only for a material product choice, missing authority, or
+  safety boundary.
+- Update `IMPLEMENTATION_STATUS.md` only for a completed slice or genuine
+  blocker. Finish multi-slice work with an independent final analysis and note
+  residual risk or a follow-up owner.
 
 ## Context and token discipline
 
@@ -135,17 +112,16 @@ Use context deliberately without weakening investigation or verification.
 - Start with `rg`/`rg --files` and read only the exact route, module, test,
   migration, and documentation relevant to the current vertical slice. Do not
   print an entire large file when targeted line ranges answer the question.
-- Record the slice's source range, invariants, owner module, and required
-  tests before editing. Reuse that compact map rather than rediscovering the
-  same code after every patch.
+- Reuse a compact route/invariant/test map instead of rediscovering files.
 - Build and test the extracted feature module first; then replace one complete
   contiguous router block in `worker.js`. Do not leave duplicate transition
   logic after the slice is complete.
-- Use focused tests and syntax checks after each small patch. Run `npm run
-  check` once per completed slice and before its commit, rather than after
-  unrelated exploratory changes.
+- Use focused checks during work; run `npm run check` once per completed slice
+  and before commit.
 - Keep command output bounded. Request only the needed diff, status, or line
   range; use `git diff --stat` before a full diff.
+- Keep subagent packets compact, use `fork_turns = "none"` when self-contained,
+  and request summaries instead of raw logs.
 - Read skills and project rules once per task, then reopen only a specifically
   relevant section when a new risk or release step requires it.
 

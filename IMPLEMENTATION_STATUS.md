@@ -57,6 +57,10 @@ slices and genuine blockers. It is not a stream of intentions.
   Best Practices skill with upstream provenance. The React role remains inactive
   for the current framework-free landing architecture; D1 changes trigger the
   database role while SRE retains the production migration gate.
+- Framework version 0.2.1 reduces token cost: routine presets now use Terra
+  medium, narrow exploration uses Luna low, concurrent subagents are capped at
+  two, role activation no longer implies delegation, and skills use a strict
+  progressive-disclosure budget instead of loading compiled references.
 - Active-vocabulary controls made safer on 4 August 2026: example buttons now
   use the `📘` prefix and the separate mark-as-learned buttons use `✅`, so the
   two identical numbered blocks are visually distinct. `npm run check` passed

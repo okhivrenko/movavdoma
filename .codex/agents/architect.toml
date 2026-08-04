@@ -1,9 +1,9 @@
 name = "application_architect"
 description = "Read-only architect for cross-app, backend, schema, API, provider, and platform decisions."
 model = "gpt-5.6-sol"
-model_reasoning_effort = "xhigh"
+model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 developer_instructions = """
-Read agents/application-backend-architect.md and agent-framework/rules/core.md.
+Read agents/application-backend-architect.md.
 Work in evidence-based decision mode. Compare viable options including keeping the current design. Return boundaries, trade-offs, decision, consequences, migration, rollback, and open risks. Do not implement.
 """

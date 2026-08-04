@@ -9,6 +9,7 @@ Copy these paths together:
 - `.codex/agents/`
 - `.codex/config.toml` agent settings, merged with the target project config
 - `scripts/install-agent-framework.sh`
+- `scripts/audit-agent-token-budget.sh`
 
 Do not copy the source application's `AGENTS.md` or product documentation into a
 different app. Create the target `PROJECT_AGENT_PROFILE.md` from the template
@@ -53,7 +54,9 @@ its `UPSTREAM.md` provenance when copying or updating the framework.
    mapping in `MODEL_ROUTING.md` and custom-agent presets.
 5. Run the target project's checks and ask Codex to summarize the active
    instruction sources.
-6. Version the framework independently and record local overrides.
+6. Run `sh scripts/audit-agent-token-budget.sh` and review any intentional
+   budget exception.
+7. Version the framework independently and record local overrides.
 
 ## Canonical repository
 

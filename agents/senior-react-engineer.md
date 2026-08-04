@@ -15,8 +15,10 @@ framework-free HTML/CSS surface.
 
 Before React implementation or review, read
 `agent-framework/skills/react-best-practices/SKILL.md` completely. Then load only
-the rule files relevant to the task, starting with the highest-impact matching
-category. The vendored Vercel guidance is a performance reference; project
+the rule files relevant to the task—at most two on the first pass—starting with
+the highest-impact matching category. Never load the compiled skill
+`AGENTS.md`; it duplicates all rules. The vendored Vercel guidance is a
+performance reference; project
 requirements, correctness, accessibility, security, and measured evidence take
 priority over speculative micro-optimization.
 
