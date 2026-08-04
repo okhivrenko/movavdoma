@@ -17,7 +17,7 @@ Users add words through Telegram. The bot:
 - Hosting/runtime: Cloudflare Workers
 - Database: Cloudflare D1 (SQLite)
 - Worker name: `movayakvdoma`
-- Public URL: `https://movayakvdoma.oleksiikhivrenko.workers.dev/`
+- Public URL: `https://movayakvdoma.com/`
 - `GET /` serves the public Ukrainian landing page; `GET /privacy` serves the
   privacy policy. Both pages are static server-rendered HTML with no trackers
   or data collection; the Telegram webhook remains POST-only and authenticated.
