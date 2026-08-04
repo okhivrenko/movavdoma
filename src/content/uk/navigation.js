@@ -21,8 +21,8 @@ export const navigation = Object.freeze({
         "⏰ Нагадування",
         "⏰ Щоденне слово",
     ]),
-    schedulePrefix: "⏰ Розклад (",
-    legacySchedulePrefixes: Object.freeze(["⏰ Розклад і рівень"]),
+    schedulePrefix: "⏰ Налаштування\n(",
+    legacySchedulePrefixes: Object.freeze(["⏰ Розклад (", "⏰ Розклад і рівень"]),
     copy: Object.freeze({
         interfaceUpdated: "✨ Меню оновлено. Можеш користуватися новими кнопками нижче.",
         menu: "Ось меню:",

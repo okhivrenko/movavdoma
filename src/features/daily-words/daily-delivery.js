@@ -1,10 +1,10 @@
-import { localDateAndTime } from "../../domain/helpers.js";
+import { DEFAULT_DAILY_SETTINGS, localDateAndTime } from "../../domain/helpers.js";
 import { dailyWordKeyboard, dailyWordText, getPendingDailyWord, savePendingDailyWord } from "./daily-words.js";
 import { sendMessage } from "../../platform/telegram.js";
 
 export async function sendTodayDailyWord(env, chatId, userId, dependencies) {
     const user = await env.DB.prepare("SELECT timezone, daily_level FROM users WHERE telegram_user_id = ?").bind(userId).first();
-    const localTime = localDateAndTime(user?.timezone ?? "Europe/Warsaw", Date.now());
+    const localTime = localDateAndTime(user?.timezone ?? DEFAULT_DAILY_SETTINGS.timezone, Date.now());
     if (!localTime) throw new Error("Unable to calculate local date for daily word.");
     const pending = await getPendingDailyWord(env, userId, localTime.date);
     if (pending) {

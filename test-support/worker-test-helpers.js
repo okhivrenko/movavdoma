@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 export class WorkerTestDb {
     constructor({ dailySettings, interfaceVersion = 9 } = {}) {
         this.dailySettings = dailySettings ?? {
+            timezone: "Europe/Kyiv",
             daily_time: "10:00",
             daily_enabled: 1,
             daily_level: "A0",
@@ -33,7 +34,7 @@ export class WorkerTestDb {
         if (query.includes("SELECT interface_version FROM users")) {
             return { interface_version: this.interfaceVersion };
         }
-        if (query.includes("SELECT daily_time, daily_enabled, daily_level FROM users")) {
+        if (query.includes("SELECT timezone, daily_time, daily_enabled, daily_level FROM users")) {
             return { ...this.dailySettings };
         }
 
@@ -70,6 +71,10 @@ export class WorkerTestDb {
         }
         if (query.includes("UPDATE users SET daily_level")) {
             this.dailySettings.daily_level = parameters[0];
+            return { meta: { changes: 1 } };
+        }
+        if (query.includes("UPDATE users SET timezone")) {
+            this.dailySettings.timezone = parameters[0];
             return { meta: { changes: 1 } };
         }
         if (query.includes("SET daily_time = ?, daily_enabled = 1")) {

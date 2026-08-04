@@ -1,7 +1,7 @@
 import { openAIJson } from "../../platform/openai.js";
 import { answerCallbackQuery, editMessage, sendMessage } from "../../platform/telegram.js";
 import { LANGUAGE, LANGUAGE_LABEL_UK } from "../../domain/languages.js";
-import { localDateAndTime } from "../../domain/helpers.js";
+import { DEFAULT_DAILY_SETTINGS, localDateAndTime } from "../../domain/helpers.js";
 
 export const MAX_TRANSLATION_TEXT_LENGTH = 256;
 export const DAILY_TEXT_TRANSLATION_LIMIT = 10;
@@ -77,7 +77,7 @@ async function getPendingTextTranslation(env, userId) {
 
 export async function claimDailyTextTranslation(env, userId) {
     const user = await env.DB.prepare("SELECT timezone FROM users WHERE telegram_user_id = ?").bind(userId).first();
-    const localTime = localDateAndTime(user?.timezone ?? "Europe/Warsaw", Date.now());
+    const localTime = localDateAndTime(user?.timezone ?? DEFAULT_DAILY_SETTINGS.timezone, Date.now());
     if (!localTime) throw new Error("Unable to calculate local translation date.");
 
     const claimed = await env.DB.prepare(`

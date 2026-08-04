@@ -108,7 +108,7 @@ const DAILY_ADD_LIMIT = 10;
 const MAX_DAILY_WORD_ATTEMPTS = 3;
 const LEARNED_WORD_RETENTION_DAYS = 30;
 // Increment only when the persistent reply keyboard changes for users.
-const INTERFACE_VERSION = 11;
+const INTERFACE_VERSION = 12;
 
 // User-facing reply/inline keyboards and the admin-only user directory.
 // Authorization itself stays in helpers.js so every entry path compares IDs consistently.
@@ -310,8 +310,8 @@ export default {
 
         await env.DB
             .prepare(`
-        INSERT INTO users (telegram_user_id, chat_id, daily_time, daily_level, telegram_username, telegram_first_name)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO users (telegram_user_id, chat_id, timezone, daily_time, daily_level, telegram_username, telegram_first_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(telegram_user_id)
         DO UPDATE SET chat_id = excluded.chat_id, is_active = 1,
           telegram_username = excluded.telegram_username,
@@ -320,6 +320,7 @@ export default {
             .bind(
                 userId,
                 chatId,
+                DEFAULT_DAILY_SETTINGS.timezone,
                 DEFAULT_DAILY_SETTINGS.daily_time,
                 DEFAULT_DAILY_SETTINGS.daily_level,
                 message.from.username ?? null,

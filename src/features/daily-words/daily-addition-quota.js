@@ -1,4 +1,4 @@
-import { localDateAndTime } from "../../domain/helpers.js";
+import { DEFAULT_DAILY_SETTINGS, localDateAndTime } from "../../domain/helpers.js";
 
 // Atomically claims a learning-list slot before a word is generated or saved.
 export async function claimDailyWordAddition(env, userId, dependencies) {
@@ -12,7 +12,7 @@ export async function claimDailyWordAddition(env, userId, dependencies) {
         .prepare("SELECT daily_limit FROM user_daily_limits WHERE user_id = ? AND expires_at > CURRENT_TIMESTAMP")
         .bind(userId)
         .first();
-    const localTime = localDateAndTime(user?.timezone ?? "Europe/Warsaw", Date.now());
+    const localTime = localDateAndTime(user?.timezone ?? DEFAULT_DAILY_SETTINGS.timezone, Date.now());
     if (!localTime) throw new Error("Unable to calculate daily addition date.");
 
     const claimed = await env.DB.prepare(`

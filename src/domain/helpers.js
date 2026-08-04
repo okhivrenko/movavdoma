@@ -1,5 +1,6 @@
 /** Shared formatting, authorization, and time helpers with no database access. */
 export const DEFAULT_DAILY_SETTINGS = Object.freeze({
+    timezone: "Europe/Kyiv",
     daily_time: "10:00",
     daily_enabled: 1,
     daily_level: "A0",
@@ -11,7 +12,7 @@ export function dailyScheduleKeyboardLabel(settings) {
         ? settings.daily_time ?? DEFAULT_DAILY_SETTINGS.daily_time
         : "вимкнено";
     const level = settings?.daily_level ?? DEFAULT_DAILY_SETTINGS.daily_level;
-    return `⏰ Розклад (${time} - ${level})`;
+    return `⏰ Налаштування\n(${time} - ${level})`;
 }
 
 export function wordCountLabel(count) {

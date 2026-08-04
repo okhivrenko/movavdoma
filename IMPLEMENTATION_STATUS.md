@@ -51,3 +51,9 @@ slices and genuine blockers. It is not a stream of intentions.
   translation flow and updated menu are live. Production migration `0017` was
   applied before deployment, the D1 journal has no pending migrations, and the
   public Worker returned HTTP 200.
+- Timezone and settings-label slice verified locally on 4 August 2026: new and
+  migrated users default to `Europe/Kyiv`; `⏰ Налаштування` offers a paginated
+  whitelist of popular IANA timezones with their dynamic GMT offset. `npm run
+  check` passed with 60 tests. Migration `0018` and this UI update were
+  deployed to production; the D1 journal has no pending migrations and the
+  public Worker returned HTTP 200.
