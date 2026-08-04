@@ -46,7 +46,9 @@ test("active-word list separates example and learned controls", async () => {
 
     assert.match(payload.text, /Показати приклад/);
     assert.match(payload.text, /Вже вивчив/);
+    assert.equal(payload.reply_markup.inline_keyboard[0][0].text, "📘 1");
     assert.equal(payload.reply_markup.inline_keyboard[0][0].callback_data, "examples:10");
+    assert.equal(payload.reply_markup.inline_keyboard[1][0].text, "✅ 1");
     assert.equal(payload.reply_markup.inline_keyboard[1][0].callback_data, "delete:10:0");
 });
 
@@ -59,9 +61,13 @@ test("active-word list groups both actions and adds pagination", async () => {
     const payload = await captureTelegramMessage(() => sendActiveWordList(envWithWords(words, 11), 1, 2));
 
     assert.equal(payload.reply_markup.inline_keyboard.length, 5);
+    assert.equal(payload.reply_markup.inline_keyboard[0][0].text, "📘 1");
     assert.equal(payload.reply_markup.inline_keyboard[0][0].callback_data, "examples:1");
+    assert.equal(payload.reply_markup.inline_keyboard[1][4].text, "📘 10");
     assert.equal(payload.reply_markup.inline_keyboard[1][4].callback_data, "examples:10");
+    assert.equal(payload.reply_markup.inline_keyboard[2][0].text, "✅ 1");
     assert.equal(payload.reply_markup.inline_keyboard[2][0].callback_data, "delete:1:0");
+    assert.equal(payload.reply_markup.inline_keyboard[3][4].text, "✅ 10");
     assert.equal(payload.reply_markup.inline_keyboard[3][4].callback_data, "delete:10:0");
     assert.equal(payload.reply_markup.inline_keyboard[4][0].callback_data, "active-page:1");
 });

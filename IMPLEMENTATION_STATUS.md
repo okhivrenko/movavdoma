@@ -46,6 +46,10 @@ slices and genuine blockers. It is not a stream of intentions.
 
 ## Latest verified result
 
+- Active-vocabulary controls made safer on 4 August 2026: example buttons now
+  use the `📘` prefix and the separate mark-as-learned buttons use `✅`, so the
+  two identical numbered blocks are visually distinct. `npm run check` passed
+  with 72 tests; no database migration was required.
 - `npm run check`: 58 tests passed, migrations validated, Worker dry-run built.
 - Version 1.5.0 deployed on 3 August 2026: the bounded Ukrainian ↔ English
   translation flow and updated menu are live. Production migration `0017` was

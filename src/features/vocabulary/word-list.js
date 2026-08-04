@@ -44,9 +44,9 @@ function listText(words, page, totalPages) {
     return `Мої слова · сторінка ${page + 1} з ${totalPages}:\n${words.map((word, index) => `${index + 1}. ${word.source_text} — ${word.translation_uk}`).join("\n")}\n\n📘 Показати приклад — натисни номер слова нижче.\n✅ Вже вивчив — натисни номер слова нижче.`;
 }
 
-function numberButtonRows(words, callbackData) {
+function numberButtonRows(words, callbackData, prefix = "") {
     const buttons = words.map((word, index) => ({
-        text: String(index + 1),
+        text: `${prefix}${index + 1}`,
         callback_data: callbackData(word),
     }));
     const rows = [];
@@ -61,8 +61,8 @@ function numberButtonRows(words, callbackData) {
 function listKeyboard(words, page, totalPages) {
     if (words.length === 0) return undefined;
     const rows = [
-        ...numberButtonRows(words, (word) => `examples:${word.id}`),
-        ...numberButtonRows(words, (word) => `delete:${word.id}:${page}`),
+        ...numberButtonRows(words, (word) => `examples:${word.id}`, "📘 "),
+        ...numberButtonRows(words, (word) => `delete:${word.id}:${page}`, "✅ "),
     ];
     const navigation = [];
 
