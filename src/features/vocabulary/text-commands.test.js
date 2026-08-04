@@ -27,6 +27,16 @@ test("vocabulary text commands reject non-English input before claiming quota", 
     assert.match(sent[0], /англійське слово/i);
 });
 
+test("an explicitly supplied context is never written to the shared card cache", async () => {
+    let saved;
+    const handled = await handleVocabularyTextCommand({}, "/add charge / payment for a service", { chatId: 1, userId: 2 }, dependencies({
+        parseVocabularyInput: () => ({ word: "charge", explicitContext: "payment for a service" }),
+        saveAndSendWord: async (...arguments_) => { saved = arguments_; },
+    }));
+    assert.equal(handled, true);
+    assert.deepEqual(saved.slice(3), ["charge", "payment for a service", { sharedCache: false }]);
+});
+
 test("archive all binds its owner and never interpolates user data", async () => {
     const calls = []; const sent = [];
     const env = { DB: { prepare(query) { calls.push(query); return { bind(...values) { return { run: async () => ({ meta: { changes: 2 }, values }) }; } }; } } };

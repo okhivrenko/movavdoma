@@ -1,4 +1,5 @@
 import { openAIJson } from "../../platform/openai.js";
+import { translateWithDeepL } from "../../platform/deepl.js";
 
 // Daily-card persistence and delivery flow. Network and access dependencies are
 // passed in explicitly so the Worker remains the composition root.
@@ -8,19 +9,27 @@ export async function generateDailyWordCard(env, level) {
     const result = await openAIJson(env, "daily_word_card", {
         type: "object", additionalProperties: false,
         properties: {
-            word: { type: "string" }, context_en: { type: "string" }, translation_uk: { type: "string" },
+            word: { type: "string" }, context_en: { type: "string" },
             examples: { type: "array", items: {
                 type: "object", additionalProperties: false,
-                properties: { source: { type: "string" }, uk: { type: "string" } },
-                required: ["source", "uk"],
+                properties: { source: { type: "string" } },
+                required: ["source"],
             } },
-        }, required: ["word", "context_en", "translation_uk", "examples"],
-    }, "Create one useful English vocabulary card for a learner at the requested CEFR level. word must be a single English word or a short common phrase, not a proper noun. context_en must precisely state its meaning. Give a short Ukrainian translation and exactly two natural English example sentences, each 8–18 words, with fluent Ukrainian translations. Both examples must use exactly the stated meaning.", `CEFR level: ${level}`);
+        }, required: ["word", "context_en", "examples"],
+    }, "Create one useful English vocabulary card for a learner at the requested CEFR level. word must be a single English word or a short common phrase, not a proper noun. context_en must precisely state its meaning. Create exactly two natural English example sentences, each 8–18 words. Both examples must use exactly the stated meaning. Do not translate anything.", `CEFR level: ${level}`, { model: env.OPENAI_WORD_MODEL ?? "gpt-5.4-mini", reasoningEffort: "low" });
 
-    if (!Array.isArray(result.examples) || result.examples.length !== 2) {
+    if (!result.word?.trim() || !result.context_en?.trim() || !Array.isArray(result.examples) || result.examples.length !== 2 || result.examples.some((example) => typeof example?.source !== "string" || !example.source.trim())) {
         throw new Error("Invalid daily word examples response.");
     }
-    return result;
+    const translations = await translateWithDeepL(env, [result.word, ...result.examples.map((example) => example.source)], {
+        source: "en", target: "uk", context: `English vocabulary meaning: ${result.context_en}`,
+    });
+    return {
+        word: result.word.trim(),
+        context_en: result.context_en.trim(),
+        translation_uk: translations[0],
+        examples: result.examples.map((example, index) => ({ source: example.source.trim(), uk: translations[index + 1] })),
+    };
 }
 
 export function dailyWordKeyboard(pendingId) {

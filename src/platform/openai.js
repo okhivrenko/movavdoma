@@ -18,7 +18,7 @@ export async function openAIJson(env, name, schema, instructions, input, options
                 method: "POST",
                 headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
                 body: JSON.stringify({
-                    model: "gpt-5.4-nano", reasoning_effort: "none", max_completion_tokens: options.maxCompletionTokens ?? 400,
+                    model: options.model ?? "gpt-5.4-nano", reasoning_effort: options.reasoningEffort ?? "none", max_completion_tokens: options.maxCompletionTokens ?? 400,
                     response_format: { type: "json_schema", json_schema: { name, strict: true, schema } },
                     messages: [{ role: "developer", content: instructions }, { role: "user", content: input }],
                 }),

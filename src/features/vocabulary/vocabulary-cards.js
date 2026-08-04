@@ -1,37 +1,54 @@
 import { openAIJson } from "../../platform/openai.js";
+import { translateWithDeepL } from "../../platform/deepl.js";
 import { answerCallbackQuery, editMessage, sendMessage } from "../../platform/telegram.js";
+import { getOrCreateSharedCard, getOrCreateSharedSenses } from "./shared-vocabulary.js";
 
 export const SENSES_PER_PAGE = 3;
 const MAX_SENSES = 9;
+const WORD_MODEL = "gpt-5.4-mini";
 
 /** OpenAI generation and D1 persistence for one user-selected word meaning. */
 export async function suggestSenses(env, word) {
-    const result = await openAIJson(env, "word_senses", {
-        type: "object", additionalProperties: false,
-        properties: { senses: { type: "array", items: {
+    const senses = await getOrCreateSharedSenses(env, word, async () => {
+        const result = await openAIJson(env, "word_senses", {
             type: "object", additionalProperties: false,
-            properties: { label_uk: { type: "string" }, context_en: { type: "string" } },
-            required: ["label_uk", "context_en"],
-        } } }, required: ["senses"],
-    }, "For an English vocabulary word, return one to nine genuinely different common meanings. Return one item only when the word is unambiguous. label_uk must be a short Ukrainian label suitable for a Telegram button. context_en must be a short English explanation of the exact meaning. Prioritize everyday meanings. Do not return grammatical forms of the same sense.", `Word: ${word}`);
-
-    return result.senses.slice(0, MAX_SENSES);
+            properties: { senses: { type: "array", items: {
+                type: "object", additionalProperties: false,
+                properties: { label_uk: { type: "string" }, context_en: { type: "string" } },
+                required: ["label_uk", "context_en"],
+            } } }, required: ["senses"],
+        }, "For an English vocabulary word, return one to nine genuinely different, common dictionary senses. Return one item only when the word is unambiguous. label_uk must be a concise Ukrainian meaning label for a Telegram button; context_en must precisely distinguish that meaning in English. Prioritize everyday meanings, order by commonness, and never split grammatical forms or near-synonyms into separate senses.", `Word: ${word}`, { model: env.OPENAI_WORD_MODEL ?? WORD_MODEL, reasoningEffort: "low" });
+        return result.senses.slice(0, MAX_SENSES);
+    });
+    return senses.slice(0, MAX_SENSES);
 }
 
-async function generateWordCard(env, word, context) {
-    const result = await openAIJson(env, "word_card", {
+async function createWordCard(env, word, context) {
+    const result = await openAIJson(env, "word_card_examples", {
         type: "object", additionalProperties: false,
-        properties: {
-            translation_uk: { type: "string" }, examples: { type: "array", items: {
-                type: "object", additionalProperties: false,
-                properties: { source: { type: "string" }, uk: { type: "string" } },
-                required: ["source", "uk"],
-            } },
-        }, required: ["translation_uk", "examples"],
-    }, "Create one consistent vocabulary card. Translate the word into Ukrainian strictly for the supplied meaning. Create exactly two natural English sentences, each 8–18 words, using only that same meaning. Translate each sentence fluently into Ukrainian. Never mix meanings of the word.", `Word: ${word}\nChosen meaning: ${context}`);
+        properties: { examples: { type: "array", items: {
+            type: "object", additionalProperties: false,
+            properties: { source: { type: "string" } },
+            required: ["source"],
+        } },
+    }, required: ["examples"] }, "Create exactly two natural English example sentences for the supplied English word and exact meaning. Each sentence must be 8–18 words, use the word or its conventional inflection, and demonstrate only the supplied meaning. Do not translate anything. Never mix meanings.", `Word: ${word}\nChosen meaning: ${context}`, { model: env.OPENAI_WORD_MODEL ?? WORD_MODEL, reasoningEffort: "low" });
 
-    if (!Array.isArray(result.examples) || result.examples.length !== 2) throw new Error("Invalid examples response.");
-    return result;
+    if (!Array.isArray(result.examples) || result.examples.length !== 2 || result.examples.some((example) => typeof example?.source !== "string" || !example.source.trim())) {
+        throw new Error("Invalid examples response.");
+    }
+    const translations = await translateWithDeepL(env, [word, ...result.examples.map((example) => example.source)], {
+        source: "en", target: "uk", context: `English vocabulary meaning: ${context}`,
+    });
+    return {
+        translation_uk: translations[0],
+        examples: result.examples.map((example, index) => ({ source: example.source.trim(), uk: translations[index + 1] })),
+    };
+}
+
+async function generateWordCard(env, word, context, sharedCache) {
+    return sharedCache
+        ? getOrCreateSharedCard(env, word, context, () => createWordCard(env, word, context))
+        : createWordCard(env, word, context);
 }
 
 export function senseKeyboard(senses, page) {
@@ -75,8 +92,8 @@ export async function closePendingSelection(env, userId) {
     }
 }
 
-export async function saveAndSendWord(env, chatId, userId, word, context) {
-    const card = await generateWordCard(env, word, context);
+export async function saveAndSendWord(env, chatId, userId, word, context, { sharedCache = true } = {}) {
+    const card = await generateWordCard(env, word, context, sharedCache);
     const insertedWord = await env.DB.prepare(`
       INSERT INTO words (user_id, source_text, source_language, translation_uk, context_note)
       VALUES (?, ?, 'en', ?, ?)

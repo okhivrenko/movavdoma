@@ -32,7 +32,7 @@ Never commit or print these values:
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_WEBHOOK_SECRET`
 - `OPENAI_API_KEY`
-- `DEEPL_API_KEY` — currently no longer used by the latest card-generation flow, but remains configured in Cloudflare.
+- `DEEPL_API_KEY` — used for all English ↔ Ukrainian translations.
 - `MONOBANK_API_TOKEN` — personal Monobank API token used only to read the configured jar statement.
 
 Cloudflare runtime configuration is kept in the local, Git-ignored
@@ -146,11 +146,12 @@ date.
 
 ### Text translation
 
-`🌐 Перекласти текст` is an ephemeral Ukrainian ↔ English translation flow.
+`🌐 Перекласти текст` is an ephemeral Ukrainian ↔ English translation flow
+powered by DeepL.
 The user chooses the direction, then sends exactly one word, phrase, or
 sentence. The input is never added to the vocabulary. Each request is limited
 to 256 Unicode characters and each user can make up to 10 translations per
-local day; the D1 counter is claimed atomically before the OpenAI request.
+local day; the D1 counter is claimed atomically before the DeepL request.
 
 ### Support and bonuses
 
@@ -183,13 +184,17 @@ local day; the D1 counter is claimed atomically before the OpenAI request.
 - Ignore group chats; support private chats only.
 - Each user must see only their own words.
 
-## OpenAI integration
+## Translation and OpenAI integration
 
-- Model: `gpt-5.4-nano`
-- API: Chat Completions API with structured JSON output.
-- Reasoning effort: `none`.
-- Generate translation and examples in one OpenAI response so all content uses the same selected meaning.
-- Do not independently translate the word through another provider after the user selects a sense.
+- DeepL translates user text and every English vocabulary word/example into
+  Ukrainian with its quality-preferred model and the chosen word sense as
+  translation context.
+- OpenAI uses Chat Completions structured JSON only for English word senses and
+  English examples. The default word model is `gpt-5.4-mini` with `low`
+  reasoning; `OPENAI_WORD_MODEL` can override it without a code change.
+- Shared D1 tables cache senses by normalized word and cards by normalized
+  `word + chosen meaning`, so a later user reuses the same suggestions,
+  translation, and two examples instead of triggering another provider call.
 
 ## Access and cost control
 

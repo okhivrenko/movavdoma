@@ -20,7 +20,7 @@ async function handleAdd(env, text, { chatId, userId }, d, copy) {
     } catch (error) { logError("daily_addition_limit_check_failed", error); await d.sendMessage(env, chatId, copy.quotaCheckFailed); return true; }
     await d.closePendingSelection(env, userId);
     try {
-        if (explicitContext) { await d.saveAndSendWord(env, chatId, userId, word, explicitContext); return true; }
+        if (explicitContext) { await d.saveAndSendWord(env, chatId, userId, word, explicitContext, { sharedCache: false }); return true; }
         const senses = await d.suggestSenses(env, word);
         if (senses.length === 1) { await d.saveAndSendWord(env, chatId, userId, word, senses[0].context_en); return true; }
         const selection = await d.sendMessage(env, chatId, d.senseText(word, senses, 0), d.senseKeyboard(senses, 0));

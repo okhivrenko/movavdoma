@@ -66,3 +66,7 @@ slices and genuine blockers. It is not a stream of intentions.
   messages are stored independently and the admin panel shows separate lists
   of 10 entries with next/back navigation. Migration `0020` was applied before
   the Worker deployment.
+- Translation-quality slice released on 4 August 2026: DeepL now translates
+  English ↔ Ukrainian text and vocabulary-card content, while OpenAI generates
+  only senses and English examples with the stronger `gpt-5.4-mini` default.
+  Shared vocabulary cache migration `0021` was applied before deployment.

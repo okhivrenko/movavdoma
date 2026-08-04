@@ -20,10 +20,12 @@ EXPECTED_SCHEMA_COUNT="$(sqlite3 "$CHECK_DB" "
     (SELECT COUNT(*) FROM pragma_table_info('users') WHERE name = 'feedback_pending') +
     (SELECT COUNT(*) FROM pragma_table_info('users') WHERE name = 'feedback_kind') +
     (SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'user_messages') +
+    (SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'shared_word_senses') +
+    (SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'shared_vocabulary_cards') +
     (SELECT COUNT(*) FROM pragma_table_info('words') WHERE name = 'learned_at');
 ")"
 
-[ "$EXPECTED_SCHEMA_COUNT" = "8" ] || {
+[ "$EXPECTED_SCHEMA_COUNT" = "10" ] || {
   echo "Expected release schema is missing" >&2
   exit 1
 }
