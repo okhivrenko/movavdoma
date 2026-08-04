@@ -9,14 +9,21 @@ export const EN_TO_UK_INPUT_PARSER = Object.freeze({
             })
         );
 
+        // Operational logging (no secrets) for debugging parsing behavior
+        console.debug && console.debug(`[input-parser][en->uk] parseInput input="${String(input)}" separatorIndex=${separatorIndex}`);
+
         if (!Number.isFinite(separatorIndex)) {
-            return { word: input.trim(), explicitContext: "" };
+            const res = { word: input.trim(), explicitContext: "" };
+            console.debug && console.debug(`[input-parser][en->uk] result= ${JSON.stringify(res)}`);
+            return res;
         }
 
-        return {
+        const res = {
             word: input.slice(0, separatorIndex).trim(),
             explicitContext: input.slice(separatorIndex + 1).trim(),
         };
+        console.debug && console.debug(`[input-parser][en->uk] result= ${JSON.stringify(res)}`);
+        return res;
     }
 });
 

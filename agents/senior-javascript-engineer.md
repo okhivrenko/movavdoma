@@ -25,6 +25,13 @@ security-sensitive paths, Worker configuration, and production releases.
 
 ## Architecture and design checks
 
+- Add operational and documentation requirements:
+  - Instrument key feature lifecycle events with non-sensitive logging (console.debug/info). Log inputs and outputs for parsing, external API request/response status, and major decision points. Never log secrets or full external payloads that may include sensitive tokens.
+  - For significant feature or schema changes, add a short developer-facing doc in docs/ (for example, docs/MULTILANGUAGE_GUIDELINES.md) describing steps to add/enable a language, required migrations, and configuration overrides. Update IMPLEMENTATION_STATUS.md when a slice is completed.
+  - Prefer concise debug messages and guard logs with `console.debug` checks so production logs remain clean when DEBUG is disabled.
+
+
+
 - Keep webhook routing, Telegram/OpenAI I/O, D1 access, pure policies, and
   user-facing text in separate modules. Do not create circular imports.
 - Apply SOLID where it makes the code simpler:

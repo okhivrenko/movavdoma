@@ -4,10 +4,15 @@ export const PLURAL_RULES_UK = Object.freeze({
         const lastTwoDigits = count % 100;
         const lastDigit = count % 10;
 
-        if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return "слів";
-        if (lastDigit === 1) return "слово";
-        if (lastDigit >= 2 && lastDigit <= 4) return "слова";
-        return "слів";
+        let result;
+        if (lastTwoDigits >= 11 && lastTwoDigits <= 14) result = "слів";
+        else if (lastDigit === 1) result = "слово";
+        else if (lastDigit >= 2 && lastDigit <= 4) result = "слова";
+        else result = "слів";
+
+        // Debug log (do not log secrets)
+        console.debug && console.debug(`[plural-rules][uk] pluralForms count=${count} -> ${result}`);
+        return result;
     }
 });
 
