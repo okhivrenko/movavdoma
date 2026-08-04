@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 180">
+<g font-family="Arial, sans-serif" text-anchor="middle">
+  <g transform="translate(90,20)"><circle cx="0" cy="55" r="48" fill="#EAF5FF"/><text x="0" y="72" font-size="46">📘</text><text x="0" y="138" font-size="22" fill="#0A3A74" font-weight="700">Додавай слова</text></g>
+  <g transform="translate(270,20)"><circle cx="0" cy="55" r="48" fill="#FFF4D8"/><text x="0" y="72" font-size="46">💬</text><text x="0" y="138" font-size="22" fill="#0A3A74" font-weight="700">Переклад і приклади</text></g>
+  <g transform="translate(450,20)"><circle cx="0" cy="55" r="48" fill="#EAF5FF"/><text x="0" y="72" font-size="46">⏰</text><text x="0" y="138" font-size="22" fill="#0A3A74" font-weight="700">Щоденні нагадування</text></g>
+  <g transform="translate(630,20)"><circle cx="0" cy="55" r="48" fill="#FFF4D8"/><text x="0" y="72" font-size="46">🎓</text><text x="0" y="138" font-size="22" fill="#0A3A74" font-weight="700">Закріплюй знання</text></g>
+  <g transform="translate(810,20)"><circle cx="0" cy="55" r="48" fill="#EAF5FF"/><text x="0" y="72" font-size="46">🔒</text><text x="0" y="138" font-size="22" fill="#0A3A74" font-weight="700">Приватність</text></g>
+</g>
+</svg>

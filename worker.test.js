@@ -28,8 +28,9 @@ test("Worker exposes the landing and privacy page without accepting an unauthent
 
     const landing = await worker.fetch(new Request("https://example.test/"), env);
     assert.equal(landing.status, 200);
-    assert.match(await landing.text(), /Вивчай англійські слова легко та щодня — у Telegram/);
+    assert.match(await landing.text(), /Вивчай англійські слова легко та <em>щодня<\/em>/);
     assert.match(landing.headers.get("content-security-policy"), /default-src 'none'/);
+    assert.match(landing.headers.get("content-security-policy"), /style-src 'self' 'unsafe-inline'/);
     assert.equal(landing.headers.get("x-content-type-options"), "nosniff");
 
     const httpLanding = await worker.fetch(new Request("http://example.test/"), env);

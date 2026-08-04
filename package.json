@@ -1,6 +1,6 @@
 {
   "name": "movayakvdoma",
-  "version": "1.7.2",
+  "version": "1.8.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,5 +13,8 @@
     "check:migrations": "sh scripts/check-migrations.sh",
     "build": "npx --yes wrangler@latest deploy --dry-run --config wrangler.example.jsonc --outdir dist",
     "deploy": "npx --yes wrangler@latest deploy"
+  },
+  "devDependencies": {
+    "@picocss/pico": "^2.1.1"
   }
 }

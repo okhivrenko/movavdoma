@@ -29,37 +29,115 @@ export function landingPage({ brandName, publicWorkerUrl, content }) {
   <meta property="og:description" content="${description}">
   <meta property="og:url" content="${canonicalUrl}/">
   <link rel="icon" href="/favicon.png" type="image/png">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="/assets/vendor/pico.min.css">
+  <link rel="stylesheet" href="/assets/landing/landing.css">
   <title>${title}</title>
-  <style>
-    :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #12243b; background: #f9f2e6; }
-    * { box-sizing: border-box; } html { scroll-behavior: smooth; } body { margin: 0; line-height: 1.5; } a { color: inherit; } .wrap { width: min(1120px, calc(100% - 40px)); margin: auto; }
-    .hero { overflow: hidden; position: relative; padding: 24px 0 88px; background: #f9f2e6; } .hero::before, .hero::after { content: ""; position: absolute; z-index: 0; border-radius: 50%; background: #e9c75b; opacity: .28; } .hero::before { width: 440px; height: 440px; top: -250px; right: -145px; } .hero::after { width: 260px; height: 260px; bottom: -135px; left: -90px; }
-    .nav, .hero-grid, section { position: relative; z-index: 1; } .nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; } .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 1.1rem; font-weight: 800; letter-spacing: -.03em; text-decoration: none; } .brand img { width: 46px; height: 46px; object-fit: contain; border-radius: 50%; box-shadow: 0 3px 12px rgba(18, 36, 59, .12); } .brand span { color: #b57b00; } .nav a:not(.brand) { font-weight: 700; text-underline-offset: 4px; }
-    .hero-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 48px; align-items: center; padding-top: 80px; } .eyebrow { margin: 0 0 16px; color: #8f6200; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; font-size: .78rem; } h1, h2, h3 { line-height: 1.08; letter-spacing: -.045em; } h1 { max-width: 720px; margin: 0; font-size: clamp(2.8rem, 6vw, 5.4rem); } .lead { max-width: 610px; margin: 24px 0 32px; color: #3d5067; font-size: clamp(1.08rem, 2vw, 1.28rem); }
-    .button { display: inline-flex; align-items: center; justify-content: center; min-height: 52px; padding: 12px 22px; border-radius: 999px; background: #12243b; color: #fff; font-weight: 800; text-decoration: none; box-shadow: 0 7px 0 #0a1828; transition: transform .15s ease, box-shadow .15s ease; } .button:hover { transform: translateY(2px); box-shadow: 0 5px 0 #0a1828; } .button:focus-visible, a:focus-visible { outline: 3px solid #d59a00; outline-offset: 4px; }
-    .phone { width: min(100%, 330px); margin: auto; padding: 12px; border: 9px solid #12243b; border-radius: 40px; background: #fffdf9; box-shadow: 16px 16px 0 #e6bd3d; transform: rotate(3deg); } .phone-top { width: 34%; height: 7px; margin: 0 auto 18px; border-radius: 20px; background: #12243b; } .bubble { margin: 12px 0; padding: 14px; border-radius: 18px; background: #eaf0eb; color: #263a4d; font-size: .92rem; } .bubble.bot { margin-left: 18px; background: #fff0bd; } .bubble strong { display: block; margin-bottom: 4px; } .pill { display: inline-block; margin-top: 8px; padding: 5px 9px; border-radius: 99px; background: #12243b; color: #fff; font-size: .77rem; font-weight: 700; }
-    section { padding: 88px 0; } .section-label { color: #8f6200; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; font-size: .78rem; } h2 { max-width: 720px; margin: 10px 0 18px; font-size: clamp(2rem, 4vw, 3.3rem); } .section-copy { max-width: 700px; margin: 0; color: #44556a; font-size: 1.1rem; }
-    .steps, .features { display: grid; gap: 16px; margin-top: 36px; } .steps { grid-template-columns: repeat(4, 1fr); } .features { grid-template-columns: repeat(3, 1fr); } .card { padding: 26px; border: 1px solid #e4d9c6; border-radius: 24px; background: #fffdf8; } .number { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #e9c75b; font-weight: 900; } h3 { margin: 18px 0 8px; font-size: 1.3rem; } .card p { margin: 0; color: #506176; }
-    .soft { background: #eaf0eb; } .audience { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; } .quote { padding: 28px; border-left: 7px solid #e1ae1a; background: #fffdf8; border-radius: 0 20px 20px 0; font-size: 1.24rem; font-weight: 700; } .trust { border-top: 1px solid #dfd4c2; } .trust a { color: #12243b; font-weight: 800; } .final { text-align: center; background: #12243b; color: #fff; } .final h2 { margin-right: auto; margin-left: auto; } .final p { max-width: 620px; margin: 0 auto 30px; color: #dce5ef; font-size: 1.08rem; } .final .button { background: #e9c75b; color: #12243b; box-shadow: 0 7px 0 #af8410; } footer { padding: 26px 0; color: #526277; font-size: .9rem; background: #f9f2e6; }
-    @media (max-width: 760px) { .wrap { width: min(100% - 32px, 620px); } .hero { padding-bottom: 64px; } .hero-grid, .audience { grid-template-columns: 1fr; gap: 32px; padding-top: 56px; } .phone { max-width: 300px; } .steps, .features { grid-template-columns: 1fr; } section { padding: 64px 0; } .nav a:not(.brand) { font-size: .9rem; } } @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .button { transition: none; } }
-  </style>
 </head>
 <body>
-  <header class="hero"><div class="wrap">
-    <nav aria-label="Головна навігація"><a class="brand" href="/"><img src="/assets/movayakvdoma-logo-mark.png" width="46" height="46" alt="Логотип MovaYakVDoma">Mova<span>Yak</span>VDoma</a><a href="#how-it-works">Як це працює</a></nav>
-    <div class="hero-grid"><div><p class="eyebrow">Англійська у звичному місці</p><h1>Вивчай англійські слова легко та щодня — у Telegram</h1><p class="lead">${brand} допомагає додати слово, зрозуміти його значення, побачити живі приклади й повертатися до словника щодня.</p><a class="button" href="${botUrl}" target="_blank" rel="noopener noreferrer">Відкрити бота в Telegram <span aria-hidden="true">→</span></a></div>
-    <div class="phone" aria-label="Приклад діалогу з ботом"><div class="phone-top"></div><div class="bubble"><strong>Додати слово: charge</strong>Обери значення, яке тобі потрібне.</div><div class="bubble bot"><strong>charge — плата</strong>There is an extra charge for delivery.<br><span class="pill">Додати до словника</span></div><div class="bubble">Тепер це слово є у твоєму словнику ✨</div></div></div>
-  </div></header>
+  <header class="site-header">
+    <nav class="container nav" aria-label="Головна навігація">
+      <a class="wordmark" href="/" aria-label="MovaYakVDoma — головна">
+        <img src="/assets/landing/book_house.svg" width="54" height="54" alt="">
+        <span><strong>Mova<span>Yak</span>VDoma</strong><small>Твій англійський словник</small></span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">Можливості</a>
+        <a href="#how-it-works">Як це працює?</a>
+        <a href="#audience">Для кого?</a>
+        <a href="#faq">FAQ</a>
+      </div>
+      <a class="nav-cta" href="${botUrl}" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">➤</span> Спробувати бота</a>
+    </nav>
+  </header>
+
   <main>
-    <section><div class="wrap"><p class="section-label">Менше перемикань</p><h2>Не потрібні окремі словник, перекладач і трекер звичок</h2><p class="section-copy">Усе найважливіше для короткої щоденної практики — в одному Telegram-боті. Додавай слова, коли вони трапляються, і повертайся до них у зручному темпі.</p></div></section>
-    <section class="soft" id="how-it-works"><div class="wrap"><p class="section-label">Простий ритуал</p><h2>Як це працює</h2><div class="steps"><article class="card"><span class="number">1</span><h3>Відкрий бота</h3><p>Натисни «Відкрити бота в Telegram» і почни з команди <code>/start</code>.</p></article><article class="card"><span class="number">2</span><h3>Натисни «Додати слово»</h3><p>Або просто надішли англійське слово чи фразу в чат.</p></article><article class="card"><span class="number">3</span><h3>Уточни значення за потреби</h3><p>Додай контекст після <code>/</code>, наприклад: <code>charge / payment for a service</code>.</p></article><article class="card"><span class="number">4</span><h3>Отримай картку</h3><p>Бот збереже вибране значення, переклад і два приклади у твій словник.</p></article></div></div></section>
-    <section><div class="wrap"><p class="section-label">Уже в боті</p><h2>Інструменти, які підтримують навчання</h2><div class="features"><article class="card"><h3>Твій словник</h3><p>Зберігай слова, переглядай приклади та позначай вивчене.</p></article><article class="card"><h3>Щоденне слово</h3><p>Отримуй нові картки у своєму темпі й відповідно до обраного рівня.</p></article><article class="card"><h3>Переклад тексту</h3><p>Перекладай короткі фрази між українською та англійською без додавання до словника.</p></article><article class="card"><h3>Нагадування</h3><p>Обери зручний час і часовий пояс для щоденної практики.</p></article><article class="card"><h3>Значення без плутанини</h3><p>Кожна картка створюється для одного вибраного значення слова.</p></article><article class="card"><h3>Маленькі кроки</h3><p>Не треба чекати на довге заняття: достатньо одного слова зараз.</p></article></div></div></section>
-    <section class="soft"><div class="wrap audience"><div><p class="section-label">Для кого</p><h2>Для тих, хто хоче зробити англійську частиною дня</h2><p class="section-copy">Якщо слова трапляються в роботі, серіалах, книжках чи розмовах — не відкладай їх «на потім». Збережи зараз і повернися тоді, коли зручно.</p></div><p class="quote">«Замість ще одного курсу — спокійна щоденна звичка, яка живе у твоєму Telegram.»</p></div></section>
-    <section class="trust"><div class="wrap"><p class="section-label">Приватність</p><h2>Твій словник належить тобі</h2><p class="section-copy">Слова та навчальні налаштування ізольовані для кожного Telegram-користувача. Детально про обробку даних — у <a href="/privacy">політиці приватності</a>.</p></div></section>
-    <section class="final"><div class="wrap"><p class="section-label">Почни з одного слова</p><h2>Відкрий MovaYakVDoma у Telegram</h2><p>Без нових застосунків і складного старту. Просто надішли перше слово.</p><a class="button" href="${botUrl}" target="_blank" rel="noopener noreferrer">Перейти до бота <span aria-hidden="true">→</span></a></div></section>
+    <section class="hero">
+      <img class="hero-clouds" src="/assets/landing/clouds.svg" alt="" aria-hidden="true">
+      <img class="hero-fields" src="/assets/landing/field_waves.svg" alt="" aria-hidden="true">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">Англійська щодня у Telegram</p>
+          <h1>Вивчай англійські слова легко та <em>щодня</em></h1>
+          <p class="hero-lead">${brand} — твій персональний Telegram-бот для вивчення слів: точний переклад, два приклади, власний словник і зручні нагадування.</p>
+          <a class="asset-cta" href="${botUrl}" target="_blank" rel="noopener noreferrer">
+            <img src="/assets/landing/telegram_cta.svg" alt="Спробувати бота в Telegram">
+          </a>
+          <p class="trust-line"><span aria-hidden="true">🛡️</span> Безпечно. Конфіденційно. Тільки для тебе.</p>
+        </div>
+        <div class="hero-visual" aria-label="Приклад роботи MovaYakVDoma у Telegram">
+          <img class="hero-wheat" src="/assets/landing/hero_wheat.svg" alt="" aria-hidden="true">
+          <div class="phone">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="chat-head"><strong>MovaYakVDoma</strong><small>бот</small></div>
+              <div class="chat bubble">Привіт! 👋<br>Я твій помічник у вивченні англійських слів.</div>
+              <div class="chat user">resilient</div>
+              <div class="chat bubble word-card"><strong>resilient 🔊</strong><small>стійкий, витривалий</small><b>Наприклад:</b><span>She showed incredible resilience during tough times.</span><span>Resilient people bounce back stronger.</span></div>
+              <div class="bot-menu"><span>＋ Додати слово</span><span>📚 Мої слова</span><span>📅 Щоденне слово</span><span>🎓 Вивчені слова</span><span>⚙️ Налаштування</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="features section" id="features">
+      <div class="container">
+        <div class="section-heading"><p>Усе в одному чаті</p><h2>Що вміє бот?</h2><span></span></div>
+        <div class="feature-grid">
+          <article class="feature-card"><div class="feature-icon blue" aria-hidden="true">📖</div><h3>Додавай слова за секунди</h3><p>Просто надішли слово — бот зробить усе інше.</p></article>
+          <article class="feature-card"><div class="feature-icon gold" aria-hidden="true">🔤</div><h3>Точний переклад і приклади</h3><p>Переклад і два приклади речень українською.</p></article>
+          <article class="feature-card"><div class="feature-icon blue" aria-hidden="true">🗓️</div><h3>Щоденні слова та нагадування</h3><p>Обери час і рівень — бот нагадає про навчання.</p></article>
+          <article class="feature-card"><div class="feature-icon gold" aria-hidden="true">🎓</div><h3>Вивчені слова під контролем</h3><p>Позначай вивчене та повертай слова, коли треба.</p></article>
+          <article class="feature-card"><div class="feature-icon blue" aria-hidden="true">📈</div><h3>Розумне повторення (скоро)</h3><p>Плануємо систему, яка допомагатиме закріплювати матеріал.</p></article>
+          <article class="feature-card"><div class="feature-icon gold" aria-hidden="true">🔒</div><h3>Тільки твої дані</h3><p>Словник ізольований і не доступний іншим користувачам.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="steps section" id="how-it-works">
+      <div class="container">
+        <div class="section-heading"><p>П'ять простих кроків</p><h2>Як це працює?</h2><span></span></div>
+        <ol class="step-list">
+          <li><div class="step-icon">➤</div><h3>Запусти бота</h3><p>Натисни кнопку та відкрий бот у Telegram.</p></li>
+          <li><div class="step-icon">＋</div><h3>Додай слово</h3><p>Надішли англійське слово або фразу.</p></li>
+          <li><div class="step-icon">📘</div><h3>Отримай переклад</h3><p>Бот надасть переклад і приклади вживання.</p></li>
+          <li><div class="step-icon">✓</div><h3>Вчи щодня</h3><p>Повертайся до слів або отримуй нагадування.</p></li>
+          <li><div class="step-icon">🏅</div><h3>Закріплюй знання</h3><p>Щоденна практика допомагає не забути.</p></li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="audience section" id="audience">
+      <div class="container audience-grid">
+        <div><p class="eyebrow">Для кого?</p><h2>Для тих, хто хоче зробити англійську частиною дня</h2></div>
+        <p>Для роботи, подорожей, навчання чи улюблених серіалів — зберігай нові слова одразу й повертайся до них у власному темпі.</p>
+      </div>
+    </section>
+
+    <section class="cta-section section">
+      <div class="container cta-banner">
+        <img src="/assets/landing/book_house.svg" width="150" height="150" alt="Логотип MovaYakVDoma">
+        <div><h2>Почни вчити англійські слова <em>вже сьогодні</em></h2><p>${brand} — твій щоденний крок до кращої англійської.</p><a class="primary-cta" href="${botUrl}" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">➤</span> Спробувати бота в Telegram</a><small>Безкоштовний старт займає менше хвилини.</small></div>
+      </div>
+    </section>
+
+    <section class="faq section" id="faq">
+      <div class="container faq-wrap">
+        <div class="section-heading"><p>Коротко про головне</p><h2>FAQ</h2><span></span></div>
+        <details><summary>Чи потрібно встановлювати окремий застосунок?</summary><p>Ні. MovaYakVDoma працює у Telegram — достатньо відкрити бот і надіслати слово.</p></details>
+        <details><summary>Що зберігає бот?</summary><p>Твій словник, приклади, навчальний прогрес і налаштування нагадувань. Деталі є у <a href="/privacy">політиці приватності</a>.</p></details>
+        <details><summary>Чи можу я додати конкретне значення слова?</summary><p>Так. Додай контекст після <code>/</code>, наприклад: <code>charge / payment for a service</code>.</p></details>
+      </div>
+    </section>
   </main>
-  <footer><div class="wrap">© 2026 ${brand}. Англійські слова — ближче до дому.</div></footer>
+
+  <footer class="site-footer">
+    <div class="container footer-grid">
+      <a class="wordmark compact" href="/"><img src="/assets/landing/book_house.svg" width="42" height="42" alt=""><span><strong>Mova<span>Yak</span>VDoma</strong><small>Твій англійський словник</small></span></a>
+      <nav aria-label="Навігація в підвалі"><a href="#faq">FAQ</a><a href="/privacy">Політика конфіденційності</a><a href="${botUrl}" target="_blank" rel="noopener noreferrer">Telegram</a></nav>
+      <p>© 2026 ${brand}<br>Усі права захищені</p>
+    </div>
+  </footer>
 </body>
 </html>`;
 }

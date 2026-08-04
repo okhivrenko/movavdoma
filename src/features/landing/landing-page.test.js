@@ -21,11 +21,16 @@ test("landing has a canonical URL, official bot CTA, and privacy link", () => {
     assert.match(page, /href="https:\/\/t\.me\/movayakvdoma_bot"/);
     assert.match(page, /href="\/privacy"/);
     assert.match(page, /rel="icon" href="\/favicon\.png"/);
-    assert.match(page, /@picocss\/pico@2\/css\/pico\.min\.css/);
-    assert.match(page, /\/assets\/movayakvdoma-logo-mark\.png/);
-    assert.match(page, /Натисни «Додати слово»/);
+    assert.match(page, /\/assets\/vendor\/pico\.min\.css/);
+    assert.doesNotMatch(page, /cdn\.jsdelivr\.net/);
+    assert.match(page, /\/assets\/landing\/book_house\.svg/);
+    assert.match(page, /<h3>Додай слово<\/h3>/);
     assert.match(page, /charge \/ payment for a service/);
-    assert.match(page, /Вивчай англійські слова легко та щодня — у Telegram/);
+    assert.match(page, /Вивчай англійські слова легко та <em>щодня<\/em>/);
+    assert.match(page, /\/assets\/landing\/field_waves\.svg/);
+    assert.match(page, /\/assets\/landing\/hero_wheat\.svg/);
+    assert.match(page, /\/assets\/landing\/landing\.css/);
+    assert.doesNotMatch(page, /QR|qr-code/i);
 });
 
 test("landing escapes configured text before inserting it into HTML", () => {

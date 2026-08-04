@@ -203,7 +203,7 @@ function publicHtmlResponse(page) {
     return new Response(page, {
         headers: {
             "content-type": "text/html; charset=UTF-8",
-            "content-security-policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline' https://cdn.jsdelivr.net; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+            "content-security-policy": "default-src 'none'; img-src 'self'; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
             "referrer-policy": "strict-origin-when-cross-origin",
             "x-content-type-options": "nosniff",
         },
