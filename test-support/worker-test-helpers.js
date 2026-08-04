@@ -64,7 +64,7 @@ export class WorkerTestDb {
             this.interfaceVersion = parameters[0];
             return { meta: { changes: 1 } };
         }
-        if (query.includes("UPDATE users SET last_seen_at")) {
+        if (query.includes("last_seen_at = CURRENT_TIMESTAMP")) {
             this.lastSeenUpdates += 1;
             return { meta: { changes: 1 } };
         }
@@ -123,12 +123,19 @@ export function privateMessageUpdate({ updateId = 1, userId = 123, chatId = user
     };
 }
 
-export function privateCallbackUpdate({ updateId = 1, userId = 123, chatId = userId, data }) {
+export function privateCallbackUpdate({
+    updateId = 1,
+    userId = 123,
+    chatId = userId,
+    data,
+    username = "olena",
+    firstName = "Олена",
+}) {
     return {
         update_id: updateId,
         callback_query: {
             id: `callback-${updateId}`,
-            from: { id: userId },
+            from: { id: userId, username, first_name: firstName },
             data,
             message: { message_id: 7, chat: { id: chatId, type: "private" } },
         },

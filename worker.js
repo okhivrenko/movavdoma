@@ -246,8 +246,22 @@ export default {
                 return new Response("ok");
             }
 
-            await env.DB.prepare("UPDATE users SET last_seen_at = CURRENT_TIMESTAMP WHERE telegram_user_id = ?")
-                .bind(userId)
+            // Button-only interactions still carry the Telegram profile. Fill only
+            // missing fields so an absent username can never erase known data.
+            await env.DB.prepare(`
+                UPDATE users SET
+                  last_seen_at = CURRENT_TIMESTAMP,
+                  telegram_username = CASE
+                    WHEN NULLIF(TRIM(telegram_username), '') IS NULL THEN ?
+                    ELSE telegram_username
+                  END,
+                  telegram_first_name = CASE
+                    WHEN NULLIF(TRIM(telegram_first_name), '') IS NULL THEN ?
+                    ELSE telegram_first_name
+                  END
+                WHERE telegram_user_id = ?
+            `)
+                .bind(callback.from.username ?? null, callback.from.first_name ?? null, userId)
                 .run();
             await refreshInterfaceIfNeeded(env, chatId, userId);
 

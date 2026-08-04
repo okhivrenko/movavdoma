@@ -180,3 +180,25 @@ test("duplicate Telegram updates are idempotent and group chats are ignored", as
     const group = await captureTelegramCalls(() => worker.fetch(webhookRequest(groupUpdate), env));
     assert.equal(group.calls.length, 0);
 });
+
+test("callback interactions fill missing Telegram profile fields without overwriting existing data", async () => {
+    const db = new WorkerTestDb({ interfaceVersion: 12 });
+    const { response } = await captureTelegramCalls(() => worker.fetch(
+        webhookRequest(privateCallbackUpdate({
+            updateId: 14,
+            data: "dailysettings:time",
+            username: null,
+            firstName: "Ірина",
+        })),
+        workerEnv(db)
+    ));
+
+    assert.equal(response.status, 200);
+    const profileUpdate = db.calls.find((call) =>
+        call.method === "run" && call.query?.includes("telegram_first_name = CASE")
+    );
+    assert.ok(profileUpdate);
+    assert.match(profileUpdate.query, /NULLIF\(TRIM\(telegram_username\), ''\) IS NULL/);
+    assert.match(profileUpdate.query, /NULLIF\(TRIM\(telegram_first_name\), ''\) IS NULL/);
+    assert.deepEqual(profileUpdate.parameters, [null, "Ірина", 123]);
+});
