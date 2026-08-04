@@ -32,6 +32,11 @@ test("Worker exposes the landing and privacy page without accepting an unauthent
     assert.match(landing.headers.get("content-security-policy"), /default-src 'none'/);
     assert.equal(landing.headers.get("x-content-type-options"), "nosniff");
 
+    const favicon = await worker.fetch(new Request("https://example.test/favicon.svg"), env);
+    assert.equal(favicon.status, 200);
+    assert.equal(favicon.headers.get("content-type"), "image/svg+xml; charset=UTF-8");
+    assert.match(await favicon.text(), /viewBox="0 0 96 96"/);
+
     const privacy = await worker.fetch(new Request("https://example.test/privacy"), env);
     assert.equal(privacy.status, 200);
     assert.match(await privacy.text(), /Privacy Policy for MovaYakVDoma/);
