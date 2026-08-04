@@ -14,6 +14,7 @@ export class WorkerTestDb {
             daily_level: "A0",
         };
         this.interfaceVersion = interfaceVersion;
+        this.lastSeenUpdates = 0;
         this.processedUpdates = new Set();
         this.calls = [];
     }
@@ -58,6 +59,10 @@ export class WorkerTestDb {
         if (query.includes("INSERT INTO users")) return { meta: { changes: 1 } };
         if (query.includes("UPDATE users SET interface_version")) {
             this.interfaceVersion = parameters[0];
+            return { meta: { changes: 1 } };
+        }
+        if (query.includes("UPDATE users SET last_seen_at")) {
+            this.lastSeenUpdates += 1;
             return { meta: { changes: 1 } };
         }
         if (query.includes("UPDATE users SET feedback_pending = 0")) {

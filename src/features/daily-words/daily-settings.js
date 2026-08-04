@@ -55,6 +55,13 @@ export function timezoneGmtOffset(timezone, date = new Date()) {
     }
 }
 
+export function timezoneOffsetMinutes(timezone, date = new Date()) {
+    const match = timezoneGmtOffset(timezone, date).match(/^GMT(?:(\+|-)(\d{1,2})(?::(\d{2}))?)?$/);
+    if (!match) return 0;
+    const minutes = Number(match[2] ?? 0) * 60 + Number(match[3] ?? 0);
+    return match[1] === "-" ? -minutes : minutes;
+}
+
 export function timezoneDisplayLabel(timezone, date = new Date()) {
     return `${timezoneLabel(timezone)} · ${timezone} (${timezoneGmtOffset(timezone, date)})`;
 }
@@ -93,14 +100,16 @@ export function dailyLevelKeyboard() {
     };
 }
 
-export function dailyTimezoneKeyboard(page = 0) {
+export function dailyTimezoneKeyboard(page = 0, date = new Date()) {
     const totalPages = Math.ceil(DAILY_TIMEZONE_OPTIONS.length / TIMEZONE_PAGE_SIZE);
     const safePage = Number.isInteger(page) && page >= 0 && page < totalPages ? page : 0;
-    const options = DAILY_TIMEZONE_OPTIONS.slice(safePage * TIMEZONE_PAGE_SIZE, (safePage + 1) * TIMEZONE_PAGE_SIZE);
+    const options = [...DAILY_TIMEZONE_OPTIONS]
+        .sort((left, right) => timezoneOffsetMinutes(left.id, date) - timezoneOffsetMinutes(right.id, date))
+        .slice(safePage * TIMEZONE_PAGE_SIZE, (safePage + 1) * TIMEZONE_PAGE_SIZE);
     const rows = [];
     for (const option of options) {
         rows.push([{
-            text: timezoneDisplayLabel(option.id),
+            text: timezoneDisplayLabel(option.id, date),
             callback_data: `dailytimezone:${option.id}`,
         }]);
     }

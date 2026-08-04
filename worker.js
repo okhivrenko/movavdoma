@@ -246,6 +246,9 @@ export default {
                 return new Response("ok");
             }
 
+            await env.DB.prepare("UPDATE users SET last_seen_at = CURRENT_TIMESTAMP WHERE telegram_user_id = ?")
+                .bind(userId)
+                .run();
             await refreshInterfaceIfNeeded(env, chatId, userId);
 
             if (await handleAdminCallback(env, callback, { chatId, messageId, userId }, {
@@ -310,12 +313,13 @@ export default {
 
         await env.DB
             .prepare(`
-        INSERT INTO users (telegram_user_id, chat_id, timezone, daily_time, daily_level, telegram_username, telegram_first_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO users (telegram_user_id, chat_id, timezone, daily_time, daily_level, telegram_username, telegram_first_name, last_seen_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(telegram_user_id)
         DO UPDATE SET chat_id = excluded.chat_id, is_active = 1,
           telegram_username = excluded.telegram_username,
-          telegram_first_name = excluded.telegram_first_name
+          telegram_first_name = excluded.telegram_first_name,
+          last_seen_at = CURRENT_TIMESTAMP
       `)
             .bind(
                 userId,

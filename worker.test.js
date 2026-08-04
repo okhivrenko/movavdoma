@@ -60,6 +60,7 @@ test("/start shows the saved schedule and the first menu page", async () => {
         message.reply_markup.keyboard[2].map((button) => button.text),
         ["🌐 Перекласти текст", "⏰ Налаштування\n(18:00 - C1)"]
     );
+    assert.ok(db.calls.some((call) => call.query?.includes("last_seen_at")));
 });
 
 test("/menu and Ukrainian menu buttons use navigation routing", async () => {
@@ -141,7 +142,7 @@ test("daily settings can be changed in two steps and keep the settings menu visi
         webhookRequest(privateCallbackUpdate({ updateId: 5, data: "dailysettings:timezone" })), env
     ));
     const timezonePicker = telegramCall(chooseTimezone.calls, "editMessageText");
-    assert.equal(timezonePicker.reply_markup.inline_keyboard[0][0].callback_data, "dailytimezone:Europe/Kyiv");
+    assert.equal(timezonePicker.reply_markup.inline_keyboard[0][0].callback_data, "dailytimezone:America/Los_Angeles");
 
     const savedTimezone = await captureTelegramCalls(() => worker.fetch(
         webhookRequest(privateCallbackUpdate({ updateId: 6, data: "dailytimezone:America/New_York" })), env
@@ -165,6 +166,12 @@ test("duplicate Telegram updates are idempotent and group chats are ignored", as
     const second = await captureTelegramCalls(() => worker.fetch(webhookRequest(update), env));
     assert.equal(first.calls.length, 1);
     assert.equal(second.calls.length, 0);
+
+    const callback = await captureTelegramCalls(() => worker.fetch(
+        webhookRequest(privateCallbackUpdate({ updateId: 13, data: "dailysettings:time" })), env
+    ));
+    assert.equal(callback.response.status, 200);
+    assert.equal(db.lastSeenUpdates, 1);
 
     const groupUpdate = {
         update_id: 12,

@@ -16,7 +16,7 @@ export function adminKeyboard() {
 }
 
 export function adminHelpText() {
-    return "🛠 Адмін-панель\n\n• 👥 Список користувачів — усі користувачі, по 25 на сторінці, з ID, ім’ям, ніком, лімітами та кількістю активних слів.\n• 🔗 Посилання на бота — показує пряме посилання, яке можна скопіювати або переслати.\n• /grant <userId> <ліміт> — встановити ліміт додавання слів на 1 місяць.\n  Приклад: /grant 123456789 45\n• /level <userId> <0-3> — постійно підвищити рівень доступу. Щоденні картки: 0→5, 1→10, 2→15, 3→20.\n  Приклад: /level 123456789 2\n• /testlevel <userId> — видати тестовий рівень 1 на 1 день.\n  Приклад: /testlevel 123456789\n• 🎁 Заявки на донати приходять окремими картками з кнопками підтвердження.";
+    return "🛠 Адмін-панель\n\n• 👥 Список користувачів — усі користувачі, по 25 на сторінці, з ID, ім’ям, ніком, лімітами, кількістю активних слів і останньою активністю.\n• 🔗 Посилання на бота — показує пряме посилання, яке можна скопіювати або переслати.\n• /grant <userId> <ліміт> — встановити ліміт додавання слів на 1 місяць.\n  Приклад: /grant 123456789 45\n• /level <userId> <0-3> — постійно підвищити рівень доступу. Щоденні картки: 0→5, 1→10, 2→15, 3→20.\n  Приклад: /level 123456789 2\n• /testlevel <userId> — видати тестовий рівень 1 на 1 день.\n  Приклад: /testlevel 123456789\n• 🎁 Заявки на донати приходять окремими картками з кнопками підтвердження.";
 }
 
 function compactAdminNumber(value) {
@@ -29,6 +29,19 @@ function compactProfileField(value, maxLength) {
     const text = String(value ?? "").trim();
     if (!text) return null;
     return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+}
+
+export function lastActivityLabel(value, now = Date.now()) {
+    if (!value) return "—";
+    const text = String(value);
+    const timestamp = Date.parse(text.includes("T") ? text : `${text.replace(" ", "T")}Z`);
+    if (!Number.isFinite(timestamp)) return "—";
+    const minutes = Math.max(0, Math.floor((now - timestamp) / 60_000));
+    if (minutes < 1) return "щойно";
+    if (minutes < 60) return `${minutes}хв`;
+    if (minutes < 24 * 60) return `${Math.floor(minutes / 60)}г`;
+    if (minutes < 7 * 24 * 60) return `${Math.floor(minutes / (24 * 60))}д`;
+    return new Intl.DateTimeFormat("uk-UA", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Kyiv" }).format(timestamp);
 }
 
 function adminUserListKeyboard(page, totalPages) {
@@ -49,11 +62,11 @@ export async function sendAdminUserList(env, chatId, requestedPage = 0, messageI
     const totalPages = Math.ceil(total / ADMIN_USER_LIST_LIMIT);
     const page = Math.min(Math.max(requestedPage, 0), totalPages - 1);
     const result = await env.DB.prepare(`
-      SELECT u.telegram_user_id, u.telegram_username, u.telegram_first_name,
+      SELECT u.telegram_user_id, u.telegram_username, u.telegram_first_name, u.last_seen_at,
         (SELECT COUNT(*) FROM words w WHERE w.user_id = u.telegram_user_id AND w.is_active = 1) AS active_word_count,
         (SELECT daily_limit FROM user_daily_limits l WHERE l.user_id = u.telegram_user_id AND l.expires_at > CURRENT_TIMESTAMP) AS bonus_daily_limit,
         MAX(COALESCE((SELECT access_level FROM user_access_levels a WHERE a.user_id = u.telegram_user_id), 0), COALESCE((SELECT MAX(access_level) FROM user_temporary_access_grants g WHERE g.user_id = u.telegram_user_id AND g.expires_at > CURRENT_TIMESTAMP), 0)) AS access_level
-      FROM users u ORDER BY u.created_at DESC LIMIT ? OFFSET ?
+      FROM users u ORDER BY u.last_seen_at DESC, u.created_at DESC LIMIT ? OFFSET ?
     `).bind(ADMIN_USER_LIST_LIMIT, page * ADMIN_USER_LIST_LIMIT).all();
 
     const text = result.results.map((user, index) => {
@@ -61,7 +74,7 @@ export async function sendAdminUserList(env, chatId, requestedPage = 0, messageI
         const username = compactProfileField(user.telegram_username, 32);
         const firstName = compactProfileField(user.telegram_first_name, 32);
         const profile = [username && `@${username.replace(/^@/, "")}`, firstName].filter(Boolean).join(" · ");
-        return `${page * ADMIN_USER_LIST_LIMIT + index + 1}. ID ${user.telegram_user_id}${profile ? ` · ${profile}` : ""} · слів: ${compactAdminNumber(user.active_word_count)} · ліміт: ${dailyLimit} · рівень: ${user.access_level}`;
+        return `${page * ADMIN_USER_LIST_LIMIT + index + 1}. ID ${user.telegram_user_id}${profile ? ` · ${profile}` : ""} · слів: ${compactAdminNumber(user.active_word_count)} · ліміт: ${dailyLimit} · рівень: ${user.access_level} · був: ${lastActivityLabel(user.last_seen_at)}`;
     }).join("\n");
     const listText = `👥 Користувачі: ${total}\nСторінка ${page + 1} з ${totalPages}\n\n${text}\n\nЩоб змінити ліміт: /grant userId ліміт`;
     const keyboard = adminUserListKeyboard(page, totalPages);

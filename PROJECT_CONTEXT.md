@@ -67,8 +67,8 @@ the current time and level, then leads to:
 The admin also sees `🛠 Адмін`, which opens an admin-only panel with a paginated
 user list, the `/grant <userId> <dailyLimit>` format, and a summary of
 admin-only commands. It can also show a copyable direct bot link. The user
-list includes Telegram IDs, names, usernames, active-word count, and the
-current daily limit (25 users per page).
+list includes Telegram IDs, names, usernames, active-word count, current daily
+limit, access level, and last bot interaction (25 users per page).
 
 Users can simply send an English word or phrase; `/add` remains supported.
 The currently active card direction is English → Ukrainian. The architecture also

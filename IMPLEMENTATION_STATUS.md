@@ -57,3 +57,7 @@ slices and genuine blockers. It is not a stream of intentions.
   check` passed with 60 tests. Migration `0018` and this UI update were
   deployed to production; the D1 journal has no pending migrations and the
   public Worker returned HTTP 200.
+- Admin activity-monitoring slice verified locally on 4 August 2026: the user
+  directory shows the latest private bot interaction and sorts by it. `npm run
+  check` passed with 61 tests. Migration `0019` must be applied remotely before
+  deploying this slice.

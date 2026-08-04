@@ -12,6 +12,7 @@ import {
     dailyTimezoneKeyboard,
     timezoneDisplayLabel,
     timezoneGmtOffset,
+    timezoneOffsetMinutes,
 } from "./daily-settings.js";
 
 test("daily settings expose every CEFR level and all 24 whole-hour times", () => {
@@ -34,14 +35,21 @@ test("daily settings menu preserves both choices after any individual change", (
     assert.match(dailySettingsText(settings), /Київ/);
 });
 
-test("timezone picker paginates whitelisted IANA zones", () => {
+test("timezone picker sorts whitelisted IANA zones from negative to positive offsets", () => {
+    const date = new Date("2026-08-04T12:00:00Z");
     assert.equal(DAILY_TIMEZONE_OPTIONS[0].id, "Europe/Kyiv");
     assert.ok(DAILY_TIMEZONE_OPTIONS.length > 20);
     assert.deepEqual(
-        dailyTimezoneKeyboard().inline_keyboard[0].map((button) => button.callback_data),
-        ["dailytimezone:Europe/Kyiv"]
+        dailyTimezoneKeyboard(0, date).inline_keyboard[0].map((button) => button.callback_data),
+        ["dailytimezone:America/Los_Angeles"]
     );
-    const secondPage = dailyTimezoneKeyboard(1).inline_keyboard;
+    const allTimezones = Array.from({ length: 5 }, (_, page) => dailyTimezoneKeyboard(page, date).inline_keyboard)
+        .flat().flatMap((row) => row.filter((button) => button.callback_data.startsWith("dailytimezone:")).map((button) => button.callback_data.replace("dailytimezone:", "")));
+    assert.deepEqual(
+        allTimezones.map((timezone) => timezoneOffsetMinutes(timezone, date)),
+        [...allTimezones.map((timezone) => timezoneOffsetMinutes(timezone, date))].sort((left, right) => left - right)
+    );
+    const secondPage = dailyTimezoneKeyboard(1, date).inline_keyboard;
     assert.ok(secondPage.flat().some((button) => button.callback_data === "dailytimezonepage:0"));
     assert.ok(secondPage.flat().some((button) => button.callback_data === "dailytimezonepage:2"));
 });
