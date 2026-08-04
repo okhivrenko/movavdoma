@@ -1,5 +1,5 @@
 export const landing = Object.freeze({
-    title: "MovaYakVDoma — англійські слова щодня у Telegram",
-    description: "Додавайте англійські слова, розумійте значення, повторюйте щодня та зберігайте власний словник у Telegram.",
-    botUrl: "https://t.me/movayakvdoma_bot",
+    title: "Вивчення англійських слів у Telegram — MovaYakVDoma",
+    description: "Безкоштовний Telegram-бот для вивчення англійських слів: точний переклад, два приклади, особистий словник і щоденні нагадування.",
+    botUrl: "https://t.me/MovaVDomaBot",
 });

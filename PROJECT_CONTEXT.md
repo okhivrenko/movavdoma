@@ -19,8 +19,13 @@ Users add words through Telegram. The bot:
 - Worker name: `movayakvdoma`
 - Public URL: `https://movayakvdoma.com/`
 - `GET /` serves the public Ukrainian landing page; `GET /privacy` serves the
-  privacy policy. Both pages are static server-rendered HTML with no trackers
-  or data collection; the Telegram webhook remains POST-only and authenticated.
+  privacy policy. Both pages use server-rendered HTML; the landing loads the
+  consent-managed Google Analytics tag `G-7S3RWCWPV3` only after an explicit
+  opt-in and records page views plus Telegram CTA clicks. The Telegram webhook
+  remains POST-only and authenticated.
+- Search discovery uses canonical/hreflang/social metadata, `robots.txt`, an
+  XML sitemap, and truthful `WebSite` + `SoftwareApplication` JSON-LD. The
+  official landing CTA is `https://t.me/MovaVDomaBot`.
 - D1 database name: `vocab-words-db`
 - Telegram receives updates through a webhook.
 - The webhook must accept both `message` and `callback_query` updates.

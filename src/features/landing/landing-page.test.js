@@ -4,9 +4,9 @@ import assert from "node:assert/strict";
 import { landingPage } from "./landing-page.js";
 
 const content = {
-    title: "MovaYakVDoma — англійські слова щодня у Telegram",
+    title: "Вивчення англійських слів у Telegram — MovaYakVDoma",
     description: "Вивчай слова у Telegram.",
-    botUrl: "https://t.me/movayakvdoma_bot",
+    botUrl: "https://t.me/MovaVDomaBot",
 };
 
 test("landing has a canonical URL, official bot CTA, and privacy link", () => {
@@ -14,11 +14,12 @@ test("landing has a canonical URL, official bot CTA, and privacy link", () => {
         brandName: "MovaYakVDoma",
         publicWorkerUrl: "https://example.workers.dev",
         content,
+        scriptNonce: "test-nonce",
     });
 
     assert.match(page, /<html lang="uk">/);
     assert.match(page, /rel="canonical" href="https:\/\/example\.workers\.dev\/"/);
-    assert.match(page, /href="https:\/\/t\.me\/movayakvdoma_bot"/);
+    assert.match(page, /href="https:\/\/t\.me\/MovaVDomaBot"/);
     assert.match(page, /href="\/privacy"/);
     assert.match(page, /rel="icon" href="\/favicon\.png"/);
     assert.match(page, /\/assets\/vendor\/pico\.min\.css/);
@@ -30,7 +31,30 @@ test("landing has a canonical URL, official bot CTA, and privacy link", () => {
     assert.match(page, /\/assets\/landing\/field_waves\.svg/);
     assert.match(page, /\/assets\/landing\/hero_wheat\.svg/);
     assert.match(page, /\/assets\/landing\/landing\.css/);
+    assert.match(page, /\/assets\/landing\/analytics\.js/);
+    assert.match(page, /data-consent-banner/);
+    assert.match(page, /data-consent-settings/);
     assert.doesNotMatch(page, /QR|qr-code/i);
+});
+
+test("landing publishes valid app schema and complete search metadata", () => {
+    const page = landingPage({
+        brandName: "MovaYakVDoma",
+        publicWorkerUrl: "https://movayakvdoma.com",
+        content,
+        scriptNonce: "schema-nonce",
+    });
+
+    const schemaMatch = page.match(/<script type="application\/ld\+json" nonce="schema-nonce">(.+)<\/script>/);
+    assert.ok(schemaMatch);
+    const schema = JSON.parse(schemaMatch[1]);
+    const app = schema["@graph"].find((entry) => entry["@type"] === "SoftwareApplication");
+    assert.equal(app.applicationCategory, "EducationalApplication");
+    assert.equal(app.installUrl, "https://t.me/MovaVDomaBot");
+    assert.deepEqual(app.offers, { "@type": "Offer", price: "0", priceCurrency: "UAH" });
+    assert.match(page, /property="og:image" content="https:\/\/movayakvdoma\.com\/assets\/movayakvdoma-logo\.png"/);
+    assert.match(page, /name="twitter:card" content="summary"/);
+    assert.match(page, /hreflang="uk"/);
 });
 
 test("landing escapes configured text before inserting it into HTML", () => {
@@ -38,6 +62,7 @@ test("landing escapes configured text before inserting it into HTML", () => {
         brandName: '<script>alert("x")</script>',
         publicWorkerUrl: "https://example.workers.dev",
         content: { ...content, description: 'safe "description"' },
+        scriptNonce: "escape-nonce",
     });
 
     assert.doesNotMatch(page, /<script>alert/);

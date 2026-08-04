@@ -46,6 +46,19 @@ slices and genuine blockers. It is not a stream of intentions.
 
 ## Latest verified result
 
+- Version 1.9.0 released on 4 August 2026: the landing now
+  targets the Ukrainian search-intent cluster with canonical/hreflang/social
+  metadata, crawl assets, and truthful `WebSite` + `SoftwareApplication`
+  structured data. Every CTA uses `https://t.me/MovaVDomaBot`. Consent-first
+  Google Analytics (`G-7S3RWCWPV3`) measures page views and Telegram CTA clicks
+  only after opt-in, supports later withdrawal, and is covered by the updated
+  privacy policy and CSP. Image dimensions, focus handling, security headers,
+  and regression tests were improved; `npm run check` passed with 79 tests.
+  Cloudflare deployment `da0d45f9-b643-42b0-a68f-ac5940e4c990` serves the
+  canonical HTTPS page, analytics asset, robots and sitemap with HTTP 200; the
+  production D1 journal has no pending migrations. Live browser Core Web
+  Vitals and Tag Assistant validation remain a manual post-release check
+  because Chrome DevTools integration was unavailable.
 - Version 1.8.0 landing redesign released on 4 August 2026: the public site now
   follows the approved blue-and-gold concept with a responsive hero, Telegram
   phone preview, six feature cards, five-step flow, audience, FAQ, and final

@@ -4,7 +4,8 @@ export function privacyPolicyPage({ brandName, effectiveDate, content }) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Privacy Policy - ${brandName}</title>
+  <meta name="robots" content="noindex, follow">
+  <title>Політика конфіденційності — ${brandName}</title>
   <style>
     :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #16243a; background: #f6f8fb; }
     body { margin: 0; padding: 32px 16px; }

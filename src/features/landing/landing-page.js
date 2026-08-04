@@ -7,13 +7,55 @@ function escapeHtml(value) {
         .replaceAll("'", "&#39;");
 }
 
-/** Static public page; it intentionally has no client-side state, forms, or trackers. */
-export function landingPage({ brandName, publicWorkerUrl, content }) {
+function schemaJson({ brandName, canonicalUrl, description, botUrl }) {
+    return JSON.stringify({
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebSite",
+                "@id": `${canonicalUrl}/#website`,
+                url: `${canonicalUrl}/`,
+                name: brandName,
+                description,
+                inLanguage: "uk-UA",
+            },
+            {
+                "@type": "SoftwareApplication",
+                "@id": `${canonicalUrl}/#application`,
+                name: brandName,
+                url: `${canonicalUrl}/`,
+                description,
+                applicationCategory: "EducationalApplication",
+                operatingSystem: "Android, iOS, Windows, macOS, Linux",
+                runtimePlatform: "Telegram",
+                softwareRequirements: "Telegram",
+                installUrl: botUrl,
+                isAccessibleForFree: true,
+                inLanguage: "uk-UA",
+                offers: {
+                    "@type": "Offer",
+                    price: "0",
+                    priceCurrency: "UAH",
+                },
+            },
+        ],
+    }).replaceAll("<", "\\u003c");
+}
+
+/** Server-rendered public page; analytics is loaded only after explicit consent. */
+export function landingPage({ brandName, publicWorkerUrl, content, scriptNonce }) {
     const brand = escapeHtml(brandName);
     const title = escapeHtml(content.title);
     const description = escapeHtml(content.description);
     const botUrl = escapeHtml(content.botUrl);
     const canonicalUrl = escapeHtml(publicWorkerUrl);
+    const nonce = escapeHtml(scriptNonce);
+    const structuredData = schemaJson({
+        brandName,
+        canonicalUrl: publicWorkerUrl,
+        description: content.description,
+        botUrl: content.botUrl,
+    });
 
     return `<!doctype html>
 <html lang="uk">
@@ -21,16 +63,30 @@ export function landingPage({ brandName, publicWorkerUrl, content }) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="${description}">
-  <meta name="robots" content="index, follow">
+  <meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="canonical" href="${canonicalUrl}/">
+  <link rel="alternate" hreflang="uk" href="${canonicalUrl}/">
+  <link rel="alternate" hreflang="x-default" href="${canonicalUrl}/">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="uk_UA">
+  <meta property="og:site_name" content="${brand}">
   <meta property="og:title" content="${title}">
   <meta property="og:description" content="${description}">
   <meta property="og:url" content="${canonicalUrl}/">
+  <meta property="og:image" content="${canonicalUrl}/assets/movayakvdoma-logo.png">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta property="og:image:alt" content="Логотип ${brand}">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="${title}">
+  <meta name="twitter:description" content="${description}">
+  <meta name="twitter:image" content="${canonicalUrl}/assets/movayakvdoma-logo.png">
+  <meta name="theme-color" content="#eaf7ff">
   <link rel="icon" href="/favicon.png" type="image/png">
   <link rel="stylesheet" href="/assets/vendor/pico.min.css">
   <link rel="stylesheet" href="/assets/landing/landing.css">
+  <script type="application/ld+json" nonce="${nonce}">${structuredData}</script>
+  <script defer src="/assets/landing/analytics.js"></script>
   <title>${title}</title>
 </head>
 <body>
@@ -46,26 +102,26 @@ export function landingPage({ brandName, publicWorkerUrl, content }) {
         <a href="#audience">Для кого?</a>
         <a href="#faq">FAQ</a>
       </div>
-      <a class="nav-cta" href="${botUrl}" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">➤</span> Спробувати бота</a>
+      <a class="nav-cta" href="${botUrl}" target="_blank" rel="noopener noreferrer" data-analytics-event="telegram_cta_click" data-analytics-location="header"><span aria-hidden="true">➤</span> Спробувати бота</a>
     </nav>
   </header>
 
   <main>
     <section class="hero">
-      <img class="hero-clouds" src="/assets/landing/clouds.svg" alt="" aria-hidden="true">
-      <img class="hero-fields" src="/assets/landing/field_waves.svg" alt="" aria-hidden="true">
+      <img class="hero-clouds" src="/assets/landing/clouds.svg" width="900" height="260" alt="" aria-hidden="true" decoding="async">
+      <img class="hero-fields" src="/assets/landing/field_waves.svg" width="1400" height="420" alt="" aria-hidden="true" decoding="async">
       <div class="container hero-grid">
         <div class="hero-copy">
           <p class="eyebrow">Англійська щодня у Telegram</p>
           <h1>Вивчай англійські слова легко та <em>щодня</em></h1>
           <p class="hero-lead">${brand} — твій персональний Telegram-бот для вивчення слів: точний переклад, два приклади, власний словник і зручні нагадування.</p>
-          <a class="asset-cta" href="${botUrl}" target="_blank" rel="noopener noreferrer">
-            <img src="/assets/landing/telegram_cta.svg" alt="Спробувати бота в Telegram">
+          <a class="asset-cta" href="${botUrl}" target="_blank" rel="noopener noreferrer" data-analytics-event="telegram_cta_click" data-analytics-location="hero">
+            <img src="/assets/landing/telegram_cta.svg" width="620" height="140" alt="Спробувати бота в Telegram" fetchpriority="high">
           </a>
           <p class="trust-line"><span aria-hidden="true">🛡️</span> Безпечно. Конфіденційно. Тільки для тебе.</p>
         </div>
         <div class="hero-visual" aria-label="Приклад роботи MovaYakVDoma у Telegram">
-          <img class="hero-wheat" src="/assets/landing/hero_wheat.svg" alt="" aria-hidden="true">
+          <img class="hero-wheat" src="/assets/landing/hero_wheat.svg" width="420" height="620" alt="" aria-hidden="true" decoding="async">
           <div class="phone">
             <div class="phone-notch"></div>
             <div class="phone-screen">
@@ -116,8 +172,8 @@ export function landingPage({ brandName, publicWorkerUrl, content }) {
 
     <section class="cta-section section">
       <div class="container cta-banner">
-        <img src="/assets/landing/book_house.svg" width="150" height="150" alt="Логотип MovaYakVDoma">
-        <div><h2>Почни вчити англійські слова <em>вже сьогодні</em></h2><p>${brand} — твій щоденний крок до кращої англійської.</p><a class="primary-cta" href="${botUrl}" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">➤</span> Спробувати бота в Telegram</a><small>Безкоштовний старт займає менше хвилини.</small></div>
+        <img src="/assets/landing/book_house.svg" width="150" height="150" alt="Логотип MovaYakVDoma" loading="lazy" decoding="async">
+        <div><h2>Почни вчити англійські слова <em>вже сьогодні</em></h2><p>${brand} — твій щоденний крок до кращої англійської.</p><a class="primary-cta" href="${botUrl}" target="_blank" rel="noopener noreferrer" data-analytics-event="telegram_cta_click" data-analytics-location="bottom"><span aria-hidden="true">➤</span> Спробувати бота в Telegram</a><small>Безкоштовний старт займає менше хвилини.</small></div>
       </div>
     </section>
 
@@ -134,10 +190,20 @@ export function landingPage({ brandName, publicWorkerUrl, content }) {
   <footer class="site-footer">
     <div class="container footer-grid">
       <a class="wordmark compact" href="/"><img src="/assets/landing/book_house.svg" width="42" height="42" alt=""><span><strong>Mova<span>Yak</span>VDoma</strong><small>Твій англійський словник</small></span></a>
-      <nav aria-label="Навігація в підвалі"><a href="#faq">FAQ</a><a href="/privacy">Політика конфіденційності</a><a href="${botUrl}" target="_blank" rel="noopener noreferrer">Telegram</a></nav>
+      <nav aria-label="Навігація в підвалі"><a href="#faq">FAQ</a><a href="/privacy">Політика конфіденційності</a><button class="footer-link" type="button" data-consent-settings>Аналітика</button><a href="${botUrl}" target="_blank" rel="noopener noreferrer" data-analytics-event="telegram_cta_click" data-analytics-location="footer">Telegram</a></nav>
       <p>© 2026 ${brand}<br>Усі права захищені</p>
     </div>
   </footer>
+  <section class="consent-banner" data-consent-banner hidden role="dialog" aria-labelledby="consent-title" aria-describedby="consent-description">
+    <div>
+      <h2 id="consent-title">Допоможи нам покращувати сайт</h2>
+      <p id="consent-description">За твоєю згодою Google Analytics збиратиме узагальнену статистику відвідувань і переходів до Telegram. Докладніше — у <a href="/privacy">політиці конфіденційності</a>.</p>
+    </div>
+    <div class="consent-actions">
+      <button type="button" class="secondary" data-consent-reject>Лише необхідне</button>
+      <button type="button" data-consent-accept>Дозволити аналітику</button>
+    </div>
+  </section>
 </body>
 </html>`;
 }

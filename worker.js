@@ -185,27 +185,36 @@ const syncMonobankDonations = createMonobankDonationSync({
 function privacyPolicyPage(env) {
     return renderPrivacyPolicyPage({
         brandName: publicRuntimeConfig(env).botBrandName,
-        effectiveDate: "2 серпня 2026 року",
+        effectiveDate: "4 серпня 2026 року",
         content: contentFor().privacyPolicy,
     });
 }
 
-function landingPage(env) {
+function landingPage(env, scriptNonce) {
     const config = publicRuntimeConfig(env);
     return renderLandingPage({
         brandName: config.botBrandName,
         publicWorkerUrl: config.publicWorkerUrl,
         content: contentFor().landing,
+        scriptNonce,
     });
 }
 
-function publicHtmlResponse(page) {
+function publicHtmlResponse(page, { scriptNonce } = {}) {
+    const analyticsImageSources = scriptNonce
+        ? " https://www.google-analytics.com https://www.googletagmanager.com"
+        : "";
+    const scriptPolicy = scriptNonce
+        ? `; script-src 'self' 'nonce-${scriptNonce}' https://www.googletagmanager.com; connect-src https://www.google-analytics.com https://region1.google-analytics.com`
+        : "";
     return new Response(page, {
         headers: {
             "content-type": "text/html; charset=UTF-8",
-            "content-security-policy": "default-src 'none'; img-src 'self'; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+            "content-security-policy": `default-src 'none'; img-src 'self'${analyticsImageSources}; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'${scriptPolicy}`,
             "referrer-policy": "strict-origin-when-cross-origin",
+            "strict-transport-security": "max-age=31536000",
             "x-content-type-options": "nosniff",
+            "permissions-policy": "camera=(), microphone=(), geolocation=()",
         },
     });
 }
@@ -220,7 +229,8 @@ export default {
             return Response.redirect(url, 301);
         }
         if (request.method === "GET" && url.pathname === "/") {
-            return publicHtmlResponse(landingPage(env));
+            const scriptNonce = crypto.randomUUID();
+            return publicHtmlResponse(landingPage(env, scriptNonce), { scriptNonce });
         }
         if (request.method === "GET" && url.pathname === "/privacy") {
             return publicHtmlResponse(privacyPolicyPage(env));

@@ -31,7 +31,12 @@ test("Worker exposes the landing and privacy page without accepting an unauthent
     assert.match(await landing.text(), /Вивчай англійські слова легко та <em>щодня<\/em>/);
     assert.match(landing.headers.get("content-security-policy"), /default-src 'none'/);
     assert.match(landing.headers.get("content-security-policy"), /style-src 'self' 'unsafe-inline'/);
+    assert.match(landing.headers.get("content-security-policy"), /script-src 'self' 'nonce-[^']+'/);
+    assert.match(landing.headers.get("content-security-policy"), /www\.googletagmanager\.com/);
+    assert.match(landing.headers.get("content-security-policy"), /www\.google-analytics\.com/);
     assert.equal(landing.headers.get("x-content-type-options"), "nosniff");
+    assert.equal(landing.headers.get("strict-transport-security"), "max-age=31536000");
+    assert.equal(landing.headers.get("permissions-policy"), "camera=(), microphone=(), geolocation=()");
 
     const httpLanding = await worker.fetch(new Request("http://example.test/"), env);
     assert.equal(httpLanding.status, 301);
@@ -39,7 +44,9 @@ test("Worker exposes the landing and privacy page without accepting an unauthent
 
     const privacy = await worker.fetch(new Request("https://example.test/privacy"), env);
     assert.equal(privacy.status, 200);
-    assert.match(await privacy.text(), /Privacy Policy for MovaYakVDoma/);
+    const privacyPage = await privacy.text();
+    assert.match(privacyPage, /Політика конфіденційності — MovaYakVDoma/);
+    assert.match(privacyPage, /name="robots" content="noindex, follow"/);
 
     const denied = await worker.fetch(
         webhookRequest(privateMessageUpdate({ text: "/start" }), "wrong-secret"),
