@@ -1,3 +1,5 @@
+import DEFAULT_INPUT_PARSER from "../features/vocabulary/input-parsers/index.js";
+import { PLURAL_RULES_UK } from "../content/uk/plural-rules.js";
 /** Shared formatting, authorization, and time helpers with no database access. */
 export const DEFAULT_DAILY_SETTINGS = Object.freeze({
     timezone: "Europe/Kyiv",
@@ -16,13 +18,7 @@ export function dailyScheduleKeyboardLabel(settings) {
 }
 
 export function wordCountLabel(count) {
-    const lastTwoDigits = count % 100;
-    const lastDigit = count % 10;
-
-    if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return "слів";
-    if (lastDigit === 1) return "слово";
-    if (lastDigit >= 2 && lastDigit <= 4) return "слова";
-    return "слів";
+    return PLURAL_RULES_UK.pluralForms(count);
 }
 
 export function dailyLimitReachedText(limit) {
@@ -71,23 +67,10 @@ export function createSupportCode() {
 }
 
 /**
- * Split an optional meaning hint from a vocabulary entry. A slash is the
- * documented default; pipe and backslash stay supported for existing users.
+ * Split an optional meaning hint from a vocabulary entry. Delegates to the
+ * direction-specific input parser (default: EN → UK) to allow per-language
+ * configuration of separators and parsing rules.
  */
 export function parseVocabularyInput(input) {
-    const separatorIndex = Math.min(
-        ...["/", "|", "\\"].map((separator) => {
-            const index = input.indexOf(separator);
-            return index === -1 ? Infinity : index;
-        })
-    );
-
-    if (!Number.isFinite(separatorIndex)) {
-        return { word: input.trim(), explicitContext: "" };
-    }
-
-    return {
-        word: input.slice(0, separatorIndex).trim(),
-        explicitContext: input.slice(separatorIndex + 1).trim(),
-    };
+    return DEFAULT_INPUT_PARSER.parseInput(input);
 }
