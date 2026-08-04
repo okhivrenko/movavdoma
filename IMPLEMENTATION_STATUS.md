@@ -46,6 +46,13 @@ slices and genuine blockers. It is not a stream of intentions.
 
 ## Latest verified result
 
+- Version 1.9.2 released on 4 August 2026 fixes GA4 collection after consent:
+  persisted opt-in is restored through `consent update` between the denied
+  default and GA4 config, and the landing CSP now permits Google's documented
+  GA4/GTM collection hosts while advertising endpoints remain blocked. `npm run
+  check` passed with 80 tests. Cloudflare deployment
+  `ea602792-0b39-4c7b-b4f3-9f5812378f00` serves HTTP 200 with the expected live
+  consent sequence and CSP; the production D1 journal has no pending migrations.
 - Version 1.9.1 released on 4 August 2026 fixes Google tag discovery: the canonical
   page now contains the standard `gtag.js?id=G-7S3RWCWPV3` source and queues
   Consent Mode v2 defaults before Google code loads. Analytics storage and all

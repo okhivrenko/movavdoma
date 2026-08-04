@@ -34,6 +34,8 @@ test("Worker exposes the landing and privacy page without accepting an unauthent
     assert.match(landing.headers.get("content-security-policy"), /script-src 'self' 'nonce-[^']+'/);
     assert.match(landing.headers.get("content-security-policy"), /www\.googletagmanager\.com/);
     assert.match(landing.headers.get("content-security-policy"), /www\.google-analytics\.com/);
+    assert.match(landing.headers.get("content-security-policy"), /https:\/\/\*\.google-analytics\.com/);
+    assert.match(landing.headers.get("content-security-policy"), /https:\/\/\*\.analytics\.google\.com/);
     assert.equal(landing.headers.get("x-content-type-options"), "nosniff");
     assert.equal(landing.headers.get("strict-transport-security"), "max-age=31536000");
     assert.equal(landing.headers.get("permissions-policy"), "camera=(), microphone=(), geolocation=()");
@@ -49,6 +51,7 @@ test("Worker exposes the landing and privacy page without accepting an unauthent
     assert.match(privacyPage, /name="robots" content="noindex, follow"/);
     assert.match(privacyPage, /без cookies збираються обмежені вимірювання/);
     assert.match(privacyPage, /Consent Mode/);
+    assert.doesNotMatch(privacy.headers.get("content-security-policy"), /google-analytics|googletagmanager/);
 
     const denied = await worker.fetch(
         webhookRequest(privateMessageUpdate({ text: "/start" }), "wrong-secret"),

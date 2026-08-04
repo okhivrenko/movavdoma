@@ -33,11 +33,15 @@ test("landing has a canonical URL, official bot CTA, and privacy link", () => {
     assert.match(page, /\/assets\/landing\/landing\.css/);
     assert.match(page, /\/assets\/landing\/analytics-consent-v2\.js/);
     assert.match(page, /https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=G-7S3RWCWPV3/);
-    assert.match(page, /gtag\("consent","default",\{ad_storage:"denied"/);
-    assert.ok(
-        page.indexOf('gtag("consent","default"')
-        < page.indexOf("https://www.googletagmanager.com/gtag/js?id=G-7S3RWCWPV3")
-    );
+    const consentDefault = page.indexOf('gtag("consent","default"');
+    const persistedConsentUpdate = page.indexOf('gtag("consent","update",{analytics_storage:"granted"}');
+    const analyticsConfig = page.indexOf('gtag("config","G-7S3RWCWPV3"');
+    const tagLoader = page.indexOf("https://www.googletagmanager.com/gtag/js?id=G-7S3RWCWPV3");
+
+    assert.match(page, /gtag\("consent","default",\{ad_storage:"denied",ad_user_data:"denied",ad_personalization:"denied",analytics_storage:"denied"\}\)/);
+    assert.ok(consentDefault < persistedConsentUpdate);
+    assert.ok(persistedConsentUpdate < analyticsConfig);
+    assert.ok(analyticsConfig < tagLoader);
     assert.match(page, /data-consent-banner/);
     assert.match(page, /data-consent-settings/);
     assert.doesNotMatch(page, /QR|qr-code/i);

@@ -46,9 +46,10 @@ function googleTagBootstrap() {
     return `window.dataLayer=window.dataLayer||[];
 function gtag(){dataLayer.push(arguments);}
 window.gtag=gtag;
-let analyticsConsent="denied";
-try{if(window.localStorage.getItem("movayakvdoma_analytics_consent")==="granted")analyticsConsent="granted";}catch{}
-gtag("consent","default",{ad_storage:"denied",ad_user_data:"denied",ad_personalization:"denied",analytics_storage:analyticsConsent});
+let analyticsGranted=false;
+try{analyticsGranted=window.localStorage.getItem("movayakvdoma_analytics_consent")==="granted";}catch{}
+gtag("consent","default",{ad_storage:"denied",ad_user_data:"denied",ad_personalization:"denied",analytics_storage:"denied"});
+if(analyticsGranted)gtag("consent","update",{analytics_storage:"granted"});
 gtag("js",new Date());
 gtag("config","G-7S3RWCWPV3",{allow_google_signals:false,allow_ad_personalization_signals:false});`;
 }

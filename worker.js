@@ -202,10 +202,10 @@ function landingPage(env, scriptNonce) {
 
 function publicHtmlResponse(page, { scriptNonce } = {}) {
     const analyticsImageSources = scriptNonce
-        ? " https://www.google-analytics.com https://www.googletagmanager.com"
+        ? " https://www.google-analytics.com https://*.google-analytics.com https://www.googletagmanager.com"
         : "";
     const scriptPolicy = scriptNonce
-        ? `; script-src 'self' 'nonce-${scriptNonce}' https://www.googletagmanager.com; connect-src https://www.google-analytics.com https://region1.google-analytics.com`
+        ? `; script-src 'self' 'nonce-${scriptNonce}' https://www.googletagmanager.com; connect-src https://www.google-analytics.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://www.googletagmanager.com`
         : "";
     return new Response(page, {
         headers: {
