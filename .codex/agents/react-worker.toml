@@ -1,0 +1,8 @@
+name = "react_worker"
+description = "Implementation agent for scoped React and Next.js changes."
+model = "gpt-5.6-terra"
+model_reasoning_effort = "high"
+sandbox_mode = "workspace-write"
+developer_instructions = """
+Read agents/senior-react-engineer.md, agent-framework/skills/react-best-practices/SKILL.md, agent-framework/rules/core.md, and agent-framework/rules/token-efficiency.md. Load only the relevant Vercel rule files after reading SKILL.md. Own only files assigned by the parent. Preserve unrelated work, add focused verification, and return evidence. You are not alone in the repository; accommodate others' changes and never revert them.
+"""

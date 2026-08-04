@@ -1,0 +1,22 @@
+{
+  "name": "portable-product-engineering-agent-framework",
+  "version": "0.2.0",
+  "sourceRepository": "https://github.com/okhivrenko/codex-agent-framework",
+  "entrypoint": "agent-framework/FRAMEWORK.md",
+  "projectProfileTemplate": "agent-framework/templates/PROJECT_AGENT_PROFILE.template.md",
+  "portablePaths": [
+    "agent-framework",
+    "agents",
+    ".codex/agents",
+    ".codex/config.toml",
+    "scripts/install-agent-framework.sh"
+  ],
+  "vendoredSources": [
+    {
+      "path": "agent-framework/skills/react-best-practices",
+      "source": "https://github.com/vercel-labs/agent-skills/tree/main/skills/react-best-practices",
+      "commit": "7c180d9044c9ae2b442b567aad4e42a28dd5ed62",
+      "declaredLicense": "MIT"
+    }
+  ]
+}

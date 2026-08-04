@@ -1,5 +1,16 @@
 # MovaYakVDoma — agent guide
 
+## Portable agent framework
+
+- For every non-trivial request, follow `agent-framework/FRAMEWORK.md`.
+- Route the lead role and triggered gates with
+  `agent-framework/TASK_ROUTING.md`.
+- Select the lowest sufficient model and agent count with
+  `agent-framework/MODEL_ROUTING.md`; one agent is the default.
+- Load only the selected files from `agent-framework/rules/` and `agents/`.
+- `PROJECT_AGENT_PROFILE.md` and this file contain app-specific overrides and
+  take priority over portable defaults.
+
 ## Fast orientation
 
 - Runtime entry point: `worker.js`.
@@ -13,6 +24,28 @@
 - Release process: `RELEASING.md`.
 - Cloudflare config: `wrangler.jsonc`; SQL changes: `migrations/`.
 - Senior JavaScript review role: `agents/senior-javascript-engineer.md`.
+- Senior React role: `agents/senior-react-engineer.md`; activate it only for
+  React/Next.js work and pair it with the pinned Vercel guidance at
+  `agent-framework/skills/react-best-practices/SKILL.md`.
+- Database role: `agents/database-engineer.md`; use it for schema, SQL, indexes,
+  transactions, migrations, backfills, retention, and recovery design.
+- Application and backend architecture role:
+  `agents/application-backend-architect.md`; use it before cross-application,
+  schema, API-contract, external-integration, service-boundary, or consequential
+  Cloudflare platform decisions.
+- Application security role: `agents/application-security-engineer.md`; use it
+  for public endpoints, authentication, authorization, user data, providers,
+  dependencies, secrets, abuse controls, and security-sensitive releases.
+- Platform, delivery, and reliability role:
+  `agents/platform-devops-sre-engineer.md`; use it for CI/CD, Cloudflare
+  environments, migrations, observability, incident response, rollback, and
+  production releases.
+- Quality engineering role: `agents/qa-automation-quality-engineer.md`; use it
+  to define risk-based verification, automation, regression coverage, and
+  release evidence for non-trivial behavior changes.
+- Accessibility assurance role: `agents/accessibility-specialist.md`; use it
+  for public UI, content, responsive experiences, core user journeys, and
+  pre-release accessibility review.
 - For reusable Cloudflare-bot architecture and release practice, use the shared
   `$cloudflare-worker-bot` skill. These project-specific rules take priority.
 

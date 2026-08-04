@@ -46,6 +46,17 @@ slices and genuine blockers. It is not a stream of intentions.
 
 ## Latest verified result
 
+- Portable agent-orchestration framework completed on 4 August 2026: role
+  contracts, shared behavioral rules, risk-based task/model routing,
+  project-scoped Codex agent presets, a project profile, ADR, and a fail-closed
+  migration installer now separate reusable guidance from app-specific facts.
+  The installer was verified against a clean temporary repository and refused
+  a second installation without overwriting existing files.
+- Framework version 0.2.0 adds distinct Senior React and Database Engineer roles,
+  executable presets, risk/model routing, and a pinned unmodified Vercel React
+  Best Practices skill with upstream provenance. The React role remains inactive
+  for the current framework-free landing architecture; D1 changes trigger the
+  database role while SRE retains the production migration gate.
 - Active-vocabulary controls made safer on 4 August 2026: example buttons now
   use the `📘` prefix and the separate mark-as-learned buttons use `✅`, so the
   two identical numbered blocks are visually distinct. `npm run check` passed
