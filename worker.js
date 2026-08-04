@@ -93,7 +93,6 @@ import {
 } from "./src/features/navigation/navigation.js";
 import { privacyPolicyPage as renderPrivacyPolicyPage } from "./src/platform/privacy-policy.js";
 import { landingPage as renderLandingPage } from "./src/features/landing/landing-page.js";
-import { brandLogoSvg } from "./src/features/landing/brand-logo.js";
 import { contentFor } from "./src/content/index.js";
 import { handleVocabularyTextCommand } from "./src/features/vocabulary/text-commands.js";
 import { publicRuntimeConfig } from "./src/platform/runtime-config.js";
@@ -204,7 +203,7 @@ function publicHtmlResponse(page) {
     return new Response(page, {
         headers: {
             "content-type": "text/html; charset=UTF-8",
-            "content-security-policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+            "content-security-policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline' https://cdn.jsdelivr.net; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
             "referrer-policy": "strict-origin-when-cross-origin",
             "x-content-type-options": "nosniff",
         },
@@ -216,14 +215,9 @@ function publicHtmlResponse(page) {
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
-        if (request.method === "GET" && url.pathname === "/favicon.svg") {
-            return new Response(brandLogoSvg(), {
-                headers: {
-                    "content-type": "image/svg+xml; charset=UTF-8",
-                    "cache-control": "public, max-age=604800, immutable",
-                    "x-content-type-options": "nosniff",
-                },
-            });
+        if (url.protocol === "http:") {
+            url.protocol = "https:";
+            return Response.redirect(url, 301);
         }
         if (request.method === "GET" && url.pathname === "/") {
             return publicHtmlResponse(landingPage(env));

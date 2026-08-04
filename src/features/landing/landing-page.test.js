@@ -20,7 +20,9 @@ test("landing has a canonical URL, official bot CTA, and privacy link", () => {
     assert.match(page, /rel="canonical" href="https:\/\/example\.workers\.dev\/"/);
     assert.match(page, /href="https:\/\/t\.me\/movayakvdoma_bot"/);
     assert.match(page, /href="\/privacy"/);
-    assert.match(page, /rel="icon" href="\/favicon\.svg"/);
+    assert.match(page, /rel="icon" href="\/favicon\.png"/);
+    assert.match(page, /@picocss\/pico@2\/css\/pico\.min\.css/);
+    assert.match(page, /\/assets\/movayakvdoma-logo-mark\.png/);
     assert.match(page, /Натисни «Додати слово»/);
     assert.match(page, /charge \/ payment for a service/);
     assert.match(page, /Вивчай англійські слова легко та щодня — у Telegram/);
