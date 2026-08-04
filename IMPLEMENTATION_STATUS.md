@@ -46,6 +46,13 @@ slices and genuine blockers. It is not a stream of intentions.
 
 ## Latest verified result
 
+- Version 1.8.0 landing redesign released on 4 August 2026: the public site now
+  follows the approved blue-and-gold concept with a responsive hero, Telegram
+  phone preview, six feature cards, five-step flow, audience, FAQ, and final
+  CTA without a QR code. The supplied SVG pack and vendored Pico CSS live in
+  static assets. `npm run check` passed with 74 tests; production HTTPS, HTML,
+  CSS, and SVG smoke checks returned HTTP 200. Browser screenshot/reflow QA was
+  unavailable in the delivery session and remains a manual visual check.
 - Public landing-page slice completed locally on 4 August 2026: `GET /` now
   serves a responsive Ukrainian, framework-free landing page with direct
   Telegram CTAs, privacy link, SEO metadata, and restrictive public-page
