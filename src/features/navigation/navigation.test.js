@@ -44,3 +44,14 @@ test("share action sends a native Telegram share button and a copyable link", as
     assert.match(messages[0].text, /https:\/\/t\.me\/movayakvdoma_bot/);
     assert.match(messages[0].keyboard.inline_keyboard[0][0].url, /^https:\/\/t\.me\/share\/url\?/);
 });
+
+test("feedback and contact actions retain separate stored message types", async () => {
+    const started = [];
+    const dependencies = {
+        startFeedback: async (...args) => started.push(args.slice(3)),
+        contactPrompt: "Напиши повідомлення",
+    };
+    await handleNavigationMessage({}, "💬 Відгук", { chatId: 123, userId: 123 }, dependencies);
+    await handleNavigationMessage({}, "📩 Зв’язатися з нами", { chatId: 123, userId: 123 }, dependencies);
+    assert.deepEqual(started, [[undefined, "feedback"], ["Напиши повідомлення", "contact"]]);
+});

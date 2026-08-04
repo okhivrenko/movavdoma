@@ -38,6 +38,9 @@ export class WorkerTestDb {
         if (query.includes("SELECT timezone, daily_time, daily_enabled, daily_level FROM users")) {
             return { ...this.dailySettings };
         }
+        if (query.includes("SELECT feedback_pending, feedback_kind FROM users")) {
+            return { feedback_pending: 0, feedback_kind: "feedback" };
+        }
 
         throw new Error(`Unexpected D1 first query: ${query}`);
     }
@@ -74,6 +77,7 @@ export class WorkerTestDb {
         if (query.includes("UPDATE users SET feedback_pending = 1")) {
             return { meta: { changes: 1 } };
         }
+        if (query.includes("INSERT INTO user_messages")) return { meta: { changes: 1 } };
         if (query.includes("UPDATE users SET daily_level")) {
             this.dailySettings.daily_level = parameters[0];
             return { meta: { changes: 1 } };

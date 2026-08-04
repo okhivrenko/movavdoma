@@ -168,7 +168,9 @@ local day; the D1 counter is claimed atomically before the OpenAI request.
   the admin as an unmatched-payment alert.
 - When a donation grant expires, the bot thanks the user, invites further
   support, and offers the `💬 Відгук` flow. The user's next plain-text message
-  is sent to the admin and acknowledged.
+  is saved as feedback, sent to the admin, and acknowledged. Messages sent via
+  `📩 Зв’язатися з нами` are stored separately; the admin panel lists each type
+  independently in pages of 10.
 
 ## Important UX rules
 

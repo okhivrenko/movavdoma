@@ -1,16 +1,53 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { adminKeyboard, lastActivityLabel, sendAdminUserList } from "./admin-panel.js";
+import { adminKeyboard, lastActivityLabel, sendAdminMessageList, sendAdminUserList } from "./admin-panel.js";
 import { captureTelegramCalls, telegramCall } from "../../../test-support/worker-test-helpers.js";
 
 test("admin panel keeps stable callback actions and reports an empty user list", async () => {
     assert.equal(adminKeyboard().inline_keyboard[0][0].callback_data, "admin:users");
+    assert.equal(adminKeyboard().inline_keyboard[1][0].callback_data, "admin:feedback");
+    assert.equal(adminKeyboard().inline_keyboard[1][1].callback_data, "admin:contact");
     const env = { TELEGRAM_BOT_TOKEN: "test-token", DB: { prepare: () => ({ first: async () => ({ total: 0 }) }) } };
     const { calls } = await captureTelegramCalls(() => sendAdminUserList(
         env, 456, 0, null, { isAdmin: () => false, dailyAddLimit: 10 }
     ));
     assert.match(telegramCall(calls, "sendMessage").text, /Користувачів поки немає/);
+});
+
+test("admin message lists are separate and paginate after ten entries", async () => {
+    const messages = Array.from({ length: 10 }, (_, index) => ({
+        user_id: index + 1,
+        content: `Відгук ${index + 1}`,
+        created_at: "2026-08-04 08:00:00",
+        telegram_username: null,
+        telegram_first_name: null,
+    }));
+    const env = {
+        TELEGRAM_BOT_TOKEN: "test-token",
+        DB: {
+            prepare: (query) => ({
+                bind: (...parameters) => {
+                    if (query.includes("COUNT(*) AS total FROM user_messages")) {
+                        return { first: async () => ({ total: parameters[0] === "feedback" ? 11 : 0 }) };
+                    }
+                    return { all: async () => ({ results: messages }) };
+                },
+            }),
+        },
+    };
+    const feedback = await captureTelegramCalls(() => sendAdminMessageList(env, 456, "feedback"));
+    const feedbackMessage = telegramCall(feedback.calls, "sendMessage");
+    assert.match(feedbackMessage.text, /💬 Відгуки: 11/);
+    assert.match(feedbackMessage.text, /04\.08\.2026/);
+    assert.equal(feedbackMessage.reply_markup.inline_keyboard[0][0].callback_data, "admin:feedback:1");
+
+    const secondPage = await captureTelegramCalls(() => sendAdminMessageList(env, 456, "feedback", 1, 77));
+    const secondPageMessage = telegramCall(secondPage.calls, "editMessageText");
+    assert.equal(secondPageMessage.reply_markup.inline_keyboard[0][0].callback_data, "admin:feedback:0");
+
+    const contact = await captureTelegramCalls(() => sendAdminMessageList(env, 456, "contact"));
+    assert.match(telegramCall(contact.calls, "sendMessage").text, /📩 Повідомлення поки немає/);
 });
 
 test("admin user list includes the stored Telegram nickname and first name", async () => {

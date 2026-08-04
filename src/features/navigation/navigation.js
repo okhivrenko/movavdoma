@@ -188,7 +188,13 @@ export async function handleNavigationMessage(env, text, context, dependencies) 
     }
 
     if (action === MENU_ACTION.FEEDBACK || action === MENU_ACTION.CONTACT) {
-        await startFeedback(env, chatId, userId, action === MENU_ACTION.CONTACT ? dependencies.contactPrompt : undefined);
+        await startFeedback(
+            env,
+            chatId,
+            userId,
+            action === MENU_ACTION.CONTACT ? dependencies.contactPrompt : undefined,
+            action === MENU_ACTION.CONTACT ? "contact" : "feedback"
+        );
         return true;
     }
 

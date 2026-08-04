@@ -79,7 +79,7 @@ import {
     generateNewDailyWord,
 } from "./src/features/daily-words/daily-words.js";
 import { handleDailyWordCallback } from "./src/features/daily-words/daily-word-callbacks.js";
-import { clearPendingFeedback, startFeedback, submitFeedback } from "./src/features/feedback/feedback.js";
+import { clearPendingFeedback, startFeedback, submitFeedback, USER_MESSAGE_TYPE } from "./src/features/feedback/feedback.js";
 import { removeExpiredLearnedWords as cleanupLearnedWords } from "./src/features/vocabulary/learned-word-cleanup.js";
 import { sendDueDailyWords as deliverDueDailyWords, sendTodayDailyWord as deliverTodayDailyWord } from "./src/features/daily-words/daily-delivery.js";
 import {
@@ -382,13 +382,16 @@ export default {
         }
 
         const feedbackState = await env.DB
-            .prepare("SELECT feedback_pending FROM users WHERE telegram_user_id = ?")
+            .prepare("SELECT feedback_pending, feedback_kind FROM users WHERE telegram_user_id = ?")
             .bind(userId)
             .first();
 
         if (feedbackState?.feedback_pending === 1 && !text.startsWith("/")) {
             try {
-                await submitFeedback(env, chatId, userId, text.slice(0, 3500), getAdminChatId);
+                const type = feedbackState.feedback_kind === USER_MESSAGE_TYPE.CONTACT
+                    ? USER_MESSAGE_TYPE.CONTACT
+                    : USER_MESSAGE_TYPE.FEEDBACK;
+                await submitFeedback(env, chatId, userId, text.slice(0, 3500), getAdminChatId, type);
             } catch (error) {
                 console.error({ event: "feedback_delivery_failed", message: error instanceof Error ? error.message : "Unknown error" });
                 await sendMessage(env, chatId, "Не вдалося передати відгук. Спробуй надіслати його ще раз за хвилину.");

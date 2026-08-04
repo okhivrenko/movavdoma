@@ -62,3 +62,7 @@ slices and genuine blockers. It is not a stream of intentions.
   passed with 61 tests. Migration `0019` was applied before the Worker deploy;
   the D1 journal has no pending migrations and the public Worker returned HTTP
   200.
+- Feedback-history slice released on 4 August 2026: feedback and contact
+  messages are stored independently and the admin panel shows separate lists
+  of 10 entries with next/back navigation. Migration `0020` was applied before
+  the Worker deployment.
