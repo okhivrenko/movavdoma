@@ -15,19 +15,16 @@ const MESSAGE_LIST_CONFIG = Object.freeze({
 
 export function adminKeyboard() {
     return { inline_keyboard: [
-        [{ text: "👥 Список користувачів", callback_data: "admin:users" }],
-        [{ text: "📈 Джерела стартів", callback_data: "admin:sources" }],
+        [{ text: "👥 Користувачі", callback_data: "admin:users" }, { text: "📈 Джерела", callback_data: "admin:sources" }],
         [{ text: "💬 Відгуки", callback_data: "admin:feedback" }, { text: "📩 Повідомлення", callback_data: "admin:contact" }],
-        [{ text: "🔗 Посилання на бота", callback_data: "admin:link" }],
-        [{ text: "🎁 Змінити ліміт", callback_data: "admin:grant" }],
-        [{ text: "🎚 Змінити рівень", callback_data: "admin:level" }],
-        [{ text: "🧪 Тест рівня 1", callback_data: "admin:testlevel" }],
-        [{ text: "❓ Команди адміна", callback_data: "admin:help" }],
+        [{ text: "🎁 Ліміт слів", callback_data: "admin:grant" }, { text: "🎚 Рівень", callback_data: "admin:level" }],
+        [{ text: "🧪 Тест рівня", callback_data: "admin:testlevel" }, { text: "🔗 Посилання", callback_data: "admin:link" }],
+        [{ text: "❓ Команди й ліміти", callback_data: "admin:help" }],
     ] };
 }
 
 export function adminHelpText() {
-    return "🛠 Адмін-панель\n\n• 👥 Список користувачів — усі користувачі, по 25 на сторінці, з ID, ім’ям, ніком, лімітами, кількістю активних слів і останньою активністю.\n• 📈 Джерела стартів або /sources — підсумок першого відомого джерела запуску бота.\n• 💬 Відгуки та 📩 Повідомлення — окремі списки звернень, по 10 на сторінці, з кнопками для читання повного тексту.\n• 🔗 Посилання на бота — показує пряме посилання, яке можна скопіювати або переслати.\n• /grant <userId> <ліміт> — встановити ліміт додавання слів на 1 місяць.\n  Приклад: /grant 123456789 45\n• /level <userId> <0-3> — постійно підвищити рівень доступу. Щоденні картки: 0→5, 1→10, 2→15, 3→20.\n  Приклад: /level 123456789 2\n• /testlevel <userId> — видати тестовий рівень 1 на 1 день.\n  Приклад: /testlevel 123456789\n• 🎁 Заявки на донати приходять окремими картками з кнопками підтвердження.";
+    return "🛠 Адмін-панель\n\nЛіміти:\n• Додавання слів: базово 10 на локальний день; /grant задає окремий ліміт на 1 місяць.\n• Щоденні картки: рівень 0→5, 1→10, 2→15, 3→20 нових карток на локальний день.\n\nКоманди:\n• /grant <userId> <ліміт> — ліміт додавання на 1 місяць.\n  Приклад: /grant 123456789 45\n• /level <userId> <0-3> — постійно підвищити рівень.\n  Приклад: /level 123456789 2\n• /testlevel <userId> — рівень 1 на 1 день.\n\n👥 Користувачі показують ID, профіль, активні слова, ліміт додавання, рівень і останню активність. 🎁 Заявки на донати приходять окремими картками.";
 }
 
 export async function sendAcquisitionSourceSummary(env, chatId) {

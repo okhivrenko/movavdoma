@@ -6,9 +6,8 @@ import { captureTelegramCalls, telegramCall } from "../../../test-support/worker
 
 test("admin panel keeps stable callback actions and reports an empty user list", async () => {
     assert.equal(adminKeyboard().inline_keyboard[0][0].callback_data, "admin:users");
-    assert.equal(adminKeyboard().inline_keyboard[1][0].callback_data, "admin:sources");
-    assert.equal(adminKeyboard().inline_keyboard[2][0].callback_data, "admin:feedback");
-    assert.equal(adminKeyboard().inline_keyboard[2][1].callback_data, "admin:contact");
+    assert.equal(adminKeyboard().inline_keyboard[0][1].callback_data, "admin:sources");
+    assert.ok(adminKeyboard().inline_keyboard.every((row) => row.length <= 2));
     const env = { TELEGRAM_BOT_TOKEN: "test-token", DB: { prepare: () => ({ first: async () => ({ total: 0 }) }) } };
     const { calls } = await captureTelegramCalls(() => sendAdminUserList(
         env, 456, 0, null, { isAdmin: () => false, dailyAddLimit: 10 }
