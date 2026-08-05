@@ -27,8 +27,10 @@ test("opening the daily-word menu again replaces the already displayed pending c
             DB: {
                 prepare(query) {
                     return { bind: (...parameters) => ({
-                        first: async () => query.includes("FROM users") ? { timezone: "Europe/Warsaw", daily_level: "B1", should_refresh_daily_word: 1 } : pending,
-                        run: async () => ({ meta: { changes: query.includes("UPDATE pending_daily_words") ? 1 : 1 } }),
+                        first: async () => query.includes("FROM users")
+                            ? { timezone: "Europe/Warsaw", daily_level: "B1", should_refresh_daily_word: 1 }
+                            : query.includes("id >") || query.includes("id <") ? null : pending,
+                        run: async () => ({ meta: { changes: 1, last_row_id: 43 } }),
                     }) };
                 },
             },
@@ -50,7 +52,7 @@ test("opening the daily-word menu again replaces the already displayed pending c
             maxAttempts: 3,
         });
         assert.match(requests[0].text, /curious — допитливий/);
-        assert.equal(requests[0].reply_markup.inline_keyboard[1][0].callback_data, "daily:next:42");
+        assert.equal(requests[0].reply_markup.inline_keyboard[1][0].callback_data, "daily:next:43");
     } finally {
         globalThis.fetch = originalFetch;
     }

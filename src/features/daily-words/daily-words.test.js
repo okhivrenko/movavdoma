@@ -24,13 +24,14 @@ const card = {
 test("daily-card presentation preserves both user actions and exactly two examples", () => {
     assert.deepEqual(dailyWordKeyboard(42), {
         inline_keyboard: [
-            [
-                { text: "✅ Знаю", callback_data: "daily:know:42" },
-                { text: "📖 Вчити", callback_data: "daily:learn:42" },
-            ],
-            [{ text: "🔄 Показати ще", callback_data: "daily:next:42" }],
+            [{ text: "📖 Вчити", callback_data: "daily:learn:42" }],
+            [{ text: "Наступне слово →", callback_data: "daily:next:42" }],
         ],
     });
+    assert.deepEqual(dailyWordKeyboard(42, { hasPrevious: true, canLearn: false }).inline_keyboard, [[
+        { text: "← Попереднє слово", callback_data: "daily:prev:42" },
+        { text: "Наступне слово →", callback_data: "daily:next:42" },
+    ]]);
 
     const text = dailyWordText(card, "B1");
     assert.match(text, /^📚 Нове слово · B1/);
@@ -108,7 +109,7 @@ test("pending daily cards are read and consumed only through user-owned queries"
     assert.equal((await getPendingDailyWord(env, 123, "2026-08-03")).id, 42);
     assert.equal(await savePendingDailyWordToLearning(env, 123, 42), true);
 
-    const ownerQueries = db.calls.filter((call) => call.query.includes("pending_daily_words"));
+    const ownerQueries = db.calls.filter((call) => call.query.includes("daily_word_cards"));
     assert.ok(ownerQueries.every((call) => call.query.includes("user_id = ?")));
     assert.ok(ownerQueries.some((call) => call.parameters.includes(123)));
     const exampleWrites = db.calls.filter((call) => call.query.includes("INSERT INTO examples"));

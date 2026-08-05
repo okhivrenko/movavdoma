@@ -39,16 +39,14 @@ export async function generateDailyWordCard(env, level) {
     };
 }
 
-export function dailyWordKeyboard(pendingId) {
-    return {
-        inline_keyboard: [
-            [
-                { text: "✅ Знаю", callback_data: `daily:know:${pendingId}` },
-                { text: "📖 Вчити", callback_data: `daily:learn:${pendingId}` },
-            ],
-            [{ text: "🔄 Показати ще", callback_data: `daily:next:${pendingId}` }],
-        ],
-    };
+export function dailyWordKeyboard(cardId, { hasPrevious = false, canLearn = true } = {}) {
+    const navigation = [];
+    if (hasPrevious) navigation.push({ text: "← Попереднє слово", callback_data: `daily:prev:${cardId}` });
+    navigation.push({ text: "Наступне слово →", callback_data: `daily:next:${cardId}` });
+    return { inline_keyboard: [
+        ...(canLearn ? [[{ text: "📖 Вчити", callback_data: `daily:learn:${cardId}` }]] : []),
+        navigation,
+    ] };
 }
 
 export function dailyWordText(card, level) {
@@ -62,7 +60,7 @@ export function dailyCardFromPending(pending) {
         return { id: pending.id, card: {
             word: pending.source_text, translation_uk: pending.translation_uk,
             context_en: pending.context_note, examples,
-        } };
+        }, learnedAt: pending.learned_at ?? null, localDate: pending.local_date };
     } catch {
         return null;
     }
@@ -100,7 +98,7 @@ export async function generateNewDailyWord(env, userId, level, generateCard, max
         const existing = await env.DB.prepare(`
           SELECT 1 FROM words WHERE user_id = ? AND lower(source_text) = lower(?)
           UNION ALL
-          SELECT 1 FROM pending_daily_words WHERE user_id = ? AND lower(source_text) = lower(?)
+          SELECT 1 FROM daily_word_cards WHERE user_id = ? AND lower(source_text) = lower(?)
           LIMIT 1
         `).bind(userId, card.word.trim(), userId, card.word.trim()).first();
 
@@ -110,24 +108,11 @@ export async function generateNewDailyWord(env, userId, level, generateCard, max
     throw new Error("Could not generate a new daily word.");
 }
 
-/** Replaces an unanswered card without exposing another user's pending card. */
-export async function replacePendingDailyWord(env, userId, pendingId, card, localDate) {
-    const replaced = await env.DB.prepare(`
-      UPDATE pending_daily_words
-      SET source_text = ?, translation_uk = ?, context_note = ?, examples_json = ?, local_date = ?
-      WHERE id = ? AND user_id = ?
-    `).bind(
-        card.word.trim(), card.translation_uk, card.context_en, JSON.stringify(card.examples), localDate,
-        pendingId, userId
-    ).run();
-    return replaced.meta.changes > 0;
-}
-
 export async function savePendingDailyWord(env, userId, card, localDate) {
-    await env.DB.prepare("DELETE FROM pending_daily_words WHERE user_id = ? AND local_date <> ?")
+    await env.DB.prepare("DELETE FROM daily_word_cards WHERE user_id = ? AND local_date <> ?")
         .bind(userId, localDate).run();
     const inserted = await env.DB.prepare(`
-      INSERT INTO pending_daily_words (
+      INSERT INTO daily_word_cards (
         user_id, source_text, translation_uk, context_note, examples_json, local_date
       ) VALUES (?, ?, ?, ?, ?, ?)
     `).bind(userId, card.word.trim(), card.translation_uk, card.context_en, JSON.stringify(card.examples), localDate).run();
@@ -136,23 +121,40 @@ export async function savePendingDailyWord(env, userId, card, localDate) {
 
 export async function getPendingDailyWord(env, userId, localDate) {
     const pending = await env.DB.prepare(`
-      SELECT id, source_text, translation_uk, context_note, examples_json
-      FROM pending_daily_words WHERE user_id = ? AND local_date = ? LIMIT 1
+      SELECT id, source_text, translation_uk, context_note, examples_json, learned_at, local_date
+      FROM daily_word_cards WHERE user_id = ? AND local_date = ? ORDER BY id DESC LIMIT 1
     `).bind(userId, localDate).first();
     if (!pending) return null;
 
     return dailyCardFromPending(pending);
 }
 
+export async function getDailyWordNavigation(env, userId, cardId, localDate, direction) {
+    const comparison = direction === "previous" ? "<" : ">";
+    const ordering = direction === "previous" ? "DESC" : "ASC";
+    const pending = await env.DB.prepare(`
+      SELECT id, source_text, translation_uk, context_note, examples_json, learned_at, local_date
+      FROM daily_word_cards
+      WHERE user_id = ? AND local_date = ? AND id ${comparison} ?
+      ORDER BY id ${ordering} LIMIT 1
+    `).bind(userId, localDate, cardId).first();
+    if (!pending) return null;
+    return dailyCardFromPending(pending);
+}
+
+export async function hasPreviousDailyWord(env, userId, cardId, localDate) {
+    return Boolean(await getDailyWordNavigation(env, userId, cardId, localDate, "previous"));
+}
+
 export async function hasPendingDailyWord(env, userId, pendingId) {
-    return Boolean(await env.DB.prepare("SELECT 1 FROM pending_daily_words WHERE id = ? AND user_id = ?")
+    return Boolean(await env.DB.prepare("SELECT 1 FROM daily_word_cards WHERE id = ? AND user_id = ? AND learned_at IS NULL")
         .bind(pendingId, userId).first());
 }
 
 export async function savePendingDailyWordToLearning(env, userId, pendingId) {
     const pending = await env.DB.prepare(`
       SELECT source_text, translation_uk, context_note, examples_json
-      FROM pending_daily_words WHERE id = ? AND user_id = ?
+      FROM daily_word_cards WHERE id = ? AND user_id = ? AND learned_at IS NULL
     `).bind(pendingId, userId).first();
     if (!pending) return false;
 
@@ -169,7 +171,7 @@ export async function savePendingDailyWordToLearning(env, userId, pendingId) {
           VALUES (?, ?, ?, ?)
         `).bind(insertedWord.meta.last_row_id, examples[index].source, examples[index].uk, index + 1).run();
     }
-    await env.DB.prepare("DELETE FROM pending_daily_words WHERE id = ? AND user_id = ?")
+    await env.DB.prepare("UPDATE daily_word_cards SET learned_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?")
         .bind(pendingId, userId).run();
     return true;
 }

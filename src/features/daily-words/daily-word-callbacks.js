@@ -7,10 +7,10 @@ import { answerCallbackQuery, editMessage, sendMessage } from "../../platform/te
 
 /** Handles user-owned actions on an already-sent daily word card. */
 export async function handleDailyWordCallback(env, callback, context, dependencies) {
-    if (!callback.data.startsWith("daily:know:") && !callback.data.startsWith("daily:learn:") && !callback.data.startsWith("daily:next:")) return false;
+    if (!callback.data.startsWith("daily:learn:") && !callback.data.startsWith("daily:next:") && !callback.data.startsWith("daily:prev:")) return false;
 
     const { chatId, messageId, userId } = context;
-    const match = callback.data.match(/^daily:(know|learn|next):(\d+)$/);
+    const match = callback.data.match(/^daily:(learn|next|prev):(\d+)$/);
     if (!match) {
         await answerCallbackQuery(env, callback.id, "Невірний вибір.");
         return true;
@@ -22,6 +22,11 @@ export async function handleDailyWordCallback(env, callback, context, dependenci
         if (action === "next") {
             await answerCallbackQuery(env, callback.id, "Завантажую наступне слово…");
             await dependencies.sendNextDailyWord(env, chatId, userId, pendingId, messageId);
+            return true;
+        }
+        if (action === "prev") {
+            await answerCallbackQuery(env, callback.id, "Показую попереднє слово…");
+            await dependencies.sendPreviousDailyWord(env, chatId, userId, pendingId, messageId);
             return true;
         }
         if (action === "learn") {
@@ -37,23 +42,20 @@ export async function handleDailyWordCallback(env, callback, context, dependenci
             }
         }
 
-        const changed = action === "learn"
-            ? await savePendingDailyWordToLearning(env, userId, pendingId)
-            : (await env.DB.prepare("DELETE FROM pending_daily_words WHERE id = ? AND user_id = ?")
-                .bind(pendingId, userId).run()).meta.changes > 0;
+        const changed = await savePendingDailyWordToLearning(env, userId, pendingId);
         if (!changed) {
             await answerCallbackQuery(env, callback.id, "Ця картка вже оброблена.");
             return true;
         }
 
         await answerCallbackQuery(env, callback.id,
-            action === "learn" ? "Додано до списку для вивчення." : "Чудово, не додаю до списку.");
+            "Додано до списку для вивчення.");
         await editMessage(env, chatId, messageId,
-            action === "learn" ? "📖 Слово додано до «📚 Мої слова»." : "✅ Чудово! Це слово не додано до твого списку.",
+            "📖 Слово додано до «📚 Мої слова».",
             { inline_keyboard: [] });
     } catch (error) {
         console.error({ event: "daily_word_action_failed", message: error instanceof Error ? error.message : "Unknown error" });
-        if (action === "next") {
+        if (action === "next" || action === "prev") {
             await sendMessage(env, chatId, "Не вдалося завантажити наступне слово. Спробуй ще раз за хвилину.");
             return true;
         }

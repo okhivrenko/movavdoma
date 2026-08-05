@@ -82,7 +82,7 @@ import {
 import { handleDailyWordCallback } from "./src/features/daily-words/daily-word-callbacks.js";
 import { clearPendingFeedback, startFeedback, submitFeedback, USER_MESSAGE_TYPE } from "./src/features/feedback/feedback.js";
 import { removeExpiredLearnedWords as cleanupLearnedWords } from "./src/features/vocabulary/learned-word-cleanup.js";
-import { sendDueDailyWords as deliverDueDailyWords, sendNextDailyWord as deliverNextDailyWord, sendTodayDailyWord as deliverTodayDailyWord } from "./src/features/daily-words/daily-delivery.js";
+import { sendDueDailyWords as deliverDueDailyWords, sendNextDailyWord as deliverNextDailyWord, sendPreviousDailyWord as deliverPreviousDailyWord, sendTodayDailyWord as deliverTodayDailyWord } from "./src/features/daily-words/daily-delivery.js";
 import {
     ensureTelegramWebhook as ensureTelegramWebhookFlow,
     sendHelp as sendHelpFlow,
@@ -340,6 +340,7 @@ export default {
                     generateDailyWordCard,
                     maxAttempts: MAX_DAILY_WORD_ATTEMPTS,
                 }, targetMessageId),
+                sendPreviousDailyWord: (targetEnv, targetChatId, targetUserId, pendingId, targetMessageId) => deliverPreviousDailyWord(targetEnv, targetChatId, targetUserId, pendingId, targetMessageId),
             })) {
                 return new Response("ok");
             }
