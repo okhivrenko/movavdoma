@@ -41,12 +41,12 @@ async function learnedWordPageCount(env, userId) {
 
 function listText(words, page, totalPages) {
     if (words.length === 0) return "У словнику поки немає активних слів.";
-    return `Мої слова · сторінка ${page + 1} з ${totalPages}:\n${words.map((word, index) => `${index + 1}. ${word.source_text} — ${word.translation_uk}`).join("\n")}\n\n📘 Показати приклад — натисни номер слова нижче.\n✅ Вже вивчив — натисни номер слова нижче.`;
+    return `Мої слова · сторінка ${page + 1} з ${totalPages}:\n${words.map((word, index) => `${page * ACTIVE_WORDS_PER_PAGE + index + 1}. ${word.source_text} — ${word.translation_uk}`).join("\n")}\n\n📘 Показати приклад — натисни номер слова нижче.\n✅ Вже вивчив — натисни номер слова нижче.`;
 }
 
-function numberButtonRows(words, callbackData, prefix = "") {
+function numberButtonRows(words, page, callbackData, prefix = "") {
     const buttons = words.map((word, index) => ({
-        text: `${prefix}${index + 1}`,
+        text: `${prefix}${page * ACTIVE_WORDS_PER_PAGE + index + 1}`,
         callback_data: callbackData(word),
     }));
     const rows = [];
@@ -61,8 +61,8 @@ function numberButtonRows(words, callbackData, prefix = "") {
 function listKeyboard(words, page, totalPages) {
     if (words.length === 0) return undefined;
     const rows = [
-        ...numberButtonRows(words, (word) => `examples:${word.id}`, "📘 "),
-        ...numberButtonRows(words, (word) => `delete:${word.id}:${page}`, "✅ "),
+        ...numberButtonRows(words, page, (word) => `examples:${word.id}`, "📘 "),
+        ...numberButtonRows(words, page, (word) => `delete:${word.id}:${page}`, "✅ "),
     ];
     const navigation = [];
 
@@ -119,13 +119,13 @@ export async function handleExamplesCallback(env, callback, { chatId, userId }) 
 
 function archivedText(words, page, totalPages) {
     if (words.length === 0) return "Вивчених слів поки немає.";
-    return `Вивчені слова · сторінка ${page + 1} з ${totalPages}:\n${words.map((word, index) => `${index + 1}. ${word.source_text} — ${word.translation_uk}`).join("\n")}\n\nНатисни номер слова, щоб повернути його до навчання.`;
+    return `Вивчені слова · сторінка ${page + 1} з ${totalPages}:\n${words.map((word, index) => `${page * LEARNED_WORDS_PER_PAGE + index + 1}. ${word.source_text} — ${word.translation_uk}`).join("\n")}\n\nНатисни номер слова, щоб повернути його до навчання.`;
 }
 
 function archivedKeyboard(words, page, totalPages) {
     if (words.length === 0) return undefined;
     const numberButtons = words.map((word, index) => ({
-        text: String(index + 1),
+        text: String(page * LEARNED_WORDS_PER_PAGE + index + 1),
         callback_data: `restore:${word.id}:${page}`,
     }));
     const rows = [];

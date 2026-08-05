@@ -96,3 +96,13 @@ test("learned-word list groups number controls and adds pagination", async () =>
     assert.equal(payload.reply_markup.inline_keyboard[1][4].text, "10");
     assert.equal(payload.reply_markup.inline_keyboard[2][0].callback_data, "learned-page:1");
 });
+
+test("vocabulary list numbering continues from eleven on the second page", async () => {
+    const words = Array.from({ length: 10 }, (_, index) => ({ id: index + 11, source_text: `word-${index + 11}`, translation_uk: `переклад-${index + 11}` }));
+    const active = await captureTelegramMessage(() => sendActiveWordList(envWithWords(words, 20), 1, 2, 1));
+    assert.match(active.text, /11\. word-11/);
+    assert.equal(active.reply_markup.inline_keyboard[0][0].text, "📘 11");
+    const learned = await captureTelegramMessage(() => sendLearnedWordList(envWithWords(words, 20), 1, 2, 1));
+    assert.match(learned.text, /11\. word-11/);
+    assert.equal(learned.reply_markup.inline_keyboard[0][0].text, "11");
+});
