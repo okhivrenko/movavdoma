@@ -94,3 +94,21 @@ test("opening the menu again within twelve hours preserves the pending card and 
         globalThis.fetch = originalFetch;
     }
 });
+
+test("a card added to vocabulary can still anchor navigation to the next daily card", async () => {
+    const calls = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (_url, init) => {
+        calls.push(JSON.parse(init.body));
+        return new Response(JSON.stringify({ ok: true, result: true }), { headers: { "content-type": "application/json" } });
+    };
+    try {
+        const next = { ...pending, id: 43, source_text: "curious", translation_uk: "допитливий" };
+        const env = { TELEGRAM_BOT_TOKEN: "test-token", DB: { prepare(query) {
+            return { bind: () => ({ first: async () => query.includes("id >") ? next : query.includes("FROM users") ? { timezone: "Europe/Warsaw", daily_level: "B1" } : pending }) };
+        } } };
+        const { sendNextDailyWord } = await import("./daily-delivery.js");
+        assert.equal(await sendNextDailyWord(env, 123, 123, 42, {}, 7), true);
+        assert.match(calls.at(-1).text, /curious — допитливий/);
+    } finally { globalThis.fetch = originalFetch; }
+});

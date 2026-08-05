@@ -58,10 +58,6 @@ export async function sendNextDailyWord(env, chatId, userId, pendingId, dependen
       SELECT id, source_text, translation_uk, context_note, examples_json, learned_at
       FROM daily_word_cards d
       WHERE id = ? AND user_id = ? AND local_date = ?
-        AND NOT EXISTS (
-          SELECT 1 FROM words w
-          WHERE w.user_id = d.user_id AND lower(w.source_text) = lower(d.source_text)
-        )
     `).bind(pendingId, userId, localTime.date).first();
     if (!current) return false;
     const next = await getDailyWordNavigation(env, userId, pendingId, localTime.date, "next");
