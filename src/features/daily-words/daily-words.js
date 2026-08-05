@@ -181,7 +181,7 @@ export async function savePendingDailyWordToLearning(env, userId, pendingId) {
           VALUES (?, ?, ?, ?)
         `).bind(insertedWord.meta.last_row_id, examples[index].source, examples[index].uk, index + 1).run();
     }
-    await env.DB.prepare("DELETE FROM daily_word_cards WHERE id = ? AND user_id = ?")
+    await env.DB.prepare("UPDATE daily_word_cards SET learned_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?")
         .bind(pendingId, userId).run();
     return true;
 }

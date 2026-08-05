@@ -116,4 +116,5 @@ test("pending daily cards are read and consumed only through user-owned queries"
     const exampleWrites = db.calls.filter((call) => call.query.includes("INSERT INTO examples"));
     assert.equal(exampleWrites.length, 2);
     assert.deepEqual(exampleWrites.map((call) => call.parameters[3]), [1, 2]);
+    assert.ok(db.calls.some((call) => call.query.includes("SET learned_at = CURRENT_TIMESTAMP") && call.parameters.includes(123)));
 });
