@@ -19,7 +19,7 @@ test("landing has a canonical URL, official bot CTA, and privacy link", () => {
 
     assert.match(page, /<html lang="uk">/);
     assert.match(page, /rel="canonical" href="https:\/\/example\.workers\.dev\/"/);
-    assert.match(page, /href="https:\/\/t\.me\/MovaVDomaBot"/);
+    assert.equal([...page.matchAll(/href="https:\/\/t\.me\/MovaVDomaBot\?start=website"/g)].length, 4);
     assert.match(page, /href="\/privacy"/);
     assert.match(page, /rel="icon" href="\/favicon\.png"/);
     assert.match(page, /\/assets\/vendor\/pico\.min\.css/);

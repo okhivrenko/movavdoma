@@ -54,12 +54,18 @@ gtag("js",new Date());
 gtag("config","G-7S3RWCWPV3",{allow_google_signals:false,allow_ad_personalization_signals:false});`;
 }
 
+function telegramStartLink(botUrl, source) {
+    const url = new URL(botUrl);
+    url.searchParams.set("start", source);
+    return url.toString();
+}
+
 /** Server-rendered public page; Google tag defaults to denied analytics storage. */
 export function landingPage({ brandName, publicWorkerUrl, content, scriptNonce }) {
     const brand = escapeHtml(brandName);
     const title = escapeHtml(content.title);
     const description = escapeHtml(content.description);
-    const botUrl = escapeHtml(content.botUrl);
+    const websiteBotUrl = escapeHtml(telegramStartLink(content.botUrl, "website"));
     const canonicalUrl = escapeHtml(publicWorkerUrl);
     const nonce = escapeHtml(scriptNonce);
     const structuredData = schemaJson({
@@ -117,7 +123,7 @@ export function landingPage({ brandName, publicWorkerUrl, content, scriptNonce }
         <a href="#audience">Для кого?</a>
         <a href="#faq">FAQ</a>
       </div>
-      <a class="nav-cta" href="${botUrl}" target="_blank" rel="noopener noreferrer" data-analytics-event="telegram_cta_click" data-analytics-location="header"><span aria-hidden="true">➤</span> Спробувати бота</a>
+      <a class="nav-cta" href="${websiteBotUrl}" target="_blank" rel="noopener noreferrer" data-analytics-event="telegram_cta_click" data-analytics-location="header"><span aria-hidden="true">➤</span> Спробувати бота</a>
     </nav>
   </header>
 
@@ -130,7 +136,7 @@ export function landingPage({ brandName, publicWorkerUrl, content, scriptNonce }
           <p class="eyebrow">Англійська щодня у Telegram</p>
           <h1>Вивчай англійські слова легко та <em>щодня</em></h1>
           <p class="hero-lead">${brand} («Мова як вдома») — твій персональний Telegram-бот, якщо вивчаєш англійську мову: точний переклад, два приклади, власний словник і зручні нагадування.</p>
-          <a class="asset-cta" href="${botUrl}" target="_blank" rel="noopener noreferrer" data-analytics-event="telegram_cta_click" data-analytics-location="hero">
+          <a class="asset-cta" href="${websiteBotUrl}" target="_blank" rel="noopener noreferrer" data-analytics-event="telegram_cta_click" data-analytics-location="hero">
             <img src="/assets/landing/telegram_cta.svg" width="620" height="140" alt="Спробувати бота в Telegram" fetchpriority="high">
           </a>
           <p class="trust-line"><span aria-hidden="true">🛡️</span> Безпечно. Конфіденційно. Тільки для тебе.</p>
@@ -188,7 +194,7 @@ export function landingPage({ brandName, publicWorkerUrl, content, scriptNonce }
     <section class="cta-section section">
       <div class="container cta-banner">
         <img src="/assets/landing/book_house.svg" width="150" height="150" alt="Логотип MovaYakVDoma" loading="lazy" decoding="async">
-        <div><h2>Почни вчити англійські слова <em>вже сьогодні</em></h2><p>${brand} — твій щоденний крок до кращої англійської.</p><a class="primary-cta" href="${botUrl}" target="_blank" rel="noopener noreferrer" data-analytics-event="telegram_cta_click" data-analytics-location="bottom"><span aria-hidden="true">➤</span> Спробувати бота в Telegram</a><small>Безкоштовний старт займає менше хвилини.</small></div>
+        <div><h2>Почни вчити англійські слова <em>вже сьогодні</em></h2><p>${brand} — твій щоденний крок до кращої англійської.</p><a class="primary-cta" href="${websiteBotUrl}" target="_blank" rel="noopener noreferrer" data-analytics-event="telegram_cta_click" data-analytics-location="bottom"><span aria-hidden="true">➤</span> Спробувати бота в Telegram</a><small>Безкоштовний старт займає менше хвилини.</small></div>
       </div>
     </section>
 
@@ -207,7 +213,7 @@ export function landingPage({ brandName, publicWorkerUrl, content, scriptNonce }
   <footer class="site-footer">
     <div class="container footer-grid">
       <a class="wordmark compact" href="/"><img src="/assets/landing/book_house.svg" width="42" height="42" alt=""><span><strong>Mova<span>Yak</span>VDoma</strong><small>Твій англійський словник</small></span></a>
-      <nav aria-label="Навігація в підвалі"><a href="#faq">FAQ</a><a href="/privacy">Політика конфіденційності</a><button class="footer-link" type="button" data-consent-settings>Аналітика</button><a href="${botUrl}" target="_blank" rel="noopener noreferrer" data-analytics-event="telegram_cta_click" data-analytics-location="footer">Telegram</a></nav>
+      <nav aria-label="Навігація в підвалі"><a href="#faq">FAQ</a><a href="/privacy">Політика конфіденційності</a><button class="footer-link" type="button" data-consent-settings>Аналітика</button><a href="${websiteBotUrl}" target="_blank" rel="noopener noreferrer" data-analytics-event="telegram_cta_click" data-analytics-location="footer">Telegram</a></nav>
       <p>© 2026 ${brand}<br>Усі права захищені</p>
     </div>
   </footer>

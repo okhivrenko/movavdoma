@@ -46,6 +46,10 @@ slices and genuine blockers. It is not a stream of intentions.
 
 ## Latest verified result
 
+- Version 1.9.8 released on 5 August 2026 marks all landing-page Telegram
+  calls to action with the privacy-disclosed `website` first-touch source.
+  The public `SoftwareApplication` schema retains the canonical bot URL;
+  `npm run check` passed with 86 tests.
 - Version 1.9.7 released on 5 August 2026 adds privacy-disclosed first-touch
   attribution for the bot.
   Telegram deep links can use the bounded labels `ig_bio`, `ig_story`,
