@@ -5,6 +5,7 @@ import {
     dailyCardFromPending,
     dailyWordKeyboard,
     dailyWordText,
+    generateNewDailyWord,
     getPendingDailyWord,
     savePendingDailyWordToLearning,
 } from "./daily-words.js";
@@ -21,16 +22,32 @@ const card = {
 
 test("daily-card presentation preserves both user actions and exactly two examples", () => {
     assert.deepEqual(dailyWordKeyboard(42), {
-        inline_keyboard: [[
-            { text: "✅ Знаю", callback_data: "daily:know:42" },
-            { text: "📖 Вчити", callback_data: "daily:learn:42" },
-        ]],
+        inline_keyboard: [
+            [
+                { text: "✅ Знаю", callback_data: "daily:know:42" },
+                { text: "📖 Вчити", callback_data: "daily:learn:42" },
+            ],
+            [{ text: "🔄 Показати ще", callback_data: "daily:next:42" }],
+        ],
     });
 
     const text = dailyWordText(card, "B1");
     assert.match(text, /^📚 Нове слово · B1/);
     assert.match(text, /1\. The reliable bus arrived exactly on time\./);
     assert.match(text, /2\. She is reliable when the team needs help\./);
+});
+
+test("daily word generation retries a failed card build before giving up", async () => {
+    let calls = 0;
+    const env = { DB: { prepare: () => ({ bind: () => ({ first: async () => null }) }) } };
+    const generated = await generateNewDailyWord(env, 123, "B1", async () => {
+        calls += 1;
+        if (calls === 1) throw new Error("temporary provider failure");
+        return card;
+    }, 3);
+
+    assert.equal(calls, 2);
+    assert.equal(generated.word, card.word);
 });
 
 test("corrupt or incomplete pending daily cards cannot be shown", () => {

@@ -23,3 +23,20 @@ test("daily callback handler rejects malformed legacy-safe actions before any D1
     });
     assert.equal(telegramCall(calls, "answerCallbackQuery").text, "Невірний вибір.");
 });
+
+test("daily next callback delegates only the owned pending card to the replacement flow", async () => {
+    const calls = [];
+    const { calls: telegramCalls } = await captureTelegramCalls(async () => {
+        const handled = await handleDailyWordCallback({ DB: {} }, { ...callback, data: "daily:next:42" }, context, {
+            ...dependencies,
+            sendNextDailyWord: async (...args) => {
+                calls.push(args.slice(1));
+                return true;
+            },
+        });
+        assert.equal(handled, true);
+    });
+
+    assert.deepEqual(calls, [[123, 123, 42, 7]]);
+    assert.equal(telegramCall(telegramCalls, "answerCallbackQuery").text, "Завантажую наступне слово…");
+});

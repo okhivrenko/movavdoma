@@ -5,12 +5,12 @@ import {
 } from "./daily-words.js";
 import { answerCallbackQuery, editMessage, sendMessage } from "../../platform/telegram.js";
 
-/** Handles the two user-owned actions on an already-sent daily word card. */
+/** Handles user-owned actions on an already-sent daily word card. */
 export async function handleDailyWordCallback(env, callback, context, dependencies) {
-    if (!callback.data.startsWith("daily:know:") && !callback.data.startsWith("daily:learn:")) return false;
+    if (!callback.data.startsWith("daily:know:") && !callback.data.startsWith("daily:learn:") && !callback.data.startsWith("daily:next:")) return false;
 
     const { chatId, messageId, userId } = context;
-    const match = callback.data.match(/^daily:(know|learn):(\d+)$/);
+    const match = callback.data.match(/^daily:(know|learn|next):(\d+)$/);
     if (!match) {
         await answerCallbackQuery(env, callback.id, "Невірний вибір.");
         return true;
@@ -19,6 +19,11 @@ export async function handleDailyWordCallback(env, callback, context, dependenci
     const action = match[1];
     const pendingId = Number(match[2]);
     try {
+        if (action === "next") {
+            await answerCallbackQuery(env, callback.id, "Завантажую наступне слово…");
+            await dependencies.sendNextDailyWord(env, chatId, userId, pendingId, messageId);
+            return true;
+        }
         if (action === "learn") {
             if (!(await hasPendingDailyWord(env, userId, pendingId))) {
                 await answerCallbackQuery(env, callback.id, "Ця картка вже оброблена.");
@@ -48,6 +53,10 @@ export async function handleDailyWordCallback(env, callback, context, dependenci
             { inline_keyboard: [] });
     } catch (error) {
         console.error({ event: "daily_word_action_failed", message: error instanceof Error ? error.message : "Unknown error" });
+        if (action === "next") {
+            await sendMessage(env, chatId, "Не вдалося завантажити наступне слово. Спробуй ще раз за хвилину.");
+            return true;
+        }
         await answerCallbackQuery(env, callback.id, "Не вдалося зберегти вибір.");
     }
     return true;

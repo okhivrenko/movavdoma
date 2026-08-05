@@ -82,7 +82,7 @@ import {
 import { handleDailyWordCallback } from "./src/features/daily-words/daily-word-callbacks.js";
 import { clearPendingFeedback, startFeedback, submitFeedback, USER_MESSAGE_TYPE } from "./src/features/feedback/feedback.js";
 import { removeExpiredLearnedWords as cleanupLearnedWords } from "./src/features/vocabulary/learned-word-cleanup.js";
-import { sendDueDailyWords as deliverDueDailyWords, sendTodayDailyWord as deliverTodayDailyWord } from "./src/features/daily-words/daily-delivery.js";
+import { sendDueDailyWords as deliverDueDailyWords, sendNextDailyWord as deliverNextDailyWord, sendTodayDailyWord as deliverTodayDailyWord } from "./src/features/daily-words/daily-delivery.js";
 import {
     ensureTelegramWebhook as ensureTelegramWebhookFlow,
     sendHelp as sendHelpFlow,
@@ -331,6 +331,15 @@ export default {
             if (await handleDailyWordCallback(env, callback, { chatId, messageId, userId }, {
                 claimDailyWordAddition,
                 getDailyAdditionLimit,
+                sendNextDailyWord: (targetEnv, targetChatId, targetUserId, pendingId, targetMessageId) => deliverNextDailyWord(targetEnv, targetChatId, targetUserId, pendingId, {
+                    claimDailyWordCard,
+                    access: { isAdmin, getUserAccessLevel, dailyWordCardLimitForLevel },
+                    dailyWordCardLimitForLevel,
+                    getUserAccessLevel,
+                    generateNewDailyWord,
+                    generateDailyWordCard,
+                    maxAttempts: MAX_DAILY_WORD_ATTEMPTS,
+                }, targetMessageId),
             })) {
                 return new Response("ok");
             }

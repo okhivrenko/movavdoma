@@ -169,7 +169,11 @@ restore buttons and next/previous navigation. Learned words remain in D1 with
 
 ### Daily word
 
-`📚 Щоденне слово` shows the current pending card or generates a new one.
+`📚 Щоденне слово` generates a new card when the previous pending card was
+already displayed; each shown card counts against the separate daily-card
+limit. The card also has `🔄 Показати ще`, which replaces that unanswered card
+in place with another new card. Card generation retries transient and whole
+card-build failures before showing an error.
 After `Знаю` or `Вчити`, the user can open another card on the same day. The
 number of newly generated cards depends on access level: 5, 10, 15, or 20.
 `⏰ Налаштування` opens a two-step settings flow: choose

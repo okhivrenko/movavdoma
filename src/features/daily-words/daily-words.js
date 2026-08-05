@@ -34,10 +34,13 @@ export async function generateDailyWordCard(env, level) {
 
 export function dailyWordKeyboard(pendingId) {
     return {
-        inline_keyboard: [[
-            { text: "✅ Знаю", callback_data: `daily:know:${pendingId}` },
-            { text: "📖 Вчити", callback_data: `daily:learn:${pendingId}` },
-        ]],
+        inline_keyboard: [
+            [
+                { text: "✅ Знаю", callback_data: `daily:know:${pendingId}` },
+                { text: "📖 Вчити", callback_data: `daily:learn:${pendingId}` },
+            ],
+            [{ text: "🔄 Показати ще", callback_data: `daily:next:${pendingId}` }],
+        ],
     };
 }
 
@@ -75,7 +78,18 @@ export async function claimDailyWordCard(env, userId, localDate, { isAdmin, getU
 
 export async function generateNewDailyWord(env, userId, level, generateCard, maxAttempts) {
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-        const card = await generateCard(env, level);
+        let card;
+        try {
+            card = await generateCard(env, level);
+        } catch (error) {
+            if (attempt === maxAttempts - 1) throw error;
+            console.warn({
+                event: "daily_word_generation_retry",
+                attempt: attempt + 1,
+                message: error instanceof Error ? error.message : "Unknown error",
+            });
+            continue;
+        }
         const existing = await env.DB.prepare(`
           SELECT 1 FROM words WHERE user_id = ? AND lower(source_text) = lower(?)
           UNION ALL
@@ -87,6 +101,19 @@ export async function generateNewDailyWord(env, userId, level, generateCard, max
     }
 
     throw new Error("Could not generate a new daily word.");
+}
+
+/** Replaces an unanswered card without exposing another user's pending card. */
+export async function replacePendingDailyWord(env, userId, pendingId, card, localDate) {
+    const replaced = await env.DB.prepare(`
+      UPDATE pending_daily_words
+      SET source_text = ?, translation_uk = ?, context_note = ?, examples_json = ?, local_date = ?
+      WHERE id = ? AND user_id = ?
+    `).bind(
+        card.word.trim(), card.translation_uk, card.context_en, JSON.stringify(card.examples), localDate,
+        pendingId, userId
+    ).run();
+    return replaced.meta.changes > 0;
 }
 
 export async function savePendingDailyWord(env, userId, card, localDate) {
