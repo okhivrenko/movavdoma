@@ -7,6 +7,7 @@ import {
     dailyWordText,
     generateNewDailyWord,
     getPendingDailyWord,
+    hasValidDailyExamples,
     savePendingDailyWordToLearning,
 } from "./daily-words.js";
 
@@ -48,6 +49,17 @@ test("daily word generation retries a failed card build before giving up", async
 
     assert.equal(calls, 2);
     assert.equal(generated.word, card.word);
+});
+
+test("daily cards reject placeholder, duplicate, and out-of-range example sentences", () => {
+    const valid = [
+        { source: "The reliable bus arrived exactly on time for every passenger." },
+        { source: "She is reliable whenever the team needs extra help." },
+    ];
+    assert.equal(hasValidDailyExamples(valid), true);
+    assert.equal(hasValidDailyExamples([{ source: "A" }, { source: "B" }]), false);
+    assert.equal(hasValidDailyExamples([valid[0], valid[0]]), false);
+    assert.equal(hasValidDailyExamples([{ source: "Too short." }, valid[1]]), false);
 });
 
 test("corrupt or incomplete pending daily cards cannot be shown", () => {

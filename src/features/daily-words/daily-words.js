@@ -4,6 +4,13 @@ import { translateWithDeepL } from "../../platform/deepl.js";
 // Daily-card persistence and delivery flow. Network and access dependencies are
 // passed in explicitly so the Worker remains the composition root.
 
+export function hasValidDailyExamples(examples) {
+    if (!Array.isArray(examples) || examples.length !== 2) return false;
+    const normalized = examples.map((example) => example?.source?.trim());
+    return normalized.every((source) => typeof source === "string" && source.split(/\s+/).length >= 8 && source.split(/\s+/).length <= 18)
+        && new Set(normalized.map((source) => source.toLocaleLowerCase())).size === normalized.length;
+}
+
 /** Generates one coherent two-example card for the supplied CEFR level. */
 export async function generateDailyWordCard(env, level) {
     const result = await openAIJson(env, "daily_word_card", {
@@ -18,7 +25,7 @@ export async function generateDailyWordCard(env, level) {
         }, required: ["word", "context_en", "examples"],
     }, "Create one useful English vocabulary card for a learner at the requested CEFR level. word must be a single English word or a short common phrase, not a proper noun. context_en must precisely state its meaning. Create exactly two natural English example sentences, each 8–18 words. Both examples must use exactly the stated meaning. Do not translate anything.", `CEFR level: ${level}`, { model: env.OPENAI_WORD_MODEL ?? "gpt-5.4-mini", reasoningEffort: "low" });
 
-    if (!result.word?.trim() || !result.context_en?.trim() || !Array.isArray(result.examples) || result.examples.length !== 2 || result.examples.some((example) => typeof example?.source !== "string" || !example.source.trim())) {
+    if (!result.word?.trim() || !result.context_en?.trim() || !hasValidDailyExamples(result.examples)) {
         throw new Error("Invalid daily word examples response.");
     }
     const translations = await translateWithDeepL(env, [result.word, ...result.examples.map((example) => example.source)], {
