@@ -46,6 +46,12 @@ slices and genuine blockers. It is not a stream of intentions.
 
 ## Latest verified result
 
+- Version 1.9.6 released on 5 August 2026 improves landing-page search intent
+  with people-first Ukrainian copy for MovaYakVDoma / «Мова як вдома» / «Мова
+  вдома», English-learning and Telegram-bot queries, plus truthful DeepL and
+  OpenAI FAQ answers. Focused landing tests passed. Cloudflare deployment
+  `64f872f3-0f41-4e09-a70b-cb60bbc9be24` serves the new SEO metadata and FAQ;
+  the production D1 journal has no pending migrations.
 - Version 1.9.5 released on 5 August 2026 vertically centers landing step
   icons with flex alignment. The production CSS asset contains the expected
   `align-items: center` rule. Full tests were intentionally skipped for this
