@@ -82,7 +82,7 @@ em { color: var(--brand-gold); font-style: normal; }
 .step-list { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); gap: 24px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
 .step-list::before { content: ""; position: absolute; top: 51px; left: 10%; right: 10%; border-top: 4px dotted #d7e3ef; }
 .step-list li { position: relative; counter-increment: step; text-align: center; }
-.step-icon { position: relative; z-index: 1; display: grid; place-items: center; width: 104px; height: 104px; margin: 0 auto 20px; border: 1px solid #d8e4ef; border-radius: 50%; color: #fff; background: #fff; box-shadow: 0 10px 28px rgba(10,58,116,.08); font-size: 0; }
+.step-icon { position: relative; z-index: 1; display: flex; justify-content: center; width: 104px; height: 104px; margin: 0 auto 20px; border: 1px solid #d8e4ef; border-radius: 50%; color: #fff; background: #fff; box-shadow: 0 10px 28px rgba(10,58,116,.08); font-size: 0; }
 .step-icon::before { display: grid; place-items: center; width: 68px; height: 68px; border-radius: 50%; background: linear-gradient(145deg, #1496e7, #0875d1); content: counter(step); font-size: 1.55rem; font-weight: 900; }
 .step-list h3 { margin: 0 0 9px; color: var(--brand-navy); font-size: 1rem; }
 .step-list p { margin: 0 auto; max-width: 185px; color: #536a82; font-size: .82rem; line-height: 1.55; }
