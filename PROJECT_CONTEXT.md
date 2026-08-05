@@ -28,7 +28,8 @@ Users add words through Telegram. The bot:
   Telegram webhook remains POST-only and authenticated.
 - Search discovery uses canonical/hreflang/social metadata, `robots.txt`, an
   XML sitemap, and truthful `WebSite` + `SoftwareApplication` JSON-LD. The
-  official landing CTA is `https://t.me/MovaVDomaBot`.
+  canonical bot URL is `https://t.me/MovaVDomaBot`; landing CTAs use its
+  `?start=website` attribution link.
 - D1 database name: `vocab-words-db`
 - Telegram receives updates through a webhook.
 - The webhook must accept both `message` and `callback_query` updates.
@@ -86,6 +87,25 @@ Marketing links can use one approved Telegram start payload: `ig_bio`,
 `https://t.me/MovaVDomaBot?start=ig_bio`. The bot stores only the first known
 source for a new user; it never overwrites it or stores arbitrary payloads.
 Admins can open `📈 Джерела стартів` or use `/sources` for a grouped count.
+
+#### Marketing attribution and monitoring
+
+Use one dedicated link per channel:
+
+| Channel | Link |
+| --- | --- |
+| Landing page | automatically uses `?start=website` |
+| Instagram bio | `https://t.me/MovaVDomaBot?start=ig_bio` |
+| Instagram story | `https://t.me/MovaVDomaBot?start=ig_story` |
+| Telegram post | `https://t.me/MovaVDomaBot?start=tg_post` |
+| Telegram Ads | `https://t.me/MovaVDomaBot?start=tg_ads` |
+
+Monitor new bot users in the admin-only `📈 Джерела стартів` view or with
+`/sources`. `direct_or_legacy` combines users who started without an approved
+link and users created before attribution existed. For landing traffic and CTA
+clicks, use GA4 property `G-7S3RWCWPV3`; full events require the visitor to
+accept analytics cookies, while the source summary is independent of web
+analytics consent.
 
 Users can simply send an English word or phrase; `/add` remains supported.
 The currently active card direction is English → Ukrainian. The architecture also

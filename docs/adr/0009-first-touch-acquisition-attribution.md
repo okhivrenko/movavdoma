@@ -21,6 +21,8 @@ links never overwrite the first-touch value.
 
 The admin-only `📈 Джерела стартів` action and `/sources` show grouped totals
 without user identifiers. The privacy policy discloses this limited purpose.
+All public landing-page CTA links use `?start=website`; canonical SEO schema
+retains the clean bot URL.
 
 ## Alternatives considered
 
