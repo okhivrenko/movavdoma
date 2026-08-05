@@ -46,6 +46,11 @@ slices and genuine blockers. It is not a stream of intentions.
 
 ## Latest verified result
 
+- Version 1.9.3 released on 5 August 2026 centers landing step icons with flex
+  layout and ships the widened Telegram CTA SVG. `npm run check` passed with 80
+  tests. Cloudflare deployment `af6f40b0-f41b-46f0-a266-cdb634acb09e`
+  serves the landing, updated CSS, and valid SVG with HTTP 200; the production
+  D1 journal has no pending migrations.
 - Version 1.9.2 released on 4 August 2026 fixes GA4 collection after consent:
   persisted opt-in is restored through `consent update` between the denied
   default and GA4 config, and the landing CSP now permits Google's documented
