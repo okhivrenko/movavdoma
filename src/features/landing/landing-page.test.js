@@ -4,8 +4,8 @@ import assert from "node:assert/strict";
 import { landingPage } from "./landing-page.js";
 
 const content = {
-    title: "Вивчення англійських слів у Telegram — MovaYakVDoma",
-    description: "Вивчай слова у Telegram.",
+    title: "MovaYakVDoma («Мова як вдома») — Telegram-бот для вивчення англійської",
+    description: "MovaYakVDoma — Telegram-бот для вивчення англійської мови.",
     botUrl: "https://t.me/MovaVDomaBot",
 };
 
@@ -28,6 +28,11 @@ test("landing has a canonical URL, official bot CTA, and privacy link", () => {
     assert.match(page, /<h3>Додай слово<\/h3>/);
     assert.match(page, /charge \/ payment for a service/);
     assert.match(page, /Вивчай англійські слова легко та <em>щодня<\/em>/);
+    assert.match(page, /Мова як вдома/);
+    assert.match(page, /Мова вдома/);
+    assert.match(page, /вивчаєш англійську мову/);
+    assert.match(page, /OpenAI допомагає підібрати значення/);
+    assert.match(page, /DeepL/);
     assert.match(page, /\/assets\/landing\/field_waves\.svg/);
     assert.match(page, /\/assets\/landing\/hero_wheat\.svg/);
     assert.match(page, /\/assets\/landing\/landing\.css/);

@@ -129,7 +129,7 @@ export function landingPage({ brandName, publicWorkerUrl, content, scriptNonce }
         <div class="hero-copy">
           <p class="eyebrow">Англійська щодня у Telegram</p>
           <h1>Вивчай англійські слова легко та <em>щодня</em></h1>
-          <p class="hero-lead">${brand} — твій персональний Telegram-бот для вивчення слів: точний переклад, два приклади, власний словник і зручні нагадування.</p>
+          <p class="hero-lead">${brand} («Мова як вдома») — твій персональний Telegram-бот, якщо вивчаєш англійську мову: точний переклад, два приклади, власний словник і зручні нагадування.</p>
           <a class="asset-cta" href="${botUrl}" target="_blank" rel="noopener noreferrer" data-analytics-event="telegram_cta_click" data-analytics-location="hero">
             <img src="/assets/landing/telegram_cta.svg" width="620" height="140" alt="Спробувати бота в Telegram" fetchpriority="high">
           </a>
@@ -196,8 +196,10 @@ export function landingPage({ brandName, publicWorkerUrl, content, scriptNonce }
       <div class="container faq-wrap">
         <div class="section-heading"><p>Коротко про головне</p><h2>FAQ</h2><span></span></div>
         <details><summary>Чи потрібно встановлювати окремий застосунок?</summary><p>Ні. MovaYakVDoma працює у Telegram — достатньо відкрити бот і надіслати слово.</p></details>
+        <details><summary>Що таке MovaYakVDoma («Мова як вдома» або «Мова вдома»)?</summary><p>Це безкоштовний Telegram-бот для тих, хто вивчає англійську мову: він допомагає перекладати слова, бачити приклади й повертатися до власного словника щодня.</p></details>
         <details><summary>Що зберігає бот?</summary><p>Твій словник, приклади, навчальний прогрес і налаштування нагадувань. Деталі є у <a href="/privacy">політиці приватності</a>.</p></details>
         <details><summary>Чи можу я додати конкретне значення слова?</summary><p>Так. Додай контекст після <code>/</code>, наприклад: <code>charge / payment for a service</code>.</p></details>
+        <details><summary>Які AI-сервіси допомагають боту?</summary><p>Для перекладу текстів бот використовує DeepL. OpenAI допомагає підібрати значення англійських слів і створити приклади; окремо реєструватися у цих сервісах не потрібно.</p></details>
       </div>
     </section>
   </main>
