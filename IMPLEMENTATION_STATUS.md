@@ -46,6 +46,11 @@ slices and genuine blockers. It is not a stream of intentions.
 
 ## Latest verified result
 
+- Version 1.9.5 released on 5 August 2026 vertically centers landing step
+  icons with flex alignment. The production CSS asset contains the expected
+  `align-items: center` rule. Full tests were intentionally skipped for this
+  CSS-only hotfix at the user's request. Cloudflare deployment
+  `4c73441b-f76e-4233-8bf9-033d702537da` is live.
 - Version 1.9.4 released on 5 August 2026 lets admins read full feedback and
   contact messages from separate paginated lists. Each page shows ten stable
   numbered read buttons, plus previous/next navigation; every detail view
