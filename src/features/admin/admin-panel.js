@@ -5,10 +5,12 @@ import { editMessage, sendMessage } from "../../platform/telegram.js";
 const ADMIN_USER_LIST_LIMIT = 25;
 const ADMIN_MESSAGE_LIST_LIMIT = 10;
 const ADMIN_MESSAGE_PREVIEW_LIMIT = 240;
+const ADMIN_MESSAGE_DETAIL_LIMIT = 3500;
+const ADMIN_MESSAGE_BUTTON_COLUMNS = 5;
 
 const MESSAGE_LIST_CONFIG = Object.freeze({
-    feedback: Object.freeze({ title: "💬 Відгуки", callback: "admin:feedback" }),
-    contact: Object.freeze({ title: "📩 Повідомлення", callback: "admin:contact" }),
+    feedback: Object.freeze({ title: "💬 Відгуки", detailTitle: "💬 Відгук", callback: "admin:feedback" }),
+    contact: Object.freeze({ title: "📩 Повідомлення", detailTitle: "📩 Повідомлення", callback: "admin:contact" }),
 });
 
 export function adminKeyboard() {
@@ -24,7 +26,7 @@ export function adminKeyboard() {
 }
 
 export function adminHelpText() {
-    return "🛠 Адмін-панель\n\n• 👥 Список користувачів — усі користувачі, по 25 на сторінці, з ID, ім’ям, ніком, лімітами, кількістю активних слів і останньою активністю.\n• 💬 Відгуки та 📩 Повідомлення — окремі списки звернень, по 10 на сторінці.\n• 🔗 Посилання на бота — показує пряме посилання, яке можна скопіювати або переслати.\n• /grant <userId> <ліміт> — встановити ліміт додавання слів на 1 місяць.\n  Приклад: /grant 123456789 45\n• /level <userId> <0-3> — постійно підвищити рівень доступу. Щоденні картки: 0→5, 1→10, 2→15, 3→20.\n  Приклад: /level 123456789 2\n• /testlevel <userId> — видати тестовий рівень 1 на 1 день.\n  Приклад: /testlevel 123456789\n• 🎁 Заявки на донати приходять окремими картками з кнопками підтвердження.";
+    return "🛠 Адмін-панель\n\n• 👥 Список користувачів — усі користувачі, по 25 на сторінці, з ID, ім’ям, ніком, лімітами, кількістю активних слів і останньою активністю.\n• 💬 Відгуки та 📩 Повідомлення — окремі списки звернень, по 10 на сторінці, з кнопками для читання повного тексту.\n• 🔗 Посилання на бота — показує пряме посилання, яке можна скопіювати або переслати.\n• /grant <userId> <ліміт> — встановити ліміт додавання слів на 1 місяць.\n  Приклад: /grant 123456789 45\n• /level <userId> <0-3> — постійно підвищити рівень доступу. Щоденні картки: 0→5, 1→10, 2→15, 3→20.\n  Приклад: /level 123456789 2\n• /testlevel <userId> — видати тестовий рівень 1 на 1 день.\n  Приклад: /testlevel 123456789\n• 🎁 Заявки на донати приходять окремими картками з кнопками підтвердження.";
 }
 
 function compactAdminNumber(value) {
@@ -64,6 +66,13 @@ function compactMessagePreview(value) {
     return text.length > ADMIN_MESSAGE_PREVIEW_LIMIT ? `${text.slice(0, ADMIN_MESSAGE_PREVIEW_LIMIT - 1)}…` : text;
 }
 
+function messageSender(message) {
+    const username = compactProfileField(message.telegram_username, 32);
+    const firstName = compactProfileField(message.telegram_first_name, 32);
+    const profile = [username && `@${username.replace(/^@/, "")}`, firstName].filter(Boolean).join(" · ");
+    return `ID ${message.user_id}${profile ? ` · ${profile}` : ""}`;
+}
+
 function messageCreatedAtLabel(value) {
     const text = String(value ?? "");
     const timestamp = Date.parse(text.includes("T") ? text : `${text.replace(" ", "T")}Z`);
@@ -78,12 +87,21 @@ function messageCreatedAtLabel(value) {
     }).format(timestamp);
 }
 
-function messageListKeyboard(type, page, totalPages) {
+function messageListKeyboard(type, page, totalPages, messages) {
     const navigation = [];
     const callback = MESSAGE_LIST_CONFIG[type].callback;
+    const readButtons = messages.map((message, index) => ({
+        text: String(page * ADMIN_MESSAGE_LIST_LIMIT + index + 1),
+        callback_data: `${callback}:read:${message.id}:${page}`,
+    }));
+    const keyboard = Array.from(
+        { length: Math.ceil(readButtons.length / ADMIN_MESSAGE_BUTTON_COLUMNS) },
+        (_, index) => readButtons.slice(index * ADMIN_MESSAGE_BUTTON_COLUMNS, (index + 1) * ADMIN_MESSAGE_BUTTON_COLUMNS)
+    );
     if (page > 0) navigation.push({ text: "← Назад", callback_data: `${callback}:${page - 1}` });
     if (page < totalPages - 1) navigation.push({ text: "Далі →", callback_data: `${callback}:${page + 1}` });
-    return navigation.length > 0 ? { inline_keyboard: [navigation] } : { inline_keyboard: [] };
+    if (navigation.length > 0) keyboard.push(navigation);
+    return { inline_keyboard: keyboard };
 }
 
 export async function sendAdminMessageList(env, chatId, type, requestedPage = 0, messageId = null) {
@@ -100,7 +118,7 @@ export async function sendAdminMessageList(env, chatId, type, requestedPage = 0,
     const totalPages = Math.ceil(total / ADMIN_MESSAGE_LIST_LIMIT);
     const page = Math.min(Math.max(requestedPage, 0), totalPages - 1);
     const result = await env.DB.prepare(`
-      SELECT m.user_id, m.content, m.created_at, u.telegram_username, u.telegram_first_name
+      SELECT m.id, m.user_id, m.content, m.created_at, u.telegram_username, u.telegram_first_name
       FROM user_messages m
       LEFT JOIN users u ON u.telegram_user_id = m.user_id
       WHERE m.message_type = ?
@@ -108,16 +126,32 @@ export async function sendAdminMessageList(env, chatId, type, requestedPage = 0,
       LIMIT ? OFFSET ?
     `).bind(type, ADMIN_MESSAGE_LIST_LIMIT, page * ADMIN_MESSAGE_LIST_LIMIT).all();
     const entries = result.results.map((message, index) => {
-        const username = compactProfileField(message.telegram_username, 32);
-        const firstName = compactProfileField(message.telegram_first_name, 32);
-        const profile = [username && `@${username.replace(/^@/, "")}`, firstName].filter(Boolean).join(" · ");
-        const sender = `ID ${message.user_id}${profile ? ` · ${profile}` : ""}`;
-        return `${page * ADMIN_MESSAGE_LIST_LIMIT + index + 1}. ${messageCreatedAtLabel(message.created_at)} · ${sender}\n${compactMessagePreview(message.content)}`;
+        return `${page * ADMIN_MESSAGE_LIST_LIMIT + index + 1}. ${messageCreatedAtLabel(message.created_at)} · ${messageSender(message)}\n${compactMessagePreview(message.content)}`;
     }).join("\n\n");
-    const text = `${config.title}: ${total}\nСторінка ${page + 1} з ${totalPages}\n\n${entries}`;
-    const keyboard = messageListKeyboard(type, page, totalPages);
+    const text = `${config.title}: ${total}\nСторінка ${page + 1} з ${totalPages}\n\n${entries}\n\nПрочитати:`;
+    const keyboard = messageListKeyboard(type, page, totalPages, result.results);
     if (messageId) return editMessage(env, chatId, messageId, text, keyboard);
     return sendMessage(env, chatId, text, keyboard);
+}
+
+export async function showAdminMessageDetail(env, chatId, type, recordId, page, telegramMessageId) {
+    const config = MESSAGE_LIST_CONFIG[type];
+    if (!config) throw new Error("Unsupported admin message list type.");
+    const message = await env.DB.prepare(`
+      SELECT m.id, m.user_id, m.content, m.created_at, u.telegram_username, u.telegram_first_name
+      FROM user_messages m
+      LEFT JOIN users u ON u.telegram_user_id = m.user_id
+      WHERE m.id = ? AND m.message_type = ?
+      LIMIT 1
+    `).bind(recordId, type).first();
+    if (!message) return false;
+
+    const content = String(message.content ?? "").slice(0, ADMIN_MESSAGE_DETAIL_LIMIT);
+    const text = `${config.detailTitle} #${recordId}\n${messageCreatedAtLabel(message.created_at)} · ${messageSender(message)}\n\n${content}`;
+    await editMessage(env, chatId, telegramMessageId, text, {
+        inline_keyboard: [[{ text: "← До списку", callback_data: `${config.callback}:${page}` }]],
+    });
+    return true;
 }
 
 export async function sendAdminUserList(env, chatId, requestedPage = 0, messageId = null, dependencies) {

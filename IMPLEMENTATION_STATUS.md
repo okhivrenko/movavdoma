@@ -46,6 +46,14 @@ slices and genuine blockers. It is not a stream of intentions.
 
 ## Latest verified result
 
+- Version 1.9.4 released on 5 August 2026 lets admins read full feedback and
+  contact messages from separate paginated lists. Each page shows ten stable
+  numbered read buttons, plus previous/next navigation; every detail view
+  returns to its original list page. Access remains restricted to private-chat
+  admins and record IDs are validated before parameterized reads. `npm run
+  check` passed with 82 tests. Cloudflare deployment
+  `717c7a21-e788-4ffe-a681-012c177e55fc` returns HTTP 200; the production D1
+  journal has no pending migrations.
 - Version 1.9.3 released on 5 August 2026 centers landing step icons with flex
   layout and ships the widened Telegram CTA SVG. `npm run check` passed with 80
   tests. Cloudflare deployment `af6f40b0-f41b-46f0-a266-cdb634acb09e`

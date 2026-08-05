@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { adminKeyboard, lastActivityLabel, sendAdminMessageList, sendAdminUserList } from "./admin-panel.js";
+import { adminKeyboard, lastActivityLabel, sendAdminMessageList, sendAdminUserList, showAdminMessageDetail } from "./admin-panel.js";
 import { captureTelegramCalls, telegramCall } from "../../../test-support/worker-test-helpers.js";
 
 test("admin panel keeps stable callback actions and reports an empty user list", async () => {
@@ -17,6 +17,7 @@ test("admin panel keeps stable callback actions and reports an empty user list",
 
 test("admin message lists are separate and paginate after ten entries", async () => {
     const messages = Array.from({ length: 10 }, (_, index) => ({
+        id: index + 100,
         user_id: index + 1,
         content: `Відгук ${index + 1}`,
         created_at: "2026-08-04 08:00:00",
@@ -40,14 +41,45 @@ test("admin message lists are separate and paginate after ten entries", async ()
     const feedbackMessage = telegramCall(feedback.calls, "sendMessage");
     assert.match(feedbackMessage.text, /💬 Відгуки: 11/);
     assert.match(feedbackMessage.text, /04\.08\.2026/);
-    assert.equal(feedbackMessage.reply_markup.inline_keyboard[0][0].callback_data, "admin:feedback:1");
+    assert.deepEqual(
+        feedbackMessage.reply_markup.inline_keyboard.slice(0, 2).flat().map((button) => button.callback_data),
+        ["admin:feedback:read:100:0", "admin:feedback:read:101:0", "admin:feedback:read:102:0", "admin:feedback:read:103:0", "admin:feedback:read:104:0", "admin:feedback:read:105:0", "admin:feedback:read:106:0", "admin:feedback:read:107:0", "admin:feedback:read:108:0", "admin:feedback:read:109:0"]
+    );
+    assert.equal(feedbackMessage.reply_markup.inline_keyboard[2][0].callback_data, "admin:feedback:1");
 
     const secondPage = await captureTelegramCalls(() => sendAdminMessageList(env, 456, "feedback", 1, 77));
     const secondPageMessage = telegramCall(secondPage.calls, "editMessageText");
-    assert.equal(secondPageMessage.reply_markup.inline_keyboard[0][0].callback_data, "admin:feedback:0");
+    assert.equal(secondPageMessage.reply_markup.inline_keyboard.at(-1)[0].callback_data, "admin:feedback:0");
 
     const contact = await captureTelegramCalls(() => sendAdminMessageList(env, 456, "contact"));
     assert.match(telegramCall(contact.calls, "sendMessage").text, /📩 Повідомлення поки немає/);
+});
+
+test("admin can read one full feedback message and return to its list page", async () => {
+    const env = {
+        TELEGRAM_BOT_TOKEN: "test-token",
+        DB: {
+            prepare: () => ({
+                bind: () => ({ first: async () => ({
+                    id: 42,
+                    user_id: 123,
+                    content: "Повний текст відгуку\nз нового рядка.",
+                    created_at: "2026-08-05 08:00:00",
+                    telegram_username: "olena",
+                    telegram_first_name: "Олена",
+                }) }),
+            }),
+        },
+    };
+    const { calls } = await captureTelegramCalls(() => showAdminMessageDetail(env, 456, "feedback", 42, 1, 77));
+    const message = telegramCall(calls, "editMessageText");
+    assert.match(message.text, /Повний текст відгуку\nз нового рядка/);
+    assert.match(message.text, /ID 123 · @olena · Олена/);
+    assert.equal(message.reply_markup.inline_keyboard[0][0].callback_data, "admin:feedback:1");
+
+    const contact = await captureTelegramCalls(() => showAdminMessageDetail(env, 456, "contact", 42, 0, 77));
+    assert.match(telegramCall(contact.calls, "editMessageText").text, /📩 Повідомлення #42/);
+    assert.equal(telegramCall(contact.calls, "editMessageText").reply_markup.inline_keyboard[0][0].callback_data, "admin:contact:0");
 });
 
 test("admin user list includes the stored Telegram nickname and first name", async () => {

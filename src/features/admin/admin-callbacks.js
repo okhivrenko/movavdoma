@@ -1,5 +1,5 @@
 import { answerCallbackQuery, sendMessage } from "../../platform/telegram.js";
-import { adminHelpText, sendAdminMessageList, sendAdminUserList } from "./admin-panel.js";
+import { adminHelpText, sendAdminMessageList, sendAdminUserList, showAdminMessageDetail } from "./admin-panel.js";
 
 /** Handles only the stable `admin:` callback namespace after private-chat validation. */
 export async function handleAdminCallback(env, callback, context, dependencies) {
@@ -22,6 +22,19 @@ export async function handleAdminCallback(env, callback, context, dependencies) 
             isAdmin: dependencies.isAdmin,
             dailyAddLimit: dependencies.dailyAddLimit,
         });
+        return true;
+    }
+
+    const messageReadMatch = callback.data.match(/^admin:(feedback|contact):read:(\d+):(\d+)$/);
+    if (messageReadMatch) {
+        const recordId = Number(messageReadMatch[2]);
+        const page = Number(messageReadMatch[3]);
+        if (!Number.isSafeInteger(recordId) || recordId < 1 || !Number.isSafeInteger(page) || page < 0) {
+            await answerCallbackQuery(env, callback.id, "Невірне звернення.");
+            return true;
+        }
+        const found = await showAdminMessageDetail(env, chatId, messageReadMatch[1], recordId, page, messageId);
+        await answerCallbackQuery(env, callback.id, found ? "Відкриваю звернення." : "Звернення не знайдено.");
         return true;
     }
 
