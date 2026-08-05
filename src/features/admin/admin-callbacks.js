@@ -1,5 +1,5 @@
 import { answerCallbackQuery, sendMessage } from "../../platform/telegram.js";
-import { adminHelpText, sendAdminMessageList, sendAdminUserList, showAdminMessageDetail } from "./admin-panel.js";
+import { adminHelpText, sendAcquisitionSourceSummary, sendAdminMessageList, sendAdminUserList, showAdminMessageDetail } from "./admin-panel.js";
 
 /** Handles only the stable `admin:` callback namespace after private-chat validation. */
 export async function handleAdminCallback(env, callback, context, dependencies) {
@@ -22,6 +22,12 @@ export async function handleAdminCallback(env, callback, context, dependencies) 
             isAdmin: dependencies.isAdmin,
             dailyAddLimit: dependencies.dailyAddLimit,
         });
+        return true;
+    }
+
+    if (callback.data === "admin:sources") {
+        await answerCallbackQuery(env, callback.id, "Готую джерела стартів.");
+        await sendAcquisitionSourceSummary(env, chatId);
         return true;
     }
 

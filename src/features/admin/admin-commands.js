@@ -4,8 +4,13 @@ export async function handleAdminCommand(env, text, { chatId, userId }, d) {
     const grant = text.match(/^\/grant(?:\s+(.+))?$/i);
     const level = text.match(/^\/level(?:\s+(.+))?$/i);
     const test = text.match(/^\/testlevel(?:\s+(.+))?$/i);
-    if (!grant && !level && !test) return false;
+    const sources = /^\/sources$/i.test(text);
+    if (!grant && !level && !test && !sources) return false;
     if (!d.isAdmin(env, userId)) { await sendMessage(env, chatId, "Ця команда доступна лише адміну."); return true; }
+    if (sources) {
+        await d.sendAcquisitionSourceSummary(env, chatId);
+        return true;
+    }
     if (grant) {
         const p = grant[1]?.trim().split(/\s+/) ?? [];
         if (p.length !== 2 || !/^\d+$/.test(p[0]) || !/^\d+$/.test(p[1])) { await sendMessage(env, chatId, "Використай: /grant userId ліміт\nНаприклад: /grant 123456789 45"); return true; }

@@ -86,6 +86,20 @@ test("/start shows the saved schedule and the first menu page", async () => {
     assert.ok(db.calls.some((call) => call.query?.includes("last_seen_at")));
 });
 
+test("a supported Telegram start link welcomes the user and records its first-touch source", async () => {
+    const db = new WorkerTestDb();
+    const { calls } = await captureTelegramCalls(() => worker.fetch(
+        webhookRequest(privateMessageUpdate({ updateId: 18, text: "/start ig_bio" })),
+        workerEnv(db)
+    ));
+
+    assert.match(telegramCall(calls, "sendMessage").text, /Нагадування:/);
+    const userUpsert = db.calls.find((call) => call.method === "run" && call.query?.includes("INSERT INTO users"));
+    assert.ok(userUpsert);
+    assert.equal(userUpsert.parameters.at(-1), "ig_bio");
+    assert.doesNotMatch(userUpsert.query, /acquisition_source =/);
+});
+
 test("/menu and Ukrainian menu buttons use navigation routing", async () => {
     const db = new WorkerTestDb();
     const env = workerEnv(db);

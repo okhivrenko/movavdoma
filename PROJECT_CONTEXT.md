@@ -81,6 +81,12 @@ admin-only commands. It can also show a copyable direct bot link. The user
 list includes Telegram IDs, names, usernames, active-word count, current daily
 limit, access level, and last bot interaction (25 users per page).
 
+Marketing links can use one approved Telegram start payload: `ig_bio`,
+`ig_story`, `tg_ads`, `tg_post`, or `website`, for example
+`https://t.me/MovaVDomaBot?start=ig_bio`. The bot stores only the first known
+source for a new user; it never overwrites it or stores arbitrary payloads.
+Admins can open `📈 Джерела стартів` or use `/sources` for a grouped count.
+
 Users can simply send an English word or phrase; `/add` remains supported.
 The currently active card direction is English → Ukrainian. The architecture also
 defines future Ukrainian → English, Spanish, Polish, and German directions, but

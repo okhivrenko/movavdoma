@@ -16,6 +16,7 @@ const MESSAGE_LIST_CONFIG = Object.freeze({
 export function adminKeyboard() {
     return { inline_keyboard: [
         [{ text: "👥 Список користувачів", callback_data: "admin:users" }],
+        [{ text: "📈 Джерела стартів", callback_data: "admin:sources" }],
         [{ text: "💬 Відгуки", callback_data: "admin:feedback" }, { text: "📩 Повідомлення", callback_data: "admin:contact" }],
         [{ text: "🔗 Посилання на бота", callback_data: "admin:link" }],
         [{ text: "🎁 Змінити ліміт", callback_data: "admin:grant" }],
@@ -26,7 +27,22 @@ export function adminKeyboard() {
 }
 
 export function adminHelpText() {
-    return "🛠 Адмін-панель\n\n• 👥 Список користувачів — усі користувачі, по 25 на сторінці, з ID, ім’ям, ніком, лімітами, кількістю активних слів і останньою активністю.\n• 💬 Відгуки та 📩 Повідомлення — окремі списки звернень, по 10 на сторінці, з кнопками для читання повного тексту.\n• 🔗 Посилання на бота — показує пряме посилання, яке можна скопіювати або переслати.\n• /grant <userId> <ліміт> — встановити ліміт додавання слів на 1 місяць.\n  Приклад: /grant 123456789 45\n• /level <userId> <0-3> — постійно підвищити рівень доступу. Щоденні картки: 0→5, 1→10, 2→15, 3→20.\n  Приклад: /level 123456789 2\n• /testlevel <userId> — видати тестовий рівень 1 на 1 день.\n  Приклад: /testlevel 123456789\n• 🎁 Заявки на донати приходять окремими картками з кнопками підтвердження.";
+    return "🛠 Адмін-панель\n\n• 👥 Список користувачів — усі користувачі, по 25 на сторінці, з ID, ім’ям, ніком, лімітами, кількістю активних слів і останньою активністю.\n• 📈 Джерела стартів або /sources — підсумок першого відомого джерела запуску бота.\n• 💬 Відгуки та 📩 Повідомлення — окремі списки звернень, по 10 на сторінці, з кнопками для читання повного тексту.\n• 🔗 Посилання на бота — показує пряме посилання, яке можна скопіювати або переслати.\n• /grant <userId> <ліміт> — встановити ліміт додавання слів на 1 місяць.\n  Приклад: /grant 123456789 45\n• /level <userId> <0-3> — постійно підвищити рівень доступу. Щоденні картки: 0→5, 1→10, 2→15, 3→20.\n  Приклад: /level 123456789 2\n• /testlevel <userId> — видати тестовий рівень 1 на 1 день.\n  Приклад: /testlevel 123456789\n• 🎁 Заявки на донати приходять окремими картками з кнопками підтвердження.";
+}
+
+export async function sendAcquisitionSourceSummary(env, chatId) {
+    const result = await env.DB.prepare(`
+      SELECT COALESCE(acquisition_source, 'direct_or_legacy') AS source, COUNT(*) AS total
+      FROM users
+      GROUP BY COALESCE(acquisition_source, 'direct_or_legacy')
+      ORDER BY total DESC, source ASC
+    `).all();
+    const rows = result.results ?? [];
+    const total = rows.reduce((sum, row) => sum + Number(row.total ?? 0), 0);
+    const list = rows.length > 0
+        ? rows.map((row) => `• ${row.source}: ${row.total}`).join("\n")
+        : "Поки немає користувачів.";
+    await sendMessage(env, chatId, `📈 Джерела стартів: ${total}\n\n${list}\n\nВраховується лише перший відомий start-link. direct_or_legacy — прямі та наявні до запуску міток.`);
 }
 
 function compactAdminNumber(value) {

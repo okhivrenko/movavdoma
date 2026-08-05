@@ -1,18 +1,36 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { adminKeyboard, lastActivityLabel, sendAdminMessageList, sendAdminUserList, showAdminMessageDetail } from "./admin-panel.js";
+import { adminKeyboard, lastActivityLabel, sendAcquisitionSourceSummary, sendAdminMessageList, sendAdminUserList, showAdminMessageDetail } from "./admin-panel.js";
 import { captureTelegramCalls, telegramCall } from "../../../test-support/worker-test-helpers.js";
 
 test("admin panel keeps stable callback actions and reports an empty user list", async () => {
     assert.equal(adminKeyboard().inline_keyboard[0][0].callback_data, "admin:users");
-    assert.equal(adminKeyboard().inline_keyboard[1][0].callback_data, "admin:feedback");
-    assert.equal(adminKeyboard().inline_keyboard[1][1].callback_data, "admin:contact");
+    assert.equal(adminKeyboard().inline_keyboard[1][0].callback_data, "admin:sources");
+    assert.equal(adminKeyboard().inline_keyboard[2][0].callback_data, "admin:feedback");
+    assert.equal(adminKeyboard().inline_keyboard[2][1].callback_data, "admin:contact");
     const env = { TELEGRAM_BOT_TOKEN: "test-token", DB: { prepare: () => ({ first: async () => ({ total: 0 }) }) } };
     const { calls } = await captureTelegramCalls(() => sendAdminUserList(
         env, 456, 0, null, { isAdmin: () => false, dailyAddLimit: 10 }
     ));
     assert.match(telegramCall(calls, "sendMessage").text, /Користувачів поки немає/);
+});
+
+test("admin source summary groups first-touch labels without user details", async () => {
+    const env = {
+        TELEGRAM_BOT_TOKEN: "test-token",
+        DB: {
+            prepare: () => ({ all: async () => ({ results: [
+                { source: "ig_bio", total: 3 },
+                { source: "direct_or_legacy", total: 2 },
+            ] }) }),
+        },
+    };
+    const { calls } = await captureTelegramCalls(() => sendAcquisitionSourceSummary(env, 456));
+    const message = telegramCall(calls, "sendMessage");
+    assert.match(message.text, /Джерела стартів: 5/);
+    assert.match(message.text, /ig_bio: 3/);
+    assert.doesNotMatch(message.text, /telegram_user_id|ID \d/);
 });
 
 test("admin message lists are separate and paginate after ten entries", async () => {

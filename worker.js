@@ -39,10 +39,11 @@ import {
     grantManualDailyLimit as grantManualDailyLimitFlow,
     grantTestLevelOne as grantTestLevelOneFlow,
 } from "./src/features/admin/admin-access.js";
-import { adminHelpText, adminKeyboard } from "./src/features/admin/admin-panel.js";
+import { adminHelpText, adminKeyboard, sendAcquisitionSourceSummary } from "./src/features/admin/admin-panel.js";
 import { handleAdminCallback } from "./src/features/admin/admin-callbacks.js";
 import { handleAdminCommand } from "./src/features/admin/admin-commands.js";
 import { messages } from "./src/domain/messages.js";
+import { acquisitionSourceFromStartCommand, isTelegramStartCommand } from "./src/domain/acquisition.js";
 import {
     getDailySettings,
     handleDailySettingsCallback,
@@ -185,7 +186,7 @@ const syncMonobankDonations = createMonobankDonationSync({
 function privacyPolicyPage(env) {
     return renderPrivacyPolicyPage({
         brandName: publicRuntimeConfig(env).botBrandName,
-        effectiveDate: "4 серпня 2026 року",
+        effectiveDate: "5 серпня 2026 року",
         content: contentFor().privacyPolicy,
     });
 }
@@ -356,11 +357,15 @@ export default {
         const chatId = message.chat.id;
         const userId = message.from.id;
         const text = message.text.trim();
+        const acquisitionSource = acquisitionSourceFromStartCommand(text);
+        if (acquisitionSource) {
+            console.info({ event: "telegram_acquisition_source_received", source: acquisitionSource });
+        }
 
         await env.DB
             .prepare(`
-        INSERT INTO users (telegram_user_id, chat_id, timezone, daily_time, daily_level, telegram_username, telegram_first_name, last_seen_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        INSERT INTO users (telegram_user_id, chat_id, timezone, daily_time, daily_level, telegram_username, telegram_first_name, acquisition_source, last_seen_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(telegram_user_id)
         DO UPDATE SET chat_id = excluded.chat_id, is_active = 1,
           telegram_username = excluded.telegram_username,
@@ -374,11 +379,12 @@ export default {
                 DEFAULT_DAILY_SETTINGS.daily_time,
                 DEFAULT_DAILY_SETTINGS.daily_level,
                 message.from.username ?? null,
-                message.from.first_name ?? null
+                message.from.first_name ?? null,
+                acquisitionSource
             )
             .run();
 
-        if (text !== "/start" && text !== "/menu") {
+        if (!isTelegramStartCommand(text) && text !== "/menu") {
             await refreshInterfaceIfNeeded(env, chatId, userId);
         }
 
@@ -475,6 +481,7 @@ export default {
             grantManualDailyLimit: (targetEnv, targetUserId, dailyLimit) => grantManualDailyLimitFlow(targetEnv, targetUserId, dailyLimit, { getUserAccessLevel, dailyWordCardLimitForLevel, adminSettingsUpdated: messages.adminSettingsUpdated }),
             grantManualAccessLevel: (targetEnv, targetUserId, accessLevel) => grantManualAccessLevelFlow(targetEnv, targetUserId, accessLevel, { grantAccessLevel, getDailyAdditionLimit, dailyAddLimit: DAILY_ADD_LIMIT, dailyWordCardLimitForLevel, adminSettingsUpdated: messages.adminSettingsUpdated }),
             grantTestLevelOne: (targetEnv, targetUserId) => grantTestLevelOneFlow(targetEnv, targetUserId, { grantTemporaryAccessLevel, getDailyAdditionLimit, dailyAddLimit: DAILY_ADD_LIMIT, dailyWordCardLimitForLevel, adminSettingsUpdated: messages.adminSettingsUpdated }),
+            sendAcquisitionSourceSummary,
         })) {
             return new Response("ok");
         }

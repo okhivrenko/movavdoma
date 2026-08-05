@@ -1,4 +1,5 @@
 import { contentFor } from "../../content/index.js";
+import { isTelegramStartCommand } from "../../domain/acquisition.js";
 import { dailyScheduleKeyboardLabel } from "../../domain/helpers.js";
 
 export const MENU_ACTION = Object.freeze({
@@ -114,7 +115,7 @@ export async function handleNavigationMessage(env, text, context, dependencies) 
     const { copy } = content.navigation;
     const action = menuActionFromText(text);
 
-    if (text === "/start") {
+    if (isTelegramStartCommand(text)) {
         await sendMessage(env, chatId, dependencies.welcome(await dependencies.getDailySettings(env, userId)), await keyboardForUser(env, userId));
         await markInterfaceVersion(env, userId);
         return true;

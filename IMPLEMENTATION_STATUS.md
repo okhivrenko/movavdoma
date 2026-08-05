@@ -46,6 +46,14 @@ slices and genuine blockers. It is not a stream of intentions.
 
 ## Latest verified result
 
+- Version 1.9.7 released on 5 August 2026 adds privacy-disclosed first-touch
+  attribution for the bot.
+  Telegram deep links can use the bounded labels `ig_bio`, `ig_story`,
+  `tg_ads`, `tg_post`, or `website`; a user retains only the source received
+  when their account is first created. Admins can view grouped counts through
+  `📈 Джерела стартів` or `/sources`, without exposing user identities. `npm
+  run check` passed with 86 tests; production GET returns HTTP 200 and the D1
+  journal has no pending migrations.
 - Version 1.9.6 released on 5 August 2026 improves landing-page search intent
   with people-first Ukrainian copy for MovaYakVDoma / «Мова як вдома» / «Мова
   вдома», English-learning and Telegram-bot queries, plus truthful DeepL and
