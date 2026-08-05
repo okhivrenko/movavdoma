@@ -39,8 +39,7 @@ test("daily next callback delegates only the owned pending card to the replaceme
 
     assert.deepEqual(calls, [[123, 123, 42, 7]]);
     assert.equal(telegramCall(telegramCalls, "answerCallbackQuery").text, "Завантажую наступне слово…");
-    const loadingCall = telegramCall(telegramCalls, "editMessageText");
-    assert.equal(loadingCall.text, "⏳ Завантажую слово…");
+    const loadingCall = telegramCall(telegramCalls, "editMessageReplyMarkup");
     assert.deepEqual(loadingCall.reply_markup, {
         inline_keyboard: [[{ text: "⏳ Завантаження…", callback_data: "daily:loading" }]],
     });
