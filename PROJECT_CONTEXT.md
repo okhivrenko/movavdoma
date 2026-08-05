@@ -83,7 +83,7 @@ list includes Telegram IDs, names, usernames, active-word count, current daily
 limit, access level, and last bot interaction (25 users per page).
 
 Marketing links can use one approved Telegram start payload: `ig_bio`,
-`ig_story`, `tg_ads`, `tg_post`, or `website`, for example
+`ig_story`, `tg_ads`, `tg_post`, `tiktok_ads`, or `website`, for example
 `https://t.me/MovaVDomaBot?start=ig_bio`. The bot stores only the first known
 source for a new user; it never overwrites it or stores arbitrary payloads.
 Admins can open `📈 Джерела стартів` or use `/sources` for a grouped count.
@@ -99,9 +99,12 @@ Use one dedicated link per channel:
 | Instagram story | `https://t.me/MovaVDomaBot?start=ig_story` |
 | Telegram post | `https://t.me/MovaVDomaBot?start=tg_post` |
 | Telegram Ads | `https://t.me/MovaVDomaBot?start=tg_ads` |
+| TikTok Ads | `https://movayakvdoma.com/?source=tiktok_ads` |
 
 Monitor new bot users in the admin-only `📈 Джерела стартів` view or with
-`/sources`. `direct_or_legacy` combines users who started without an approved
+`/sources`. TikTok traffic is intentionally sent to the public landing first;
+the server passes only the validated `tiktok_ads` value to the bot CTA. The
+summary then reports `tiktok_ads` separately. `direct_or_legacy` combines users who started without an approved
 link and users created before attribution existed. For landing traffic and CTA
 clicks, use GA4 property `G-7S3RWCWPV3`; full events require the visitor to
 accept analytics cookies, while the source summary is independent of web

@@ -43,7 +43,7 @@ import { adminHelpText, adminKeyboard, sendAcquisitionSourceSummary } from "./sr
 import { handleAdminCallback } from "./src/features/admin/admin-callbacks.js";
 import { handleAdminCommand } from "./src/features/admin/admin-commands.js";
 import { messages } from "./src/domain/messages.js";
-import { acquisitionSourceFromStartCommand, isTelegramStartCommand } from "./src/domain/acquisition.js";
+import { acquisitionAttributionFromStartCommand, acquisitionSourceFromLandingParam, isTelegramStartCommand } from "./src/domain/acquisition.js";
 import {
     getDailySettings,
     handleDailySettingsCallback,
@@ -191,13 +191,14 @@ function privacyPolicyPage(env) {
     });
 }
 
-function landingPage(env, scriptNonce) {
+function landingPage(env, scriptNonce, acquisitionSource) {
     const config = publicRuntimeConfig(env);
     return renderLandingPage({
         brandName: config.botBrandName,
         publicWorkerUrl: config.publicWorkerUrl,
         content: contentFor().landing,
         scriptNonce,
+        acquisitionSource: acquisitionSource ?? "website",
     });
 }
 
@@ -231,7 +232,7 @@ export default {
         }
         if (request.method === "GET" && url.pathname === "/") {
             const scriptNonce = crypto.randomUUID();
-            return publicHtmlResponse(landingPage(env, scriptNonce), { scriptNonce });
+            return publicHtmlResponse(landingPage(env, scriptNonce, acquisitionSourceFromLandingParam(url.searchParams.get("source"))), { scriptNonce });
         }
         if (request.method === "GET" && url.pathname === "/privacy") {
             return publicHtmlResponse(privacyPolicyPage(env));
@@ -357,15 +358,15 @@ export default {
         const chatId = message.chat.id;
         const userId = message.from.id;
         const text = message.text.trim();
-        const acquisitionSource = acquisitionSourceFromStartCommand(text);
-        if (acquisitionSource) {
-            console.info({ event: "telegram_acquisition_source_received", source: acquisitionSource });
+        const acquisition = acquisitionAttributionFromStartCommand(text);
+        if (acquisition) {
+            console.info({ event: "telegram_acquisition_source_received", source: acquisition.reportSource });
         }
 
         await env.DB
             .prepare(`
-        INSERT INTO users (telegram_user_id, chat_id, timezone, daily_time, daily_level, telegram_username, telegram_first_name, acquisition_source, last_seen_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        INSERT INTO users (telegram_user_id, chat_id, timezone, daily_time, daily_level, telegram_username, telegram_first_name, acquisition_source, acquisition_campaign, last_seen_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(telegram_user_id)
         DO UPDATE SET chat_id = excluded.chat_id, is_active = 1,
           telegram_username = excluded.telegram_username,
@@ -380,7 +381,8 @@ export default {
                 DEFAULT_DAILY_SETTINGS.daily_level,
                 message.from.username ?? null,
                 message.from.first_name ?? null,
-                acquisitionSource
+                acquisition?.source ?? null,
+                acquisition?.campaign ?? null
             )
             .run();
 

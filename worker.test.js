@@ -96,8 +96,23 @@ test("a supported Telegram start link welcomes the user and records its first-to
     assert.match(telegramCall(calls, "sendMessage").text, /Нагадування:/);
     const userUpsert = db.calls.find((call) => call.method === "run" && call.query?.includes("INSERT INTO users"));
     assert.ok(userUpsert);
-    assert.equal(userUpsert.parameters.at(-1), "ig_bio");
+    assert.deepEqual(userUpsert.parameters.slice(-2), ["ig_bio", null]);
     assert.doesNotMatch(userUpsert.query, /acquisition_source =/);
+});
+
+test("TikTok landing source survives the CTA and is stored as one bounded campaign", async () => {
+    const db = new WorkerTestDb();
+    const env = workerEnv(db);
+
+    const landing = await worker.fetch(new Request("https://example.test/?source=tiktok_ads"), env);
+    assert.equal([...((await landing.text()).matchAll(/href="https:\/\/t\.me\/MovaVDomaBot\?start=tiktok_ads"/g))].length, 4);
+
+    await captureTelegramCalls(() => worker.fetch(
+        webhookRequest(privateMessageUpdate({ updateId: 19, text: "/start tiktok_ads" })), env
+    ));
+    const userUpsert = db.calls.find((call) => call.method === "run" && call.query?.includes("INSERT INTO users"));
+    assert.ok(userUpsert);
+    assert.deepEqual(userUpsert.parameters.slice(-2), ["website", "tiktok_ads"]);
 });
 
 test("/menu and Ukrainian menu buttons use navigation routing", async () => {

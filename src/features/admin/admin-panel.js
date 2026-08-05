@@ -32,9 +32,9 @@ export function adminHelpText() {
 
 export async function sendAcquisitionSourceSummary(env, chatId) {
     const result = await env.DB.prepare(`
-      SELECT COALESCE(acquisition_source, 'direct_or_legacy') AS source, COUNT(*) AS total
+      SELECT COALESCE(acquisition_campaign, acquisition_source, 'direct_or_legacy') AS source, COUNT(*) AS total
       FROM users
-      GROUP BY COALESCE(acquisition_source, 'direct_or_legacy')
+      GROUP BY COALESCE(acquisition_campaign, acquisition_source, 'direct_or_legacy')
       ORDER BY total DESC, source ASC
     `).all();
     const rows = result.results ?? [];

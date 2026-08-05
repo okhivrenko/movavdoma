@@ -15,14 +15,21 @@ the exact `/start` command and stored no acquisition data.
 
 Store one nullable `users.acquisition_source` value only when a user is first
 inserted. Accept only this allowlist from a valid Telegram start command:
-`ig_bio`, `ig_story`, `tg_ads`, `tg_post`, and `website`. Unknown payloads
-still receive the normal welcome but are not stored. Existing users and later
-links never overwrite the first-touch value.
+`ig_bio`, `ig_story`, `tg_ads`, `tg_post`, `tiktok_ads`, and `website`. Unknown
+payloads still receive the normal welcome but are not stored. Existing users
+and later links never overwrite the first-touch value.
 
 The admin-only `📈 Джерела стартів` action and `/sources` show grouped totals
 without user identifiers. The privacy policy discloses this limited purpose.
 All public landing-page CTA links use `?start=website`; canonical SEO schema
 retains the clean bot URL.
+
+TikTok ads use `https://movayakvdoma.com/?source=tiktok_ads`, not a direct bot
+deep link. The Worker validates this public query parameter before copying it
+to a CTA. To preserve the already-deployed `acquisition_source` database
+constraint, TikTok is persisted as source `website` plus the bounded nullable
+`acquisition_campaign = 'tiktok_ads'`; the admin report resolves the campaign
+first and displays `tiktok_ads`.
 
 ## Alternatives considered
 

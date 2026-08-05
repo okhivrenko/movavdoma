@@ -72,6 +72,18 @@ test("landing publishes valid app schema and complete search metadata", () => {
     assert.match(page, /hreflang="uk"/);
 });
 
+test("landing passes a validated campaign source to every Telegram CTA", () => {
+    const page = landingPage({
+        brandName: "MovaYakVDoma",
+        publicWorkerUrl: "https://movayakvdoma.com",
+        content,
+        scriptNonce: "campaign-nonce",
+        acquisitionSource: "tiktok_ads",
+    });
+
+    assert.equal([...page.matchAll(/href="https:\/\/t\.me\/MovaVDomaBot\?start=tiktok_ads"/g)].length, 4);
+});
+
 test("landing escapes configured text before inserting it into HTML", () => {
     const page = landingPage({
         brandName: '<script>alert("x")</script>',

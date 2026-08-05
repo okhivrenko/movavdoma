@@ -46,6 +46,11 @@ slices and genuine blockers. It is not a stream of intentions.
 
 ## Latest verified result
 
+- Version 1.10.0 released on 5 August 2026 adds bounded TikTok-ad attribution.
+  `?source=tiktok_ads` on the landing is validated server-side and carried to
+  every Telegram CTA; `/sources` reports `tiktok_ads` separately while keeping
+  the existing first-touch and privacy guarantees. `npm run check` passed with
+  89 tests.
 - Version 1.9.8 released on 5 August 2026 marks all landing-page Telegram
   calls to action with the privacy-disclosed `website` first-touch source.
   The public `SoftwareApplication` schema retains the canonical bot URL;

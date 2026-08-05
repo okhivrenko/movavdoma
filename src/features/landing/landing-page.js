@@ -61,11 +61,11 @@ function telegramStartLink(botUrl, source) {
 }
 
 /** Server-rendered public page; Google tag defaults to denied analytics storage. */
-export function landingPage({ brandName, publicWorkerUrl, content, scriptNonce }) {
+export function landingPage({ brandName, publicWorkerUrl, content, scriptNonce, acquisitionSource = "website" }) {
     const brand = escapeHtml(brandName);
     const title = escapeHtml(content.title);
     const description = escapeHtml(content.description);
-    const websiteBotUrl = escapeHtml(telegramStartLink(content.botUrl, "website"));
+    const websiteBotUrl = escapeHtml(telegramStartLink(content.botUrl, acquisitionSource));
     const canonicalUrl = escapeHtml(publicWorkerUrl);
     const nonce = escapeHtml(scriptNonce);
     const structuredData = schemaJson({
