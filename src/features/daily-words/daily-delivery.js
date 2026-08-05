@@ -3,12 +3,22 @@ import { dailyWordKeyboard, dailyWordText, getPendingDailyWord, replacePendingDa
 import { editMessage, sendMessage } from "../../platform/telegram.js";
 
 export async function sendTodayDailyWord(env, chatId, userId, dependencies) {
-    const user = await env.DB.prepare("SELECT timezone, daily_level FROM users WHERE telegram_user_id = ?").bind(userId).first();
+    const user = await env.DB.prepare(`
+      SELECT timezone, daily_level,
+        (last_daily_word_menu_opened_at IS NULL
+          OR last_daily_word_menu_opened_at <= datetime('now', '-12 hours')) AS should_refresh_daily_word
+      FROM users WHERE telegram_user_id = ?
+    `).bind(userId).first();
     const localTime = localDateAndTime(user?.timezone ?? DEFAULT_DAILY_SETTINGS.timezone, Date.now());
     if (!localTime) throw new Error("Unable to calculate local date for daily word.");
     const pending = await getPendingDailyWord(env, userId, localTime.date);
     if (pending) {
-        await sendNextDailyWord(env, chatId, userId, pending.id, dependencies);
+        if (user?.should_refresh_daily_word === 0) {
+            await sendMessage(env, chatId, dailyWordText(pending.card, user?.daily_level ?? "B1"), dailyWordKeyboard(pending.id));
+        } else {
+            await sendNextDailyWord(env, chatId, userId, pending.id, dependencies);
+        }
+        await markDailyWordMenuOpened(env, userId);
         return;
     }
     if (!(await dependencies.claimDailyWordCard(env, userId, localTime.date, dependencies.access))) {
@@ -22,10 +32,18 @@ export async function sendTodayDailyWord(env, chatId, userId, dependencies) {
         const card = await dependencies.generateNewDailyWord(env, userId, level, dependencies.generateDailyWordCard, dependencies.maxAttempts);
         pendingId = await savePendingDailyWord(env, userId, card, localTime.date);
         await sendMessage(env, chatId, dailyWordText(card, level), dailyWordKeyboard(pendingId));
+        await markDailyWordMenuOpened(env, userId);
     } catch (error) {
         if (pendingId) await env.DB.prepare("DELETE FROM pending_daily_words WHERE id = ? AND user_id = ?").bind(pendingId, userId).run();
         throw error;
     }
+}
+
+async function markDailyWordMenuOpened(env, userId) {
+    await env.DB.prepare(`
+      UPDATE users SET last_daily_word_menu_opened_at = CURRENT_TIMESTAMP
+      WHERE telegram_user_id = ?
+    `).bind(userId).run();
 }
 
 /** Replaces an already displayed unanswered card with another card for today. */
