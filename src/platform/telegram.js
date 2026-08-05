@@ -31,6 +31,12 @@ export function editMessage(env, chatId, messageId, text, replyMarkup) {
     });
 }
 
+export function editMessageReplyMarkup(env, chatId, messageId, replyMarkup) {
+    return telegramApi(env, "editMessageReplyMarkup", {
+        chat_id: chatId, message_id: messageId, reply_markup: replyMarkup,
+    });
+}
+
 export function answerCallbackQuery(env, callbackQueryId, text) {
     return telegramApi(env, "answerCallbackQuery", { callback_query_id: callbackQueryId, text });
 }

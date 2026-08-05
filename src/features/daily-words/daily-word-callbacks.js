@@ -3,7 +3,9 @@ import {
     hasPendingDailyWord,
     savePendingDailyWordToLearning,
 } from "./daily-words.js";
-import { answerCallbackQuery, editMessage, sendMessage } from "../../platform/telegram.js";
+import { answerCallbackQuery, editMessage, editMessageReplyMarkup, sendMessage } from "../../platform/telegram.js";
+
+const dailyWordLoadingKeyboard = { inline_keyboard: [[{ text: "⏳ Завантаження…", callback_data: "daily:loading" }]] };
 
 /** Handles user-owned actions on an already-sent daily word card. */
 export async function handleDailyWordCallback(env, callback, context, dependencies) {
@@ -21,11 +23,13 @@ export async function handleDailyWordCallback(env, callback, context, dependenci
     try {
         if (action === "next") {
             await answerCallbackQuery(env, callback.id, "Завантажую наступне слово…");
+            await editMessageReplyMarkup(env, chatId, messageId, dailyWordLoadingKeyboard);
             await dependencies.sendNextDailyWord(env, chatId, userId, pendingId, messageId);
             return true;
         }
         if (action === "prev") {
             await answerCallbackQuery(env, callback.id, "Показую попереднє слово…");
+            await editMessageReplyMarkup(env, chatId, messageId, dailyWordLoadingKeyboard);
             await dependencies.sendPreviousDailyWord(env, chatId, userId, pendingId, messageId);
             return true;
         }
