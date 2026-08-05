@@ -1,6 +1,7 @@
 // Monobank statement synchronization is isolated from the webhook router so
 // its payment-validation and time-window rules remain independently testable.
 import { publicRuntimeConfig } from "./runtime-config.js";
+import { fetchWithTimeout } from "./http.js";
 
 export const MONOBANK_MIN_SYNC_INTERVAL_SECONDS = 60;
 export const MONOBANK_STATEMENT_OVERLAP_SECONDS = 5 * 60;
@@ -45,9 +46,11 @@ export function createMonobankDonationSync({ notifyPendingDonationRequests, noti
 
         if (state?.jar_id && state.jar_send_id === jarSendId) return state.jar_id;
 
-        const response = await fetch("https://api.monobank.ua/personal/client-info", {
+        const startedAt = Date.now();
+        const response = await fetchWithTimeout("https://api.monobank.ua/personal/client-info", {
             headers: { "X-Token": env.MONOBANK_API_TOKEN },
         });
+        console.debug({ event: "monobank_client_info_response", status: response.status, durationMs: Date.now() - startedAt });
         if (!response.ok) throw new Error(`Monobank client info ${response.status}`);
 
         const clientInfo = await response.json();
@@ -118,10 +121,12 @@ export function createMonobankDonationSync({ notifyPendingDonationRequests, noti
             .prepare("SELECT last_successful_sync_at FROM monobank_sync_state WHERE id = 1")
             .first();
         const from = monobankStatementStartTime(state?.last_successful_sync_at, nowSeconds);
-        const response = await fetch(
+        const startedAt = Date.now();
+        const response = await fetchWithTimeout(
             `https://api.monobank.ua/personal/statement/${encodeURIComponent(jarId)}/${from}/${nowSeconds}`,
             { headers: { "X-Token": env.MONOBANK_API_TOKEN } }
         );
+        console.debug({ event: "monobank_statement_response", status: response.status, durationMs: Date.now() - startedAt });
         if (!response.ok) throw new Error(`Monobank statement ${response.status}`);
 
         const transactions = await response.json();

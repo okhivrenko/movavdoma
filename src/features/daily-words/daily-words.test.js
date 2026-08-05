@@ -112,6 +112,7 @@ test("pending daily cards are read and consumed only through user-owned queries"
     const ownerQueries = db.calls.filter((call) => call.query.includes("daily_word_cards"));
     assert.ok(ownerQueries.every((call) => call.query.includes("user_id = ?")));
     assert.ok(ownerQueries.some((call) => call.parameters.includes(123)));
+    assert.ok(ownerQueries.some((call) => call.query.includes("NOT EXISTS") && call.query.includes("FROM words")));
     const exampleWrites = db.calls.filter((call) => call.query.includes("INSERT INTO examples"));
     assert.equal(exampleWrites.length, 2);
     assert.deepEqual(exampleWrites.map((call) => call.parameters[3]), [1, 2]);

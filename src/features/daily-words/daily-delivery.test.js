@@ -51,8 +51,9 @@ test("opening the daily-word menu again replaces the already displayed pending c
             generateDailyWordCard: async () => replacement,
             maxAttempts: 3,
         });
-        assert.match(requests[0].text, /curious — допитливий/);
-        assert.equal(requests[0].reply_markup.inline_keyboard[1][0].callback_data, "daily:next:43");
+        const sentCard = requests.find((request) => request.text);
+        assert.match(sentCard.text, /curious — допитливий/);
+        assert.equal(sentCard.reply_markup.inline_keyboard[1][0].callback_data, "daily:next:43");
     } finally {
         globalThis.fetch = originalFetch;
     }
@@ -87,7 +88,7 @@ test("opening the menu again within twelve hours preserves the pending card and 
             claimDailyWordCard: async () => assert.fail("a cooldown display must not claim another card"),
             generateNewDailyWord: async () => assert.fail("a cooldown display must not generate another card"),
         });
-        assert.match(requests[0].text, /reliable — надійний/);
+        assert.match(requests.find((request) => request.text).text, /reliable — надійний/);
         assert.ok(dbCalls.some((call) => call.query.includes("last_daily_word_menu_opened_at") && call.parameters.includes(123)));
     } finally {
         globalThis.fetch = originalFetch;

@@ -122,7 +122,13 @@ export async function savePendingDailyWord(env, userId, card, localDate) {
 export async function getPendingDailyWord(env, userId, localDate) {
     const pending = await env.DB.prepare(`
       SELECT id, source_text, translation_uk, context_note, examples_json, learned_at, local_date
-      FROM daily_word_cards WHERE user_id = ? AND local_date = ? ORDER BY id DESC LIMIT 1
+      FROM daily_word_cards d
+      WHERE user_id = ? AND local_date = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM words w
+          WHERE w.user_id = d.user_id AND lower(w.source_text) = lower(d.source_text)
+        )
+      ORDER BY id DESC LIMIT 1
     `).bind(userId, localDate).first();
     if (!pending) return null;
 
@@ -134,8 +140,12 @@ export async function getDailyWordNavigation(env, userId, cardId, localDate, dir
     const ordering = direction === "previous" ? "DESC" : "ASC";
     const pending = await env.DB.prepare(`
       SELECT id, source_text, translation_uk, context_note, examples_json, learned_at, local_date
-      FROM daily_word_cards
+      FROM daily_word_cards d
       WHERE user_id = ? AND local_date = ? AND id ${comparison} ?
+        AND NOT EXISTS (
+          SELECT 1 FROM words w
+          WHERE w.user_id = d.user_id AND lower(w.source_text) = lower(d.source_text)
+        )
       ORDER BY id ${ordering} LIMIT 1
     `).bind(userId, localDate, cardId).first();
     if (!pending) return null;

@@ -178,6 +178,11 @@ it also has `← Попереднє слово`. Next and previous navigate exis
 first; next generates a card only at the end of that day's history. Card
 generation retries transient and whole card-build failures before showing an
 error.
+
+External calls to OpenAI, DeepL, Telegram, and Monobank have bounded request
+times and structured, non-sensitive status and duration logs. Daily-card
+navigation excludes cards whose English word is already in the user's active
+or learned vocabulary.
 After `Знаю` or `Вчити`, the user can open another card on the same day. The
 number of newly generated cards depends on access level: 5, 10, 15, or 20.
 `⏰ Налаштування` opens a two-step settings flow: choose

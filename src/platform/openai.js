@@ -1,4 +1,5 @@
 const MAX_OPENAI_ATTEMPTS = 3;
+import { fetchWithTimeout } from "./http.js";
 
 function wait(milliseconds) { return new Promise((resolve) => setTimeout(resolve, milliseconds)); }
 function isRetryableOpenAIStatus(status) { return status === 429 || status >= 500; }
@@ -13,8 +14,9 @@ function openAIRetryDelay(response, attempt) {
 export async function openAIJson(env, name, schema, instructions, input, options = {}) {
     for (let attempt = 0; attempt < MAX_OPENAI_ATTEMPTS; attempt += 1) {
         let response;
+        const startedAt = Date.now();
         try {
-            response = await fetch("https://api.openai.com/v1/chat/completions", {
+            response = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
                 method: "POST",
                 headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
                 body: JSON.stringify({
@@ -24,11 +26,13 @@ export async function openAIJson(env, name, schema, instructions, input, options
                 }),
             });
         } catch (error) {
+            console.warn({ event: "openai_request_failed", attempt: attempt + 1, durationMs: Date.now() - startedAt, reason: error?.name === "AbortError" ? "timeout" : "network_error" });
             if (attempt === MAX_OPENAI_ATTEMPTS - 1) throw error;
             console.warn({ event: "openai_retry", attempt: attempt + 1, reason: "network_error" });
             await wait(250 * 2 ** attempt);
             continue;
         }
+        console.debug({ event: "openai_response", attempt: attempt + 1, status: response.status, durationMs: Date.now() - startedAt });
         if (!response.ok) {
             if (!isRetryableOpenAIStatus(response.status) || attempt === MAX_OPENAI_ATTEMPTS - 1) throw new Error(`OpenAI ${response.status}`);
             console.warn({ event: "openai_retry", attempt: attempt + 1, status: response.status });

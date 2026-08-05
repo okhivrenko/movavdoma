@@ -1,4 +1,5 @@
 const MAX_DEEPL_ATTEMPTS = 3;
+import { fetchWithTimeout } from "./http.js";
 
 const DEEPL_LANGUAGE = Object.freeze({ en: "EN", uk: "UK" });
 
@@ -21,8 +22,9 @@ export async function translateWithDeepL(env, texts, { source, target, context }
 
     for (let attempt = 0; attempt < MAX_DEEPL_ATTEMPTS; attempt += 1) {
         let response;
+        const startedAt = Date.now();
         try {
-            response = await fetch(deeplEndpoint(env.DEEPL_API_KEY), {
+            response = await fetchWithTimeout(deeplEndpoint(env.DEEPL_API_KEY), {
                 method: "POST",
                 headers: {
                     Authorization: `DeepL-Auth-Key ${env.DEEPL_API_KEY}`,
@@ -38,11 +40,13 @@ export async function translateWithDeepL(env, texts, { source, target, context }
                 }),
             });
         } catch (error) {
+            console.warn({ event: "deepl_request_failed", attempt: attempt + 1, durationMs: Date.now() - startedAt, reason: error?.name === "AbortError" ? "timeout" : "network_error" });
             if (attempt === MAX_DEEPL_ATTEMPTS - 1) throw error;
             console.warn({ event: "deepl_retry", attempt: attempt + 1, reason: "network_error" });
             await wait(250 * 2 ** attempt);
             continue;
         }
+        console.debug({ event: "deepl_response", attempt: attempt + 1, status: response.status, durationMs: Date.now() - startedAt });
         if (!response.ok) {
             if (!isRetryableStatus(response.status) || attempt === MAX_DEEPL_ATTEMPTS - 1) throw new Error(`DeepL ${response.status}`);
             console.warn({ event: "deepl_retry", attempt: attempt + 1, status: response.status });

@@ -1,13 +1,24 @@
 /** Telegram Bot API client shared by feature modules. */
+import { fetchWithTimeout } from "./http.js";
+
 export async function telegramApi(env, method, payload) {
-    const response = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-    });
-    const data = await response.json();
-    if (!response.ok || !data.ok) throw new Error(`Telegram ${method} failed`);
-    return data.result;
+    const startedAt = Date.now();
+    try {
+        const response = await fetchWithTimeout(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
+            method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        console.debug({ event: "telegram_api_response", method, status: response.status, durationMs: Date.now() - startedAt });
+        if (!response.ok || !data.ok) throw new Error(`Telegram ${method} failed`);
+        return data.result;
+    } catch (error) {
+        console.warn({ event: "telegram_api_failed", method, durationMs: Date.now() - startedAt, reason: error?.name === "AbortError" ? "timeout" : "request_failed" });
+        throw error;
+    }
+}
+
+export function sendTypingAction(env, chatId) {
+    return telegramApi(env, "sendChatAction", { chat_id: chatId, action: "typing" });
 }
 
 export function sendMessage(env, chatId, text, replyMarkup) {

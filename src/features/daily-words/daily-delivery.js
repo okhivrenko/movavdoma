@@ -1,6 +1,6 @@
 import { DEFAULT_DAILY_SETTINGS, localDateAndTime } from "../../domain/helpers.js";
 import { dailyWordKeyboard, dailyWordText, getDailyWordNavigation, getPendingDailyWord, hasPreviousDailyWord, savePendingDailyWord } from "./daily-words.js";
-import { editMessage, sendMessage } from "../../platform/telegram.js";
+import { editMessage, sendMessage, sendTypingAction } from "../../platform/telegram.js";
 
 export async function sendTodayDailyWord(env, chatId, userId, dependencies) {
     const user = await env.DB.prepare(`
@@ -28,11 +28,14 @@ export async function sendTodayDailyWord(env, chatId, userId, dependencies) {
     }
     let pendingId = null;
     try {
+        console.debug({ event: "daily_word_generation_started", trigger: "menu" });
+        await sendTypingAction(env, chatId).catch(() => undefined);
         const level = user?.daily_level ?? "B1";
         const card = await dependencies.generateNewDailyWord(env, userId, level, dependencies.generateDailyWordCard, dependencies.maxAttempts);
         pendingId = await savePendingDailyWord(env, userId, card, localTime.date);
         await sendDailyWordCard(env, chatId, userId, { id: pendingId, card, localDate: localTime.date }, level);
         await markDailyWordMenuOpened(env, userId);
+        console.debug({ event: "daily_word_generation_completed", trigger: "menu" });
     } catch (error) {
         if (pendingId) await env.DB.prepare("DELETE FROM daily_word_cards WHERE id = ? AND user_id = ?").bind(pendingId, userId).run();
         throw error;
@@ -53,7 +56,12 @@ export async function sendNextDailyWord(env, chatId, userId, pendingId, dependen
     if (!localTime) throw new Error("Unable to calculate local date for daily word.");
     const current = await env.DB.prepare(`
       SELECT id, source_text, translation_uk, context_note, examples_json, learned_at
-      FROM daily_word_cards WHERE id = ? AND user_id = ? AND local_date = ?
+      FROM daily_word_cards d
+      WHERE id = ? AND user_id = ? AND local_date = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM words w
+          WHERE w.user_id = d.user_id AND lower(w.source_text) = lower(d.source_text)
+        )
     `).bind(pendingId, userId, localTime.date).first();
     if (!current) return false;
     const next = await getDailyWordNavigation(env, userId, pendingId, localTime.date, "next");
@@ -68,9 +76,12 @@ export async function sendNextDailyWord(env, chatId, userId, pendingId, dependen
     }
 
     const level = user?.daily_level ?? "B1";
+    console.debug({ event: "daily_word_generation_started", trigger: "next" });
+    await sendTypingAction(env, chatId).catch(() => undefined);
     const card = await dependencies.generateNewDailyWord(env, userId, level, dependencies.generateDailyWordCard, dependencies.maxAttempts);
     const newId = await savePendingDailyWord(env, userId, card, localTime.date);
     await sendDailyWordCard(env, chatId, userId, { id: newId, card, localDate: localTime.date }, level, messageId);
+    console.debug({ event: "daily_word_generation_completed", trigger: "next" });
     return true;
 }
 
