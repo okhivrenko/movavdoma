@@ -2,6 +2,7 @@ import { openAIJson } from "../../platform/openai.js";
 import { translateWithDeepL } from "../../platform/deepl.js";
 import { answerCallbackQuery, editMessage, sendMessage } from "../../platform/telegram.js";
 import { getOrCreateSharedCard, getOrCreateSharedSenses } from "./shared-vocabulary.js";
+import { recordSeenWord } from "./user-word-history.js";
 
 export const SENSES_PER_PAGE = 3;
 import getVocabularyConfig from "../../config/vocabulary.js";
@@ -108,6 +109,7 @@ export async function saveAndSendWord(env, chatId, userId, word, context, { shar
 
     await sendMessage(env, chatId,
         `✅ ${word} — ${card.translation_uk}\n\n1. ${card.examples[0].source}\n${card.examples[0].uk}\n\n2. ${card.examples[1].source}\n${card.examples[1].uk}`);
+    await recordSeenWord(env, userId, word);
 }
 
 /** Handles stable `page:*` and `sense:*` callbacks for a user's pending choice. */

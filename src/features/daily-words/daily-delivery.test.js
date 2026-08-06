@@ -16,6 +16,7 @@ const pending = {
 
 test("opening the daily-word menu again replaces the already displayed pending card", async () => {
     const requests = [];
+    const dbCalls = [];
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async (_url, init) => {
         requests.push(JSON.parse(init.body));
@@ -30,7 +31,10 @@ test("opening the daily-word menu again replaces the already displayed pending c
                         first: async () => query.includes("FROM users")
                             ? { timezone: "Europe/Warsaw", daily_level: "B1", should_refresh_daily_word: 1 }
                             : query.includes("id >") || query.includes("id <") ? null : pending,
-                        run: async () => ({ meta: { changes: 1, last_row_id: 43 } }),
+                        run: async () => {
+                            dbCalls.push({ query, parameters });
+                            return { meta: { changes: 1, last_row_id: 43 } };
+                        },
                     }) };
                 },
             },
@@ -54,6 +58,7 @@ test("opening the daily-word menu again replaces the already displayed pending c
         const sentCard = requests.find((request) => request.text);
         assert.match(sentCard.text, /curious — допитливий/);
         assert.equal(sentCard.reply_markup.inline_keyboard[1][0].callback_data, "daily:next:43");
+        assert.ok(dbCalls.some((call) => call.query.includes("user_seen_words") && call.parameters[0] === 123 && call.parameters[1] === "curious"));
     } finally {
         globalThis.fetch = originalFetch;
     }

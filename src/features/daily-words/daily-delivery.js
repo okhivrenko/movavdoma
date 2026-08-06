@@ -1,6 +1,7 @@
 import { DEFAULT_DAILY_SETTINGS, localDateAndTime } from "../../domain/helpers.js";
 import { dailyWordKeyboard, dailyWordText, getDailyWordNavigation, getPendingDailyWord, hasPreviousDailyWord, savePendingDailyWord } from "./daily-words.js";
 import { editMessage, sendMessage, sendTypingAction } from "../../platform/telegram.js";
+import { recordSeenWord } from "../vocabulary/user-word-history.js";
 
 export async function sendTodayDailyWord(env, chatId, userId, dependencies) {
     const user = await env.DB.prepare(`
@@ -95,7 +96,10 @@ async function sendDailyWordCard(env, chatId, userId, dailyWord, level, messageI
     const hasPrevious = await hasPreviousDailyWord(env, userId, dailyWord.id, dailyWord.localDate);
     const keyboard = dailyWordKeyboard(dailyWord.id, { hasPrevious, canLearn: !dailyWord.learnedAt });
     if (messageId) await editMessage(env, chatId, messageId, dailyWordText(dailyWord.card, level), keyboard);
-    else await sendMessage(env, chatId, dailyWordText(dailyWord.card, level), keyboard);
+    else {
+        await sendMessage(env, chatId, dailyWordText(dailyWord.card, level), keyboard);
+        await recordSeenWord(env, userId, dailyWord.card.word);
+    }
 }
 
 export async function sendDueDailyWords(env, scheduledTime, dependencies) {

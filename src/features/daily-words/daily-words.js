@@ -1,6 +1,7 @@
 import { openAIJson } from "../../platform/openai.js";
 import { translateWithDeepL } from "../../platform/deepl.js";
 import { getOrCreateSharedCard } from "../vocabulary/shared-vocabulary.js";
+import { normalizeSeenWord } from "../vocabulary/user-word-history.js";
 
 // Daily-card persistence and delivery flow. Network and access dependencies are
 // passed in explicitly so the Worker remains the composition root.
@@ -106,12 +107,15 @@ export async function generateNewDailyWord(env, userId, level, generateCard, max
             });
             continue;
         }
+        const normalizedWord = normalizeSeenWord(card.word);
         const existing = await env.DB.prepare(`
-          SELECT 1 FROM words WHERE user_id = ? AND lower(source_text) = lower(?)
+          SELECT 1 FROM user_seen_words WHERE user_id = ? AND normalized_word = ?
           UNION ALL
-          SELECT 1 FROM daily_word_cards WHERE user_id = ? AND lower(source_text) = lower(?)
+          SELECT 1 FROM words WHERE user_id = ? AND lower(trim(source_text)) = ?
+          UNION ALL
+          SELECT 1 FROM daily_word_cards WHERE user_id = ? AND lower(trim(source_text)) = ?
           LIMIT 1
-        `).bind(userId, card.word.trim(), userId, card.word.trim()).first();
+        `).bind(userId, normalizedWord, userId, normalizedWord, userId, normalizedWord).first();
 
         if (!existing) return card;
     }

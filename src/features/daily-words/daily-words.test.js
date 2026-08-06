@@ -53,6 +53,21 @@ test("daily word generation retries a failed card build before giving up", async
     assert.equal(generated.word, card.word);
 });
 
+test("daily generation rejects a word retained in the user's durable history", async () => {
+    const calls = [];
+    const env = { DB: { prepare: (query) => ({ bind: (...parameters) => ({ first: async () => {
+        calls.push({ query, parameters });
+        return { exists: 1 };
+    } }) }) } };
+
+    await assert.rejects(
+        generateNewDailyWord(env, 123, "B1", async () => card, 1),
+        /Could not generate a new daily word/,
+    );
+    assert.match(calls[0].query, /FROM user_seen_words/);
+    assert.deepEqual(calls[0].parameters, [123, "reliable", 123, "reliable", 123, "reliable"]);
+});
+
 test("daily cards reuse a shared card and skip DeepL for a matching word meaning", async () => {
     const requests = [];
     const originalFetch = globalThis.fetch;

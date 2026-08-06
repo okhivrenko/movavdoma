@@ -162,6 +162,8 @@ numbered restore buttons. Selecting one returns it to the active learning
 catalog. Learned words are retained for 30 days after being marked learned,
 then a daily cleanup permanently removes them with their examples and review
 history. Active words have no total cap and are never removed by this cleanup.
+A compact per-user memory of each shown English word remains after cleanup, so
+the daily-word flow never presents that word as new again.
 `/restore 1`, `/restore 5-10`, and `/restore all` remain supported for bulk
 restoration. The learned-word view shows up to 10 words per page, with numbered
 restore buttons and next/previous navigation. Learned words remain in D1 with
@@ -303,6 +305,14 @@ CREATE TABLE IF NOT EXISTS daily_word_additions (
   additions INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, local_date),
   FOREIGN KEY (user_id) REFERENCES users(telegram_user_id)
+);
+
+CREATE TABLE IF NOT EXISTS user_seen_words (
+  user_id INTEGER NOT NULL,
+  normalized_word TEXT NOT NULL,
+  first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, normalized_word)
 );
 
 CREATE TABLE IF NOT EXISTS user_daily_limits (
