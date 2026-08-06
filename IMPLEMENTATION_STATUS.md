@@ -46,6 +46,14 @@ slices and genuine blockers. It is not a stream of intentions.
 
 ## Latest verified result
 
+- Version 1.20.3 released on 6 August 2026 removes the loading state from the
+  ready daily-word path, serves CEFR-matched prefetched cards atomically, and
+  isolates interactive generation from bounded background prefetch in separate
+  Cloudflare Queues. Durable jobs now recover after interrupted enqueue or
+  execution, failed generation releases the claimed daily-card quota, and the
+  D1 migration reconciles older concurrent jobs before tightening uniqueness.
+  `npm run check` passed with 122 tests, the production migration journal has
+  no pending entries, and the public Worker returns HTTP 200.
 - Version 1.18.1 released on 6 August 2026 synchronizes access levels across
   both local-day quotas: levels 0–3 now map to 10/5, 15/10, 25/15, and 40/20
   word additions/daily cards. Existing manual word-addition bonuses remain
