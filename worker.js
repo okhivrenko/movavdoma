@@ -27,7 +27,11 @@ import {
     notifyExpiredDonationAccessGrants as notifyExpiredDonationAccessGrantsFlow,
     rejectDonationBonus as rejectDonationBonusRequest,
 } from "./src/features/donations/donation-grants.js";
-import { notifyPendingDonationRequests as notifyDonationReviews, notifyUnmatchedDonations as notifyUnmatchedDonationAlerts } from "./src/features/donations/donation-notifications.js";
+import {
+    notifyPendingDonationReminder as notifyDonationReminder,
+    notifyPendingDonationRequests as notifyDonationReviews,
+    notifyUnmatchedDonations as notifyUnmatchedDonationAlerts,
+} from "./src/features/donations/donation-notifications.js";
 import { handleDonationCallback } from "./src/features/donations/donation-callbacks.js";
 import {
     getAdminChatId,
@@ -170,6 +174,10 @@ async function notifyPendingDonationRequests(env) {
 
 async function notifyUnmatchedDonations(env) {
     return notifyUnmatchedDonationAlerts(env, getAdminChatId, { formatHryvnias, sendMessage });
+}
+
+async function notifyPendingDonationReminder(env) {
+    return notifyDonationReminder(env, getAdminChatId, { sendMessage });
 }
 
 // Remove only already learned vocabulary after its retention period. Child rows
@@ -621,6 +629,14 @@ export default {
             } catch (error) {
                 console.error({
                     event: "learned_word_cleanup_failed",
+                    message: error instanceof Error ? error.message : "Unknown error",
+                });
+            }
+            try {
+                await notifyPendingDonationReminder(env);
+            } catch (error) {
+                console.error({
+                    event: "pending_bonus_reminder_failed",
                     message: error instanceof Error ? error.message : "Unknown error",
                 });
             }

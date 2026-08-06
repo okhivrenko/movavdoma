@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { adminDonationKeyboard, notifyPendingDonationRequests, notifyUnmatchedDonations } from "./donation-notifications.js";
+import {
+    adminDonationKeyboard,
+    notifyPendingDonationReminder,
+    notifyPendingDonationRequests,
+    notifyUnmatchedDonations,
+} from "./donation-notifications.js";
 
 test("donation review keyboard preserves stable admin callback formats", () => {
     const keyboard = adminDonationKeyboard(42, 2).inline_keyboard.flat();
@@ -41,4 +46,30 @@ test("an independent manual bonus request is immediately sent to the admin witho
     assert.match(sent[0][2], /рішення про рівень за адміністратором/);
     assert.doesNotMatch(sent[0][2], /Платіж ще не знайдено/);
     assert.deepEqual(writes[0].parameters, [7]);
+});
+
+test("pending bonus monitor stays silent when there are no active requests", async () => {
+    const env = { DB: { prepare: () => ({ first: async () => ({ pending_count: 0 }) }) } };
+
+    const sent = await notifyPendingDonationReminder(
+        env,
+        async () => assert.fail("admin chat should not be resolved without pending requests"),
+        { sendMessage: async () => assert.fail("an empty monitor must not notify the admin") }
+    );
+
+    assert.equal(sent, false);
+});
+
+test("pending bonus monitor sends one summary when requests await review", async () => {
+    const messages = [];
+    const env = { DB: { prepare: () => ({ first: async () => ({ pending_count: 2 }) }) } };
+
+    const sent = await notifyPendingDonationReminder(env, async () => 999, {
+        sendMessage: async (...args) => messages.push(args),
+    });
+
+    assert.equal(sent, true);
+    assert.equal(messages.length, 1);
+    assert.equal(messages[0][1], 999);
+    assert.match(messages[0][2], /заявок на бонус без рішення — 2/);
 });

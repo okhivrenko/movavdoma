@@ -32,6 +32,27 @@ export async function notifyPendingDonationRequests(env, getAdminChatId, depende
     }
 }
 
+export async function notifyPendingDonationReminder(env, getAdminChatId, dependencies) {
+    const summary = await env.DB
+        .prepare("SELECT COUNT(*) AS pending_count FROM donation_requests WHERE status = 'awaiting_review'")
+        .first();
+    const pendingCount = Number(summary?.pending_count ?? 0);
+    if (pendingCount <= 0) return false;
+
+    const adminChatId = await getAdminChatId(env);
+    if (!adminChatId) {
+        console.warn({ event: "donation_admin_chat_not_found" });
+        return false;
+    }
+
+    await dependencies.sendMessage(
+        env,
+        adminChatId,
+        `🎁 Нагадування: заявок на бонус без рішення — ${pendingCount}.\n\nПеревір картки заявок у цьому чаті й обери рівень або відхили заявку.`
+    );
+    return true;
+}
+
 export async function notifyUnmatchedDonations(env, getAdminChatId, dependencies) {
     const adminChatId = await getAdminChatId(env);
     if (!adminChatId) return;

@@ -251,6 +251,9 @@ local day; the D1 counter is claimed atomically before the DeepL request.
   its own payment-linked bonus button. A separate bonus action always creates
   an independent request without a donation. The administrator sees the
   request source and decides whether to grant temporary access.
+- At 03:00 UTC, the daily monitor sends the administrator one reminder when
+  one or more bonus requests still await review. It sends nothing when there
+  are no active requests.
 
 ## Important UX rules
 
