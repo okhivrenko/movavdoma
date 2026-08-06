@@ -7,6 +7,13 @@ import { answerCallbackQuery, editMessage, editMessageReplyMarkup, sendMessage }
 
 const dailyWordLoadingKeyboard = { inline_keyboard: [[{ text: "⏳ Завантаження…", callback_data: "daily:loading" }]] };
 
+function dailyWordRetryKeyboard(action, pendingId) {
+    return { inline_keyboard: [[{
+        text: "🔄 Спробувати ще раз",
+        callback_data: `daily:${action}:${pendingId}`,
+    }]] };
+}
+
 /** Handles user-owned actions on an already-sent daily word card. */
 export async function handleDailyWordCallback(env, callback, context, dependencies) {
     if (!callback.data.startsWith("daily:learn:") && !callback.data.startsWith("daily:next:") && !callback.data.startsWith("daily:prev:")) return false;
@@ -20,17 +27,22 @@ export async function handleDailyWordCallback(env, callback, context, dependenci
 
     const action = match[1];
     const pendingId = Number(match[2]);
+    const startedAt = Date.now();
     try {
         if (action === "next") {
             await answerCallbackQuery(env, callback.id, "Завантажую наступне слово…");
             await editMessageReplyMarkup(env, chatId, messageId, dailyWordLoadingKeyboard);
-            await dependencies.sendNextDailyWord(env, chatId, userId, pendingId, messageId);
+            const shown = await dependencies.sendNextDailyWord(env, chatId, userId, pendingId, messageId);
+            if (!shown) await restoreUnavailableDailyWord(env, chatId, messageId);
+            console.debug({ event: "daily_word_navigation_completed", action, durationMs: Date.now() - startedAt, shown });
             return true;
         }
         if (action === "prev") {
             await answerCallbackQuery(env, callback.id, "Показую попереднє слово…");
             await editMessageReplyMarkup(env, chatId, messageId, dailyWordLoadingKeyboard);
-            await dependencies.sendPreviousDailyWord(env, chatId, userId, pendingId, messageId);
+            const shown = await dependencies.sendPreviousDailyWord(env, chatId, userId, pendingId, messageId);
+            if (!shown) await restoreUnavailableDailyWord(env, chatId, messageId);
+            console.debug({ event: "daily_word_navigation_completed", action, durationMs: Date.now() - startedAt, shown });
             return true;
         }
         if (action === "learn") {
@@ -58,12 +70,30 @@ export async function handleDailyWordCallback(env, callback, context, dependenci
             "📖 Слово додано до «📚 Мої слова».",
             { inline_keyboard: [] });
     } catch (error) {
-        console.error({ event: "daily_word_action_failed", message: error instanceof Error ? error.message : "Unknown error" });
+        console.error({ event: "daily_word_action_failed", action, durationMs: Date.now() - startedAt, message: error instanceof Error ? error.message : "Unknown error" });
         if (action === "next" || action === "prev") {
-            await sendMessage(env, chatId, "Не вдалося завантажити наступне слово. Спробуй ще раз за хвилину.");
+            await restoreRetryableDailyWord(env, chatId, messageId, action, pendingId);
+            await sendMessage(env, chatId, "Не вдалося завантажити слово. Спробуй ще раз.");
             return true;
         }
         await answerCallbackQuery(env, callback.id, "Не вдалося зберегти вибір.");
     }
     return true;
+}
+
+async function restoreRetryableDailyWord(env, chatId, messageId, action, pendingId) {
+    try {
+        await editMessageReplyMarkup(env, chatId, messageId, dailyWordRetryKeyboard(action, pendingId));
+    } catch (error) {
+        console.warn({ event: "daily_word_retry_button_restore_failed", action, message: error instanceof Error ? error.message : "Unknown error" });
+    }
+}
+
+async function restoreUnavailableDailyWord(env, chatId, messageId) {
+    try {
+        await editMessageReplyMarkup(env, chatId, messageId, { inline_keyboard: [] });
+        await sendMessage(env, chatId, "Ця картка вже недоступна. Відкрий «📚 Щоденне слово» ще раз.");
+    } catch (error) {
+        console.warn({ event: "daily_word_unavailable_restore_failed", message: error instanceof Error ? error.message : "Unknown error" });
+    }
 }

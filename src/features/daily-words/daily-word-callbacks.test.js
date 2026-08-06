@@ -44,3 +44,33 @@ test("daily next callback delegates only the owned pending card to the replaceme
         inline_keyboard: [[{ text: "⏳ Завантаження…", callback_data: "daily:loading" }]],
     });
 });
+
+test("daily navigation restores a retry button after a generation failure", async () => {
+    const { calls } = await captureTelegramCalls(async () => {
+        const handled = await handleDailyWordCallback({ DB: {} }, { ...callback, data: "daily:next:42" }, context, {
+            ...dependencies,
+            sendNextDailyWord: async () => { throw new Error("OpenAI timeout"); },
+        });
+        assert.equal(handled, true);
+    });
+
+    const replyMarkupCalls = calls.filter((call) => call.url.endsWith("/editMessageReplyMarkup"));
+    assert.deepEqual(replyMarkupCalls.at(-1).payload.reply_markup, {
+        inline_keyboard: [[{ text: "🔄 Спробувати ще раз", callback_data: "daily:next:42" }]],
+    });
+    assert.equal(telegramCall(calls, "sendMessage").text, "Не вдалося завантажити слово. Спробуй ще раз.");
+});
+
+test("daily navigation clears the loading state when its card is no longer available", async () => {
+    const { calls } = await captureTelegramCalls(async () => {
+        const handled = await handleDailyWordCallback({ DB: {} }, { ...callback, data: "daily:prev:42" }, context, {
+            ...dependencies,
+            sendPreviousDailyWord: async () => false,
+        });
+        assert.equal(handled, true);
+    });
+
+    const replyMarkupCalls = calls.filter((call) => call.url.endsWith("/editMessageReplyMarkup"));
+    assert.deepEqual(replyMarkupCalls.at(-1).payload.reply_markup, { inline_keyboard: [] });
+    assert.equal(telegramCall(calls, "sendMessage").text, "Ця картка вже недоступна. Відкрий «📚 Щоденне слово» ще раз.");
+});
