@@ -74,7 +74,7 @@ export function createMonobankDonationSync({ notifyPendingDonationRequests, noti
         return env.DB
             .prepare(`
               SELECT id FROM donation_requests
-              WHERE status IN ('awaiting_payment', 'awaiting_review')
+              WHERE request_source = 'support' AND status IN ('awaiting_payment', 'awaiting_review')
                 AND instr(upper(?), support_code) > 0
               ORDER BY id DESC
               LIMIT 1

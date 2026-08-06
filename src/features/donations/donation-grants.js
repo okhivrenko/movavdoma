@@ -1,10 +1,10 @@
 import { dailyWordCardLimitForLevel } from "../../domain/policies.js";
 import { sendMessage } from "../../platform/telegram.js";
 
-/** Idempotently approves one admin-reviewed donation and grants one month. */
+/** Idempotently approves one admin-reviewed bonus request and grants one month. */
 export async function grantDonationBonus(env, requestId, accessLevel, grantTemporaryAccessLevel) {
     const request = await env.DB.prepare(`
-      SELECT id, user_id, status, matched_transaction_id FROM donation_requests WHERE id = ?
+      SELECT id, user_id, status, matched_transaction_id, request_source FROM donation_requests WHERE id = ?
     `).bind(requestId).first();
     if (!request || request.status !== "awaiting_review") return null;
 
@@ -20,18 +20,20 @@ export async function grantDonationBonus(env, requestId, accessLevel, grantTempo
         .bind(request.user_id).first();
     if (user?.chat_id) {
         await sendMessage(env, user.chat_id,
-            `🎁 Дякуємо за підтримку! Твій рівень доступу: ${access.accessLevel}. Наступний місяць можна відкривати до ${dailyWordCardLimitForLevel(access.accessLevel)} нових щоденних карток на день.`);
+            `${request.request_source === "support" ? "🎁 Дякуємо за підтримку!" : "🎁 Твою заявку на бонус підтверджено!"} Твій рівень доступу: ${access.accessLevel}. Наступний місяць можна відкривати до ${dailyWordCardLimitForLevel(access.accessLevel)} нових щоденних карток на день.`);
     }
     return { request, access };
 }
 
 export async function rejectDonationBonus(env, requestId) {
-    const request = await env.DB.prepare("SELECT id, user_id, status FROM donation_requests WHERE id = ?").bind(requestId).first();
+    const request = await env.DB.prepare("SELECT id, user_id, status, request_source FROM donation_requests WHERE id = ?").bind(requestId).first();
     if (!request || request.status !== "awaiting_review") return null;
     const rejected = await env.DB.prepare("UPDATE donation_requests SET status = 'rejected' WHERE id = ? AND status = 'awaiting_review'").bind(request.id).run();
     if (rejected.meta.changes === 0) return null;
     const user = await env.DB.prepare("SELECT chat_id FROM users WHERE telegram_user_id = ?").bind(request.user_id).first();
-    if (user?.chat_id) await sendMessage(env, user.chat_id, "Не вдалося підтвердити донат для бонусу. Натисни «☕ Підтримати бот», отримай новий код і додай його в коментар платежу.");
+    if (user?.chat_id) await sendMessage(env, user.chat_id, request.request_source === "support"
+        ? "Не вдалося підтвердити донат для бонусу. Натисни «☕ Підтримати бот», отримай новий код і додай його в коментар платежу."
+        : "Адмін не підтвердив заявку на бонус цього разу. Спробуй ще раз пізніше.");
     return request;
 }
 

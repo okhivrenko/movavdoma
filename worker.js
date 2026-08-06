@@ -328,7 +328,7 @@ export default {
             if (await handleLimitOptionsCallback(env, callback, { chatId, userId }, {
                 sendDonationInstructions,
                 submitDonationBonusRequest: submitDonationBonusRequestFlow,
-                notifyPendingDonationRequests: notifyDonationReviews,
+                notifyPendingDonationRequests,
             })) {
                 return new Response("ok");
             }

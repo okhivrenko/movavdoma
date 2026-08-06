@@ -247,7 +247,9 @@ local day; the D1 counter is claimed atomically before the DeepL request.
   (up to 15 added words and 10 new daily cards). A referral cannot be
   self-referred, and a referred account can reward only once. The same choices
   are shown when a user tries to save a daily card after using the addition
-  quota.
+  quota. Support gives a Monobank link and payment-comment code; a bonus can
+  also be requested independently without a donation. The administrator sees
+  the request source and decides whether to grant temporary access.
 
 ## Important UX rules
 

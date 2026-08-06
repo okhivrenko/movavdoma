@@ -17,12 +17,17 @@ export function adminDonationKeyboard(requestId, suggestedAccessLevel) {
 export async function notifyPendingDonationRequests(env, getAdminChatId, dependencies) {
     const adminChatId = await getAdminChatId(env);
     if (!adminChatId) { console.warn({ event: "donation_admin_chat_not_found" }); return; }
-    const pending = await env.DB.prepare("SELECT id, user_id, support_code, matched_transaction_id FROM donation_requests WHERE status = 'awaiting_review' AND admin_notified_at IS NULL ORDER BY id ASC").all();
+    const pending = await env.DB.prepare("SELECT id, user_id, support_code, matched_transaction_id, request_source FROM donation_requests WHERE status = 'awaiting_review' AND admin_notified_at IS NULL ORDER BY id ASC").all();
     for (const request of pending.results) {
+        const isManualBonus = request.request_source === "manual_bonus";
         const transaction = request.matched_transaction_id ? await env.DB.prepare("SELECT amount_kopiykas FROM bank_transactions WHERE transaction_id = ?").bind(request.matched_transaction_id).first() : null;
         const level = transaction ? dependencies.donationAccessLevel(transaction.amount_kopiykas) : null;
-        const amount = transaction ? `\nДонат знайдено: ${dependencies.formatHryvnias(transaction.amount_kopiykas)}.` : "\nПлатіж ще не знайдено автоматично — звір його у банці.";
-        await dependencies.sendMessage(env, adminChatId, `🎁 Заявка на бонус\nКористувач: ${request.user_id}\nКод: ${request.support_code}${amount}${level ? `\nРекомендований рівень: ${level} (${dependencies.dailyWordCardLimitForLevel(level)} щоденних карток).` : ""}`, adminDonationKeyboard(request.id, level));
+        const paymentStatus = isManualBonus
+            ? "\nЗаявка без донату — рішення про рівень за адміністратором."
+            : transaction
+                ? `\nДонат знайдено: ${dependencies.formatHryvnias(transaction.amount_kopiykas)}.`
+                : "\nПлатіж ще не знайдено автоматично — звір його у банці.";
+        await dependencies.sendMessage(env, adminChatId, `🎁 Заявка на бонус\nКористувач: ${request.user_id}\nТип: ${isManualBonus ? "без донату" : "підтримка"}${paymentStatus}${level ? `\nРекомендований рівень: ${level} (${dependencies.dailyWordCardLimitForLevel(level)} щоденних карток).` : ""}`, adminDonationKeyboard(request.id, level));
         await env.DB.prepare("UPDATE donation_requests SET admin_notified_at = CURRENT_TIMESTAMP WHERE id = ?").bind(request.id).run();
     }
 }

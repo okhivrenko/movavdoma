@@ -30,10 +30,12 @@ EXPECTED_SCHEMA_COUNT="$(sqlite3 "$CHECK_DB" "
     (SELECT COUNT(*) FROM pragma_table_info('daily_word_prefetches') WHERE name = 'cefr_level') +
     (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_daily_word_generation_jobs_recovery') +
     (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_daily_word_prefetches_level') +
-    (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_daily_word_prefetch_jobs_recovery');
+    (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_daily_word_prefetch_jobs_recovery') +
+    (SELECT COUNT(*) FROM pragma_table_info('donation_requests') WHERE name = 'request_source') +
+    (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_donation_requests_user_source_status');
 ")"
 
-[ "$EXPECTED_SCHEMA_COUNT" = "17" ] || {
+[ "$EXPECTED_SCHEMA_COUNT" = "19" ] || {
   echo "Expected release schema is missing" >&2
   exit 1
 }
@@ -80,7 +82,9 @@ PREFETCHED_WORD="$(sqlite3 "$CHECK_DB" "
 # jobs for different pending cards. The tightening migration must reconcile the
 # duplicate user rows before creating its new unique index.
 for migration in migrations/*.sql; do
-  [ "$migration" = "migrations/0032_harden_daily_word_prefetch.sql" ] && continue
+  case "$migration" in
+    migrations/0032_harden_daily_word_prefetch.sql|migrations/0033_separate_manual_bonus_requests.sql) continue ;;
+  esac
   sqlite3 "$UPGRADE_DB" < "$migration"
 done
 sqlite3 "$UPGRADE_DB" "
