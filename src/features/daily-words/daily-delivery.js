@@ -1,5 +1,5 @@
 import { DEFAULT_DAILY_SETTINGS, localDateAndTime } from "../../domain/helpers.js";
-import { dailyWordKeyboard, dailyWordText, fillDailyWordPrefetches, getDailyWordNavigation, getPendingDailyWord, hasPreviousDailyWord, savePendingDailyWord, takeDailyWordPrefetch } from "./daily-words.js";
+import { consumeDailyWordPrefetch, dailyWordKeyboard, dailyWordText, getDailyWordNavigation, getPendingDailyWord, hasPreviousDailyWord, savePendingDailyWord, takeDailyWordPrefetch } from "./daily-words.js";
 import { editMessage, sendMessage, sendTypingAction } from "../../platform/telegram.js";
 import { recordSeenWord } from "../vocabulary/user-word-history.js";
 
@@ -20,6 +20,7 @@ export async function sendTodayDailyWord(env, chatId, userId, dependencies) {
             await sendNextDailyWord(env, chatId, userId, pending.id, dependencies);
         }
         await markDailyWordMenuOpened(env, userId);
+        await requestDailyWordPrefetch(env, userId, dependencies);
         return;
     }
     if (!(await dependencies.claimDailyWordCard(env, userId, localTime.date, dependencies.access))) {
@@ -74,9 +75,10 @@ export async function sendNextDailyWord(env, chatId, userId, pendingId, dependen
             await sendMessage(env, chatId, `На сьогодні вже показано ${limit} нових карток. Завтра можна буде відкрити ще.`);
             return true;
         }
-        const newId = await savePendingDailyWord(env, userId, prefetched, localTime.date);
-        await sendDailyWordCard(env, chatId, userId, { id: newId, card: prefetched, localDate: localTime.date }, level, messageId);
-        if (dependencies.generateDailyWordCard) await refillDailyWordPrefetches(env, userId, level, dependencies);
+        const newId = await savePendingDailyWord(env, userId, prefetched.card, localTime.date);
+        await consumeDailyWordPrefetch(env, userId, prefetched.id);
+        await sendDailyWordCard(env, chatId, userId, { id: newId, card: prefetched.card, localDate: localTime.date }, level, messageId);
+        await requestDailyWordPrefetch(env, userId, dependencies);
         return true;
     }
     console.debug({ event: "daily_word_generation_started", trigger: "next" });
@@ -89,14 +91,14 @@ export async function sendNextDailyWord(env, chatId, userId, pendingId, dependen
     }
     const newId = await savePendingDailyWord(env, userId, card, localTime.date);
     await sendDailyWordCard(env, chatId, userId, { id: newId, card, localDate: localTime.date }, level, messageId);
-    if (dependencies.generateDailyWordCard) await refillDailyWordPrefetches(env, userId, level, dependencies);
+    await requestDailyWordPrefetch(env, userId, dependencies);
     console.debug({ event: "daily_word_generation_completed", trigger: "next" });
     return true;
 }
 
-async function refillDailyWordPrefetches(env, userId, level, dependencies) {
+async function requestDailyWordPrefetch(env, userId, dependencies) {
     try {
-        await fillDailyWordPrefetches(env, userId, level, dependencies.generateDailyWordCard, dependencies.maxAttempts);
+        if (dependencies.queueDailyWordPrefetch) await dependencies.queueDailyWordPrefetch(env, userId);
     } catch (error) {
         console.warn({ event: "daily_word_prefetch_failed", userId, message: error instanceof Error ? error.message : "Unknown error" });
     }
@@ -147,6 +149,7 @@ export async function sendDueDailyWords(env, scheduledTime, dependencies) {
             claimedDelivery = true;
             pendingId = await savePendingDailyWord(env, user.telegram_user_id, card, localTime.date);
             await sendDailyWordCard(env, user.chat_id, user.telegram_user_id, { id: pendingId, card, localDate: localTime.date }, user.daily_level);
+            await requestDailyWordPrefetch(env, user.telegram_user_id, dependencies);
         } catch (error) {
             console.error({ event: "daily_word_delivery_failed", userId: user.telegram_user_id, message: error instanceof Error ? error.message : "Unknown error" });
             if (claimedDelivery) await env.DB.prepare(`UPDATE users SET last_delivery_local_date = NULL WHERE telegram_user_id = ? AND last_delivery_local_date = ?`).bind(user.telegram_user_id, localTime.date).run();

@@ -146,9 +146,12 @@ export async function takeDailyWordPrefetch(env, userId) {
     if (!prefetched) return null;
     const card = dailyCardFromPending(prefetched);
     if (!card) return null;
-    await env.DB.prepare("DELETE FROM daily_word_prefetches WHERE id = ? AND user_id = ?")
-        .bind(prefetched.id, userId).run();
-    return card.card;
+    return { id: prefetched.id, card: card.card };
+}
+
+export function consumeDailyWordPrefetch(env, userId, prefetchId) {
+    return env.DB.prepare("DELETE FROM daily_word_prefetches WHERE id = ? AND user_id = ?")
+        .bind(prefetchId, userId).run();
 }
 
 export async function savePendingDailyWord(env, userId, card, localDate) {

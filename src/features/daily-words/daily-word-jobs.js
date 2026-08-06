@@ -2,6 +2,37 @@ import { editMessageReplyMarkup, sendMessage } from "../../platform/telegram.js"
 
 const MAX_JOB_ATTEMPTS = 3;
 
+export async function queueDailyWordPrefetch(env, userId) {
+    const inserted = await env.DB.prepare(`
+      INSERT OR IGNORE INTO daily_word_prefetch_jobs (user_id) VALUES (?)
+    `).bind(userId).run();
+    if (inserted.meta.changes > 0) await env.DAILY_WORD_JOBS.send({ kind: "prefetch", userId });
+}
+
+export async function processDailyWordPrefetch(env, userId, dependencies) {
+    const claimed = await env.DB.prepare(`
+      UPDATE daily_word_prefetch_jobs SET status = 'processing', attempts = attempts + 1, updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = ? AND status = 'queued'
+    `).bind(userId).run();
+    if (claimed.meta.changes === 0) return "done";
+    try {
+        const user = await env.DB.prepare("SELECT daily_level FROM users WHERE telegram_user_id = ? AND is_active = 1").bind(userId).first();
+        if (user) await dependencies.fillDailyWordPrefetches(env, userId, user.daily_level ?? "B1");
+        await env.DB.prepare("DELETE FROM daily_word_prefetch_jobs WHERE user_id = ?").bind(userId).run();
+        console.info({ event: "daily_word_prefetch_completed", userId });
+        return "done";
+    } catch (error) {
+        await env.DB.prepare("UPDATE daily_word_prefetch_jobs SET status = 'queued', updated_at = CURRENT_TIMESTAMP WHERE user_id = ?").bind(userId).run();
+        console.warn({ event: "daily_word_prefetch_retry", userId, message: error instanceof Error ? error.message : "Unknown error" });
+        return "retry";
+    }
+}
+
+export async function requeueDailyWordPrefetches(env) {
+    const jobs = await env.DB.prepare("SELECT user_id FROM daily_word_prefetch_jobs WHERE status = 'queued' ORDER BY updated_at ASC LIMIT 10").all();
+    for (const job of jobs.results ?? []) await env.DAILY_WORD_JOBS.send({ kind: "prefetch", userId: job.user_id });
+}
+
 export async function queueNextDailyWord(env, { userId, chatId, messageId, pendingId }) {
     const inserted = await env.DB.prepare(`
       INSERT OR IGNORE INTO daily_word_generation_jobs (user_id, chat_id, message_id, pending_id)
