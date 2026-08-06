@@ -5,7 +5,14 @@ import { normalizeSeenWord } from "../vocabulary/user-word-history.js";
 
 // Daily-card persistence and delivery flow. Network and access dependencies are
 // passed in explicitly so the Worker remains the composition root.
-export const DAILY_WORD_PREFETCH_TARGET = 2;
+export const DAILY_WORD_PREFETCH_TARGET = 3;
+
+export class DailyWordContentError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = "DailyWordContentError";
+    }
+}
 
 export function hasValidDailyExamples(examples) {
     if (!Array.isArray(examples) || examples.length !== 2) return false;
@@ -20,16 +27,20 @@ export async function generateDailyWordCard(env, level) {
         type: "object", additionalProperties: false,
         properties: {
             word: { type: "string" }, context_en: { type: "string" },
-            examples: { type: "array", items: {
+            examples: { type: "array", minItems: 2, maxItems: 2, items: {
                 type: "object", additionalProperties: false,
                 properties: { source: { type: "string" } },
                 required: ["source"],
             } },
         }, required: ["word", "context_en", "examples"],
-    }, "Create one useful English vocabulary card for a learner at the requested CEFR level. word must be a single English word or a short common phrase, not a proper noun. context_en must precisely state its meaning. Create exactly two natural English example sentences, each 8–18 words. Both examples must use exactly the stated meaning. Do not translate anything.", `CEFR level: ${level}`, { model: env.OPENAI_WORD_MODEL ?? "gpt-5.4-mini", reasoningEffort: "low" });
+    }, "Create one useful English vocabulary card for a learner at the requested CEFR level. word must be a single English word or a short common phrase, not a proper noun. context_en must precisely state its meaning. Create exactly two natural English example sentences, each 8–18 words. Before answering, verify that there are exactly two distinct examples and that each has 8–18 words. Both examples must use exactly the stated meaning. Do not translate anything.", `CEFR level: ${level}`, {
+        model: env.OPENAI_WORD_MODEL ?? "gpt-5.4-mini",
+        reasoningEffort: "none",
+        maxCompletionTokens: 220,
+    });
 
     if (!result.word?.trim() || !result.context_en?.trim() || !hasValidDailyExamples(result.examples)) {
-        throw new Error("Invalid daily word examples response.");
+        throw new DailyWordContentError("Invalid daily word examples response.");
     }
     let createdSharedCard = false;
     const sharedCard = await getOrCreateSharedCard(env, result.word, result.context_en, async () => {
@@ -42,7 +53,7 @@ export async function generateDailyWordCard(env, level) {
             examples: result.examples.map((example, index) => ({ source: example.source.trim(), uk: translations[index + 1] })),
         };
     });
-    if (!hasValidDailyExamples(sharedCard.examples)) throw new Error("Invalid shared daily word examples.");
+    if (!hasValidDailyExamples(sharedCard.examples)) throw new DailyWordContentError("Invalid shared daily word examples.");
     console.debug({ event: createdSharedCard ? "daily_word_shared_card_cache_miss" : "daily_word_shared_card_cache_hit" });
     return {
         word: result.word.trim(),
@@ -123,7 +134,7 @@ export async function generateNewDailyWord(env, userId, level, generateCard, max
         if (!existing) return card;
     }
 
-    throw new Error("Could not generate a new daily word.");
+    throw new DailyWordContentError("Could not generate a new daily word.");
 }
 
 export async function fillDailyWordPrefetches(env, userId, level, generateCard, maxAttempts, target = DAILY_WORD_PREFETCH_TARGET) {

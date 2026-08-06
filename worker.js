@@ -83,7 +83,7 @@ import {
     generateNewDailyWord,
 } from "./src/features/daily-words/daily-words.js";
 import { handleDailyWordCallback } from "./src/features/daily-words/daily-word-callbacks.js";
-import { processDailyWordJob, processDailyWordPrefetch, queueDailyWordPrefetch, queueNextDailyWord, requeueDailyWordJobs } from "./src/features/daily-words/daily-word-jobs.js";
+import { processDailyWordJob, processDailyWordPrefetch, queueDailyWordPrefetch, queueDailyWordPrefetchCoverage, queueNextDailyWord, requeueDailyWordJobs } from "./src/features/daily-words/daily-word-jobs.js";
 import { clearPendingFeedback, startFeedback, submitFeedback, USER_MESSAGE_TYPE } from "./src/features/feedback/feedback.js";
 import { removeExpiredLearnedWords as cleanupLearnedWords } from "./src/features/vocabulary/learned-word-cleanup.js";
 import { sendDueDailyWords as deliverDueDailyWords, sendNextDailyWord as deliverNextDailyWord, sendPreviousDailyWord as deliverPreviousDailyWord, sendReadyNextDailyWord as deliverReadyNextDailyWord, sendTodayDailyWord as deliverTodayDailyWord } from "./src/features/daily-words/daily-delivery.js";
@@ -574,7 +574,8 @@ export default {
                         queueDailyWordPrefetch,
                     }, targetMessageId),
                 });
-                if (result === "retry") message.retry({ delaySeconds: 15 });
+                if (result === "retry-fast") message.retry({ delaySeconds: 1 });
+                else if (result === "retry") message.retry({ delaySeconds: 15 });
                 else message.ack();
             } catch (error) {
                 console.error({ event: "daily_word_queue_message_failed", message: error instanceof Error ? error.message : "Unknown error" });
@@ -632,6 +633,12 @@ export default {
                 event: "daily_word_schedule_failed",
                 message: error instanceof Error ? error.message : "Unknown error",
             });
+        }
+
+        try {
+            await queueDailyWordPrefetchCoverage(env);
+        } catch (error) {
+            console.error({ event: "daily_word_prefetch_coverage_failed", message: error instanceof Error ? error.message : "Unknown error" });
         }
 
         try {

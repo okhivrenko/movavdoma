@@ -125,11 +125,13 @@ export async function sendNextDailyWord(env, chatId, userId, pendingId, dependen
     try {
         console.debug({ event: "daily_word_generation_started", trigger: "next" });
         await sendTypingAction(env, chatId).catch(() => undefined);
+        const generationStartedAt = Date.now();
         const card = await dependencies.generateNewDailyWord(env, userId, level, dependencies.generateDailyWordCard, dependencies.maxAttempts);
+        const generationMs = Date.now() - generationStartedAt;
         newId = await savePendingDailyWord(env, userId, card, localTime.date);
         await sendDailyWordCard(env, chatId, userId, { id: newId, card, localDate: localTime.date }, level, messageId);
         await requestDailyWordPrefetch(env, userId, dependencies);
-        console.debug({ event: "daily_word_generation_completed", trigger: "next" });
+        console.debug({ event: "daily_word_generation_completed", trigger: "next", generationMs });
         return true;
     } catch (error) {
         if (!newId) await releaseDailyWordCardClaim(env, userId, localTime.date, dependencies);

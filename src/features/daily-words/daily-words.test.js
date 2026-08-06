@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+    DailyWordContentError,
     dailyCardFromPending,
     dailyWordKeyboard,
     dailyWordText,
@@ -64,7 +65,7 @@ test("daily generation rejects a word retained in the user's durable history", a
 
     await assert.rejects(
         generateNewDailyWord(env, 123, "B1", async () => card, 1),
-        /Could not generate a new daily word/,
+        (error) => error instanceof DailyWordContentError && /Could not generate a new daily word/.test(error.message),
     );
     assert.match(calls[0].query, /FROM user_seen_words/);
     assert.deepEqual(calls[0].parameters, [123, "reliable", 123, "reliable", 123, "reliable", 123, "reliable"]);
@@ -101,6 +102,29 @@ test("prefetch filling creates only one level-owned card per invocation", async 
     const insert = calls.find((call) => call.query.includes("INSERT OR IGNORE INTO daily_word_prefetches"));
     assert.equal(insert.parameters.at(-1), "B1");
     assert.ok(calls.some((call) => call.query.includes("cefr_level <> ?")));
+});
+
+test("the default prefetch target keeps three ready cards", async () => {
+    let countReads = 0;
+    let generated = 0;
+    const env = { DB: { prepare(query) {
+        return { bind: () => ({
+            run: async () => ({ meta: { changes: 1 } }),
+            first: async () => {
+                if (!query.includes("COUNT(*)")) return null;
+                countReads += 1;
+                return { total: countReads === 1 ? 2 : 3 };
+            },
+        }) };
+    } } };
+
+    const result = await fillDailyWordPrefetches(env, 123, "B1", async () => {
+        generated += 1;
+        return card;
+    }, 1);
+
+    assert.deepEqual(result, { complete: true, count: 3 });
+    assert.equal(generated, 1);
 });
 
 test("prefetch consumption atomically removes only the requested user's current level", async () => {
@@ -163,6 +187,12 @@ test("daily cards reuse a shared card and skip DeepL for a matching word meaning
         assert.equal(generated.translation_uk, sharedCard.translation_uk);
         assert.deepEqual(generated.examples, sharedCard.examples);
         assert.equal(requests.length, 1);
+        assert.equal(requests[0].body.model, "gpt-5.4-mini");
+        assert.equal(requests[0].body.reasoning_effort, "none");
+        assert.equal(requests[0].body.max_completion_tokens, 220);
+        const examplesSchema = requests[0].body.response_format.json_schema.schema.properties.examples;
+        assert.equal(examplesSchema.minItems, 2);
+        assert.equal(examplesSchema.maxItems, 2);
     } finally {
         globalThis.fetch = originalFetch;
     }

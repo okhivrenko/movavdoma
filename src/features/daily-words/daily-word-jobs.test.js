@@ -5,8 +5,10 @@ import {
     processDailyWordJob,
     processDailyWordPrefetch,
     queueNextDailyWord,
+    queueDailyWordPrefetchCoverage,
     requeueDailyWordJobs,
 } from "./daily-word-jobs.js";
+import { DailyWordContentError } from "./daily-words.js";
 
 function queueRecorder() {
     const messages = [];
@@ -73,6 +75,34 @@ test("one prefetch invocation creates at most one card and schedules the next bo
     assert.ok(calls.some((call) => call.query.includes("attempts = 0")));
 });
 
+test("the coverage sweep warms a bounded batch of the most recently active users", async () => {
+    const prefetch = queueRecorder();
+    const calls = [];
+    const env = {
+        DAILY_WORD_PREFETCH_JOBS: prefetch,
+        DB: { prepare(query) {
+            return { bind: (...parameters) => ({
+                all: async () => {
+                    calls.push({ query, parameters });
+                    return { results: [{ user_id: 123 }, { user_id: 456 }] };
+                },
+                run: async () => ({ meta: { changes: 1 } }),
+                first: async () => ({ status: "queued" }),
+            }) };
+        } },
+    };
+
+    assert.deepEqual(await queueDailyWordPrefetchCoverage(env), { candidates: 2, queued: 2 });
+    assert.deepEqual(calls[0].parameters, [3, 5]);
+    assert.match(calls[0].query, /ORDER BY u\.last_seen_at DESC/);
+    assert.match(calls[0].query, /u\.daily_enabled = 1/);
+    assert.match(calls[0].query, /u\.last_seen_at >= datetime\('now', '-30 days'\)/);
+    assert.deepEqual(prefetch.messages, [
+        { kind: "daily-word-prefetch", userId: 123 },
+        { kind: "daily-word-prefetch", userId: 456 },
+    ]);
+});
+
 test("prefetch failures stop after the bounded attempt budget", async () => {
     const calls = [];
     const env = {
@@ -109,6 +139,21 @@ test("unexpected job reads return the claimed job to the retryable state", async
 
     assert.equal(await processDailyWordJob(env, 7, {}), "retry");
     assert.ok(calls.some((call) => call.query.includes("SET status = 'queued'")));
+});
+
+test("invalid generated content retries without the provider backoff", async () => {
+    const env = { DB: { prepare(query) {
+        return { bind: () => ({
+            run: async () => ({ meta: { changes: 1 } }),
+            first: async () => query.includes("SELECT id, user_id") ? {
+                id: 7, user_id: 123, chat_id: 123, message_id: 9, pending_id: 42, attempts: 1,
+            } : null,
+        }) };
+    } } };
+
+    assert.equal(await processDailyWordJob(env, 7, {
+        sendNextDailyWord: async () => { throw new DailyWordContentError("invalid examples"); },
+    }), "retry-fast");
 });
 
 test("a duplicate delivery is acknowledged while the original job is still processing", async () => {
