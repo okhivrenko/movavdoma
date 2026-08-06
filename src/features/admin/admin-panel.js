@@ -19,13 +19,14 @@ export function adminKeyboard() {
         [{ text: "👥 Користувачі", callback_data: "admin:users" }, { text: "📈 Джерела", callback_data: "admin:sources" }],
         [{ text: "💬 Відгуки", callback_data: "admin:feedback" }, { text: "📩 Повідомлення", callback_data: "admin:contact" }],
         [{ text: "🎁 Ліміт слів", callback_data: "admin:grant" }, { text: "🎚 Рівень", callback_data: "admin:level" }],
-        [{ text: "🧪 Тест рівня", callback_data: "admin:testlevel" }, { text: "🔗 Посилання", callback_data: "admin:link" }],
+        [{ text: "🧪 Тест рівня", callback_data: "admin:testlevel" }, { text: "✉️ Написати", callback_data: "admin:message" }],
+        [{ text: "🔗 Посилання", callback_data: "admin:link" }],
         [{ text: "❓ Команди й ліміти", callback_data: "admin:help" }],
     ] };
 }
 
 export function adminHelpText() {
-    return "🛠 Адмін-панель\n\nЛіміти за рівнем (додавання слів / щоденні картки): 0→10/5, 1→15/10, 2→25/15, 3→40/20 на локальний день. /grant задає окремий ліміт додавання на 1 місяць і не може зменшити ліміт від рівня.\n\nКоманди:\n• /grant <userId> <ліміт> — ліміт додавання на 1 місяць.\n  Приклад: /grant 123456789 45\n• /level <userId> <0-3> — постійно підвищити рівень.\n  Приклад: /level 123456789 2\n• /testlevel <userId> — рівень 1 на 1 день.\n\n👥 Користувачі показують ID, профіль, активні слова, ліміт додавання, рівень і останню активність. 🎁 Заявки на донати приходять окремими картками.";
+    return "🛠 Адмін-панель\n\nЛіміти за рівнем (додавання слів / щоденні картки): 0→10/5, 1→15/10, 2→25/15, 3→40/20 на локальний день. /grant задає окремий ліміт додавання на 1 місяць і не може зменшити ліміт від рівня.\n\nКоманди:\n• /grant <userId> <ліміт> — ліміт додавання на 1 місяць.\n  Приклад: /grant 123456789 45\n• /level <userId> <0-3> — постійно підвищити рівень.\n  Приклад: /level 123456789 2\n• /testlevel <userId> — рівень 1 на 1 день.\n• /message <userId> <текст> — надіслати особисте повідомлення.\n  Приклад: /message 123456789 Привіт!\n\n👥 Користувачі показують ID, профіль, активні слова, ліміт додавання, рівень і останню активність. 🎁 Заявки на донати приходять окремими картками.";
 }
 
 export async function sendAcquisitionSourceSummary(env, chatId) {

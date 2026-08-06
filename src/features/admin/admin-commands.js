@@ -5,10 +5,39 @@ export async function handleAdminCommand(env, text, { chatId, userId }, d) {
     const level = text.match(/^\/level(?:\s+(.+))?$/i);
     const test = text.match(/^\/testlevel(?:\s+(.+))?$/i);
     const sources = /^\/sources$/i.test(text);
-    if (!grant && !level && !test && !sources) return false;
+    const directMessage = text.match(/^\/message\s+(\d+)\s+([\s\S]+)$/i);
+    const messageCommand = /^\/message(?:\s+.*)?$/i.test(text);
+    if (!grant && !level && !test && !sources && !messageCommand) return false;
     if (!d.isAdmin(env, userId)) { await sendMessage(env, chatId, "Ця команда доступна лише адміну."); return true; }
     if (sources) {
         await d.sendAcquisitionSourceSummary(env, chatId);
+        return true;
+    }
+    if (messageCommand) {
+        if (!directMessage) {
+            await sendMessage(env, chatId, "Використай: /message userId текст\nНаприклад: /message 123456789 Привіт! Маємо для тебе оновлення.");
+            return true;
+        }
+        const targetUserId = Number(directMessage[1]);
+        const body = directMessage[2].trim();
+        if (!Number.isSafeInteger(targetUserId) || targetUserId <= 0 || !body || body.length > 3500) {
+            await sendMessage(env, chatId, "ID має бути додатним, а повідомлення — від 1 до 3500 символів.");
+            return true;
+        }
+        try {
+            const recipient = await env.DB.prepare("SELECT chat_id FROM users WHERE telegram_user_id = ? AND is_active = 1")
+                .bind(targetUserId).first();
+            if (!recipient?.chat_id) {
+                await sendMessage(env, chatId, "Користувача не знайдено або він більше не активний у боті.");
+                return true;
+            }
+            await sendMessage(env, recipient.chat_id, body);
+            console.info({ event: "admin_direct_message_sent", recipientUserId: targetUserId, length: body.length });
+            await sendMessage(env, chatId, "✅ Повідомлення надіслано.");
+        } catch (error) {
+            console.error({ event: "admin_direct_message_failed", recipientUserId: targetUserId, message: error instanceof Error ? error.message : "Unknown error" });
+            await sendMessage(env, chatId, "Не вдалося надіслати повідомлення. Можливо, користувач заблокував бота.");
+        }
         return true;
     }
     if (grant) {
