@@ -1,5 +1,5 @@
 import { DEFAULT_DAILY_SETTINGS, localDateAndTime } from "../../domain/helpers.js";
-import { dailyWordKeyboard, dailyWordText, getDailyWordNavigation, getPendingDailyWord, hasPreviousDailyWord, savePendingDailyWord } from "./daily-words.js";
+import { dailyWordKeyboard, dailyWordText, fillDailyWordPrefetches, getDailyWordNavigation, getPendingDailyWord, hasPreviousDailyWord, savePendingDailyWord, takeDailyWordPrefetch } from "./daily-words.js";
 import { editMessage, sendMessage, sendTypingAction } from "../../platform/telegram.js";
 import { recordSeenWord } from "../vocabulary/user-word-history.js";
 
@@ -67,6 +67,18 @@ export async function sendNextDailyWord(env, chatId, userId, pendingId, dependen
         return true;
     }
     const level = user?.daily_level ?? "B1";
+    const prefetched = await takeDailyWordPrefetch(env, userId);
+    if (prefetched) {
+        if (!(await dependencies.claimDailyWordCard(env, userId, localTime.date, dependencies.access))) {
+            const limit = dependencies.dailyWordCardLimitForLevel(await dependencies.getUserAccessLevel(env, userId));
+            await sendMessage(env, chatId, `На сьогодні вже показано ${limit} нових карток. Завтра можна буде відкрити ще.`);
+            return true;
+        }
+        const newId = await savePendingDailyWord(env, userId, prefetched, localTime.date);
+        await sendDailyWordCard(env, chatId, userId, { id: newId, card: prefetched, localDate: localTime.date }, level, messageId);
+        if (dependencies.generateDailyWordCard) await refillDailyWordPrefetches(env, userId, level, dependencies);
+        return true;
+    }
     console.debug({ event: "daily_word_generation_started", trigger: "next" });
     await sendTypingAction(env, chatId).catch(() => undefined);
     const card = await dependencies.generateNewDailyWord(env, userId, level, dependencies.generateDailyWordCard, dependencies.maxAttempts);
@@ -77,8 +89,17 @@ export async function sendNextDailyWord(env, chatId, userId, pendingId, dependen
     }
     const newId = await savePendingDailyWord(env, userId, card, localTime.date);
     await sendDailyWordCard(env, chatId, userId, { id: newId, card, localDate: localTime.date }, level, messageId);
+    if (dependencies.generateDailyWordCard) await refillDailyWordPrefetches(env, userId, level, dependencies);
     console.debug({ event: "daily_word_generation_completed", trigger: "next" });
     return true;
+}
+
+async function refillDailyWordPrefetches(env, userId, level, dependencies) {
+    try {
+        await fillDailyWordPrefetches(env, userId, level, dependencies.generateDailyWordCard, dependencies.maxAttempts);
+    } catch (error) {
+        console.warn({ event: "daily_word_prefetch_failed", userId, message: error instanceof Error ? error.message : "Unknown error" });
+    }
 }
 
 export async function sendPreviousDailyWord(env, chatId, userId, cardId, messageId) {

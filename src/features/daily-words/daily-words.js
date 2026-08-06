@@ -114,13 +114,41 @@ export async function generateNewDailyWord(env, userId, level, generateCard, max
           SELECT 1 FROM words WHERE user_id = ? AND lower(trim(source_text)) = ?
           UNION ALL
           SELECT 1 FROM daily_word_cards WHERE user_id = ? AND lower(trim(source_text)) = ?
+          UNION ALL
+          SELECT 1 FROM daily_word_prefetches WHERE user_id = ? AND lower(trim(source_text)) = ?
           LIMIT 1
-        `).bind(userId, normalizedWord, userId, normalizedWord, userId, normalizedWord).first();
+        `).bind(userId, normalizedWord, userId, normalizedWord, userId, normalizedWord, userId, normalizedWord).first();
 
         if (!existing) return card;
     }
 
     throw new Error("Could not generate a new daily word.");
+}
+
+export async function fillDailyWordPrefetches(env, userId, level, generateCard, maxAttempts, target = 5) {
+    const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM daily_word_prefetches WHERE user_id = ?")
+        .bind(userId).first();
+    const missing = Math.max(0, target - Number(count?.total ?? 0));
+    for (let index = 0; index < missing; index += 1) {
+        const card = await generateNewDailyWord(env, userId, level, generateCard, maxAttempts);
+        await env.DB.prepare(`
+          INSERT OR IGNORE INTO daily_word_prefetches (user_id, source_text, translation_uk, context_note, examples_json)
+          VALUES (?, ?, ?, ?, ?)
+        `).bind(userId, card.word, card.translation_uk, card.context_en, JSON.stringify(card.examples)).run();
+    }
+}
+
+export async function takeDailyWordPrefetch(env, userId) {
+    const prefetched = await env.DB.prepare(`
+      SELECT id, source_text, translation_uk, context_note, examples_json
+      FROM daily_word_prefetches WHERE user_id = ? ORDER BY id ASC LIMIT 1
+    `).bind(userId).first();
+    if (!prefetched) return null;
+    const card = dailyCardFromPending(prefetched);
+    if (!card) return null;
+    await env.DB.prepare("DELETE FROM daily_word_prefetches WHERE id = ? AND user_id = ?")
+        .bind(prefetched.id, userId).run();
+    return card.card;
 }
 
 export async function savePendingDailyWord(env, userId, card, localDate) {

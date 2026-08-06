@@ -28,7 +28,9 @@ test("opening the daily-word menu again replaces the already displayed pending c
             DB: {
                 prepare(query) {
                     return { bind: (...parameters) => ({
-                        first: async () => query.includes("FROM users")
+                        first: async () => query.includes("daily_word_prefetches")
+                            ? null
+                            : query.includes("FROM users")
                             ? { timezone: "Europe/Warsaw", daily_level: "B1", should_refresh_daily_word: 1 }
                             : query.includes("id >") || query.includes("id <") ? null : pending,
                         run: async () => {

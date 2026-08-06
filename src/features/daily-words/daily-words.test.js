@@ -65,7 +65,7 @@ test("daily generation rejects a word retained in the user's durable history", a
         /Could not generate a new daily word/,
     );
     assert.match(calls[0].query, /FROM user_seen_words/);
-    assert.deepEqual(calls[0].parameters, [123, "reliable", 123, "reliable", 123, "reliable"]);
+    assert.deepEqual(calls[0].parameters, [123, "reliable", 123, "reliable", 123, "reliable", 123, "reliable"]);
 });
 
 test("daily cards reuse a shared card and skip DeepL for a matching word meaning", async () => {
