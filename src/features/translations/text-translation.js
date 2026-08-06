@@ -59,7 +59,7 @@ export async function handleTextTranslationCallback(env, callback, { chatId, mes
         env,
         chatId,
         messageId,
-        `Надішли текст ${LANGUAGE_LABEL_UK[direction.source].toLowerCase()} мовою — перекладу ${LANGUAGE_LABEL_UK[direction.target].toLowerCase()} мовою.\n\nМаксимум ${MAX_TRANSLATION_TEXT_LENGTH} символів.`,
+        `Надішли текст ${LANGUAGE_LABEL_UK[direction.source].toLowerCase()} — перекладу ${LANGUAGE_LABEL_UK[direction.target].toLowerCase()}.\n\nМаксимум ${MAX_TRANSLATION_TEXT_LENGTH} символів.`,
         { inline_keyboard: [] }
     );
     return true;
