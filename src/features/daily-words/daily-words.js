@@ -1,5 +1,6 @@
 import { openAIJson } from "../../platform/openai.js";
 import { translateWithDeepL } from "../../platform/deepl.js";
+import { getOrCreateSharedCard } from "../vocabulary/shared-vocabulary.js";
 
 // Daily-card persistence and delivery flow. Network and access dependencies are
 // passed in explicitly so the Worker remains the composition root.
@@ -28,14 +29,24 @@ export async function generateDailyWordCard(env, level) {
     if (!result.word?.trim() || !result.context_en?.trim() || !hasValidDailyExamples(result.examples)) {
         throw new Error("Invalid daily word examples response.");
     }
-    const translations = await translateWithDeepL(env, [result.word, ...result.examples.map((example) => example.source)], {
-        source: "en", target: "uk", context: `English vocabulary meaning: ${result.context_en}`,
+    let createdSharedCard = false;
+    const sharedCard = await getOrCreateSharedCard(env, result.word, result.context_en, async () => {
+        createdSharedCard = true;
+        const translations = await translateWithDeepL(env, [result.word, ...result.examples.map((example) => example.source)], {
+            source: "en", target: "uk", context: `English vocabulary meaning: ${result.context_en}`,
+        });
+        return {
+            translation_uk: translations[0],
+            examples: result.examples.map((example, index) => ({ source: example.source.trim(), uk: translations[index + 1] })),
+        };
     });
+    if (!hasValidDailyExamples(sharedCard.examples)) throw new Error("Invalid shared daily word examples.");
+    console.debug({ event: createdSharedCard ? "daily_word_shared_card_cache_miss" : "daily_word_shared_card_cache_hit" });
     return {
         word: result.word.trim(),
         context_en: result.context_en.trim(),
-        translation_uk: translations[0],
-        examples: result.examples.map((example, index) => ({ source: example.source.trim(), uk: translations[index + 1] })),
+        translation_uk: sharedCard.translation_uk,
+        examples: sharedCard.examples,
     };
 }
 

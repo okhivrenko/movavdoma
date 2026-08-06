@@ -10,7 +10,7 @@ translation quality and repeatedly paid for identical results.
 ## Decision
 
 Use DeepL for all English ↔ Ukrainian translations: the text-translation menu,
-vocabulary-word translation, and the Ukrainian translations of English
+vocabulary-word translation, daily-word cards, and the Ukrainian translations of English
 examples. Send the selected English word sense as DeepL context and request
 `prefer_quality_optimized`.
 
@@ -32,7 +32,8 @@ user is never placed in the shared card cache.
 ## Consequences
 
 Later users receive the same cached card for the same word and meaning, which
-reduces latency and provider cost. A cache miss needs one OpenAI call plus one
-batched DeepL call. Cached output reflects the quality at creation time; a
+reduces latency and provider cost. Daily-card ownership, delivery date, and
+learning status remain in per-user `daily_word_cards`; only reusable content is
+shared. A cache miss needs one OpenAI call plus one batched DeepL call. Cached output reflects the quality at creation time; a
 future explicit cache-version or moderation workflow is needed to regenerate
 an incorrect shared card deliberately.

@@ -5,6 +5,7 @@ import {
     dailyCardFromPending,
     dailyWordKeyboard,
     dailyWordText,
+    generateDailyWordCard,
     generateNewDailyWord,
     getPendingDailyWord,
     hasValidDailyExamples,
@@ -50,6 +51,48 @@ test("daily word generation retries a failed card build before giving up", async
 
     assert.equal(calls, 2);
     assert.equal(generated.word, card.word);
+});
+
+test("daily cards reuse a shared card and skip DeepL for a matching word meaning", async () => {
+    const requests = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url, init) => {
+        requests.push({ url, body: JSON.parse(init.body) });
+        if (url.includes("api.openai.com")) {
+            return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
+                word: "reliable",
+                context_en: "able to be trusted",
+                examples: [
+                    { source: "The reliable bus arrived exactly on time for every passenger." },
+                    { source: "She is reliable whenever the team needs extra help." },
+                ],
+            }) } }] }), { status: 200 });
+        }
+        assert.fail("DeepL must not be called when a shared card exists");
+    };
+    const sharedCard = {
+        translation_uk: "надійний",
+        examples: [
+            { source: "The reliable bus arrived exactly on time for every passenger.", uk: "Надійний автобус прибув точно вчасно для кожного пасажира." },
+            { source: "She is reliable whenever the team needs extra help.", uk: "На неї можна покластися, коли команді потрібна додаткова допомога." },
+        ],
+    };
+    const env = {
+        OPENAI_API_KEY: "test-key",
+        DEEPL_API_KEY: "test-key",
+        DB: { prepare: () => ({ bind: () => ({ first: async () => ({
+            translation_uk: sharedCard.translation_uk,
+            examples_json: JSON.stringify(sharedCard.examples),
+        }) }) }) },
+    };
+    try {
+        const generated = await generateDailyWordCard(env, "B1");
+        assert.equal(generated.translation_uk, sharedCard.translation_uk);
+        assert.deepEqual(generated.examples, sharedCard.examples);
+        assert.equal(requests.length, 1);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
 });
 
 test("daily cards reject placeholder, duplicate, and out-of-range example sentences", () => {
