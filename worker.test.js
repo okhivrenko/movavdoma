@@ -122,7 +122,7 @@ test("an existing user cannot claim another referral reward by starting through 
     assert.equal(db.calls.some((call) => call.query?.includes("INSERT OR IGNORE INTO referral_rewards")), false);
 });
 
-test("TikTok landing source survives the CTA and is stored as one bounded campaign", async () => {
+test("TikTok landing sources survive the CTA and are stored as bounded campaigns", async () => {
     const db = new WorkerTestDb();
     const env = workerEnv(db);
 
@@ -134,7 +134,19 @@ test("TikTok landing source survives the CTA and is stored as one bounded campai
     ));
     const userUpsert = db.calls.find((call) => call.method === "run" && call.query?.includes("INSERT INTO users"));
     assert.ok(userUpsert);
-    assert.deepEqual(userUpsert.parameters.slice(-2), ["website", "tiktok_ads"]);
+    assert.deepEqual(userUpsert.parameters.slice(-2), ["website", null]);
+    const campaignInsert = db.calls.find((call) => call.method === "run" && call.query?.includes("INSERT OR IGNORE INTO user_acquisition_campaigns"));
+    assert.deepEqual(campaignInsert.parameters, [123, "tiktok_ads"]);
+
+    const storyDb = new WorkerTestDb();
+    const storyEnv = workerEnv(storyDb);
+    const storyLanding = await worker.fetch(new Request("https://example.test/?source=tiktok_story"), storyEnv);
+    assert.equal([...((await storyLanding.text()).matchAll(/href="https:\/\/t\.me\/MovaVDomaBot\?start=tiktok_story"/g))].length, 4);
+    await captureTelegramCalls(() => worker.fetch(
+        webhookRequest(privateMessageUpdate({ updateId: 20, text: "/start tiktok_story" })), storyEnv
+    ));
+    const storyCampaignInsert = storyDb.calls.find((call) => call.method === "run" && call.query?.includes("INSERT OR IGNORE INTO user_acquisition_campaigns"));
+    assert.deepEqual(storyCampaignInsert.parameters, [123, "tiktok_story"]);
 });
 
 test("/menu and Ukrainian menu buttons use navigation routing", async () => {

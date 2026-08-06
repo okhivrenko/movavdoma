@@ -109,6 +109,7 @@ export async function handleNavigationMessage(env, text, context, dependencies) 
         sendHelp,
         privacyPolicyUrl,
         addWordHint,
+        referralInvitation,
         logError,
     } = dependencies;
     const content = contentFor();
@@ -201,11 +202,8 @@ export async function handleNavigationMessage(env, text, context, dependencies) 
 
     if (action === MENU_ACTION.SHARE_BOT) {
         try {
-            const botLink = await dependencies.getBotLink(env);
-            const shareLink = `https://t.me/share/url?url=${encodeURIComponent(botLink)}&text=${encodeURIComponent("Спробуй бот MovaYakVDoma для вивчення слів!")}`;
-            await sendMessage(env, chatId, `📤 Поділися ботом з друзями:\n${botLink}`, {
-                inline_keyboard: [[{ text: "Поділитися ботом", url: shareLink }]],
-            });
+            const invitation = await referralInvitation(env, userId);
+            await sendMessage(env, chatId, invitation.text, invitation.replyMarkup);
         } catch (error) {
             logError("share_bot_link_failed", error);
             await sendMessage(env, chatId, copy.shareBotFailed);

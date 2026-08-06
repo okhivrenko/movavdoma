@@ -30,9 +30,10 @@ export function adminHelpText() {
 
 export async function sendAcquisitionSourceSummary(env, chatId) {
     const result = await env.DB.prepare(`
-      SELECT COALESCE(acquisition_campaign, acquisition_source, 'direct_or_legacy') AS source, COUNT(*) AS total
+      SELECT COALESCE(campaigns.campaign, users.acquisition_campaign, users.acquisition_source, 'direct_or_legacy') AS source, COUNT(*) AS total
       FROM users
-      GROUP BY COALESCE(acquisition_campaign, acquisition_source, 'direct_or_legacy')
+      LEFT JOIN user_acquisition_campaigns AS campaigns ON campaigns.user_id = users.telegram_user_id
+      GROUP BY COALESCE(campaigns.campaign, users.acquisition_campaign, users.acquisition_source, 'direct_or_legacy')
       ORDER BY total DESC, source ASC
     `).all();
     const rows = result.results ?? [];

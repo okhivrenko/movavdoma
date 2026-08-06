@@ -377,7 +377,7 @@ export default {
         const text = message.text.trim();
         const acquisition = acquisitionAttributionFromStartCommand(text);
         const referralUserId = referralUserIdFromStartCommand(text);
-        const existingUser = referralUserId
+        const existingUser = (referralUserId || acquisition?.campaign)
             ? await env.DB.prepare("SELECT telegram_user_id FROM users WHERE telegram_user_id = ?").bind(userId).first()
             : null;
         if (acquisition) {
@@ -403,9 +403,16 @@ export default {
                 message.from.username ?? null,
                 message.from.first_name ?? null,
                 acquisition?.source ?? null,
-                acquisition?.campaign ?? null
+                null
             )
             .run();
+
+        if (acquisition?.campaign && !existingUser) {
+            await env.DB.prepare(`
+                INSERT OR IGNORE INTO user_acquisition_campaigns (user_id, campaign)
+                VALUES (?, ?)
+            `).bind(userId, acquisition.campaign).run();
+        }
 
         if (referralUserId && !existingUser) {
             try {
@@ -458,6 +465,7 @@ export default {
             getDailySettings,
             contactPrompt: messages.contactPrompt,
             getBotLink,
+            referralInvitation: (targetEnv, targetUserId) => referralInvitation(targetEnv, targetUserId, { getBotLink }),
             logError(event, error) {
                 console.error({ event, message: error instanceof Error ? error.message : "Unknown error" });
             },

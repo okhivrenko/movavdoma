@@ -33,15 +33,18 @@ test("navigation keyboard and feedback cancellation retain current Ukrainian UI"
     );
 });
 
-test("share action sends a native Telegram share button and a copyable link", async () => {
+test("share action sends the user's personal referral link", async () => {
     const messages = [];
     const handled = await handleNavigationMessage({}, "📤 Поділитися ботом", { chatId: 123, userId: 123 }, {
-        getBotLink: async () => "https://t.me/movayakvdoma_bot",
+        referralInvitation: async (_env, userId) => ({
+            text: `Запроси друга: https://t.me/movayakvdoma_bot?start=ref_${userId}`,
+            replyMarkup: { inline_keyboard: [[{ text: "Запросити друга", url: "https://t.me/share/url?url=ref" }]] },
+        }),
         sendMessage: async (_env, _chatId, text, keyboard) => messages.push({ text, keyboard }),
         logError: () => assert.fail("share link should be available"),
     });
     assert.equal(handled, true);
-    assert.match(messages[0].text, /https:\/\/t\.me\/movayakvdoma_bot/);
+    assert.match(messages[0].text, /https:\/\/t\.me\/movayakvdoma_bot\?start=ref_123/);
     assert.match(messages[0].keyboard.inline_keyboard[0][0].url, /^https:\/\/t\.me\/share\/url\?/);
 });
 

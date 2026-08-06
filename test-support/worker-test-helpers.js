@@ -71,6 +71,7 @@ export class WorkerTestDb {
             this.existingUsers.add(parameters[0]);
             return { meta: { changes: 1 } };
         }
+        if (query.includes("INSERT OR IGNORE INTO user_acquisition_campaigns")) return { meta: { changes: 1 } };
         if (query.includes("INSERT OR IGNORE INTO referral_rewards")) return { meta: { changes: 1 } };
         if (query.includes("UPDATE users SET interface_version")) {
             this.interfaceVersion = parameters[0];

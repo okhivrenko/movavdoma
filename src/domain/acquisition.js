@@ -7,6 +7,7 @@ export const ACQUISITION_SOURCES = Object.freeze([
     "tg_ads",
     "tg_post",
     "tiktok_ads",
+    "tiktok_story",
     "website",
 ]);
 
@@ -35,6 +36,8 @@ export function acquisitionSourceFromLandingParam(value) {
 export function acquisitionAttributionFromStartCommand(text) {
     const source = acquisitionSourceFromStartCommand(text);
     if (!source) return null;
-    if (source === "tiktok_ads") return { source: "website", campaign: source, reportSource: source };
+    if (source === "tiktok_ads" || source === "tiktok_story") {
+        return { source: "website", campaign: source, reportSource: source };
+    }
     return { source, campaign: null, reportSource: source };
 }
