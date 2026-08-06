@@ -44,6 +44,30 @@ slices and genuine blockers. It is not a stream of intentions.
 - [x] Add bounded Ukrainian ↔ English text translation without changing
   vocabulary-card storage.
 
+### Readiness for 1,000-user traffic
+
+Complete this gate before a campaign expected to bring about 1,000 users in a
+short window. A gradual 1,000-user day is not evidence that burst traffic is
+safe.
+
+- [ ] Move every OpenAI/DeepL operation off the Telegram webhook path into
+  bounded, durable queues so webhook acknowledgement stays fast under load.
+- [ ] Replace the full sequential daily-delivery sweep with indexed due work,
+  an atomic per-user claim, bounded batches, and queue-backed delivery.
+- [ ] Replace per-user three-card generation with a reusable CEFR-level card
+  pool while preserving per-user seen-word exclusion and ownership.
+- [ ] Stop blind redelivery of already-enqueued durable jobs; recover only jobs
+  whose enqueue or processing lease is stale.
+- [ ] Handle Telegram `429 retry_after`, OpenAI rate limits with jittered
+  backoff, DeepL `429/456`, and expose provider circuit-breaker signals.
+- [ ] Confirm Workers Free/Paid, OpenAI usage tier, DeepL plan/current quota,
+  Queue retention, and cost-control thresholds before launch.
+- [ ] Add backlog age, delivery lag, provider status, D1 overload, and failed
+  update metrics with explicit alert/abort thresholds.
+- [ ] Pass a production-like load test for 1,000 starts plus representative
+  daily-word, vocabulary, and translation traffic with no lost updates, no D1
+  overload, bounded queue drain time, and verified Telegram/provider recovery.
+
 ## Latest verified result
 
 - Version 1.20.4 released on 6 August 2026 reduces the remaining cold daily-word
