@@ -1,4 +1,4 @@
-import { isAdmin } from "../../domain/helpers.js";
+import { DEFAULT_DAILY_SETTINGS, isAdmin, localDateAndTime } from "../../domain/helpers.js";
 import { normalizeAccessLevel } from "../../domain/policies.js";
 
 /** D1 access-level reads and monotonic grants, isolated from donation routing. */
@@ -11,11 +11,15 @@ export async function getAdminChatId(env) {
 
 export async function getUserAccessLevel(env, userId) {
     if (isAdmin(env, userId)) return 3;
-    const [permanent, temporary] = await Promise.all([
+    const user = await env.DB.prepare("SELECT timezone FROM users WHERE telegram_user_id = ?").bind(userId).first();
+    const localTime = localDateAndTime(user?.timezone ?? DEFAULT_DAILY_SETTINGS.timezone, Date.now());
+    if (!localTime) throw new Error("Unable to calculate access-level date.");
+    const [permanent, temporary, referral] = await Promise.all([
         env.DB.prepare("SELECT access_level FROM user_access_levels WHERE user_id = ?").bind(userId).first(),
         env.DB.prepare("SELECT MAX(access_level) AS access_level FROM user_temporary_access_grants WHERE user_id = ? AND expires_at > CURRENT_TIMESTAMP").bind(userId).first(),
+        env.DB.prepare("SELECT 1 AS access_level FROM referral_rewards WHERE referrer_user_id = ? AND local_date = ? LIMIT 1").bind(userId, localTime.date).first(),
     ]);
-    return Math.max(normalizeAccessLevel(permanent?.access_level), normalizeAccessLevel(temporary?.access_level));
+    return Math.max(normalizeAccessLevel(permanent?.access_level), normalizeAccessLevel(temporary?.access_level), normalizeAccessLevel(referral?.access_level));
 }
 
 /** Permanent access only moves upwards and never overwrites a higher level. */

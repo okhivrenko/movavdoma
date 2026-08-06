@@ -100,6 +100,28 @@ test("a supported Telegram start link welcomes the user and records its first-to
     assert.doesNotMatch(userUpsert.query, /acquisition_source =/);
 });
 
+test("a referral start from a new user grants the referrer a one-day level-one reward", async () => {
+    const db = new WorkerTestDb({ existingUsers: [777] });
+    await captureTelegramCalls(() => worker.fetch(
+        webhookRequest(privateMessageUpdate({ updateId: 181, userId: 888, text: "/start ref_777" })),
+        workerEnv(db)
+    ));
+
+    const reward = db.calls.find((call) => call.method === "run" && call.query?.includes("INSERT OR IGNORE INTO referral_rewards"));
+    assert.ok(reward);
+    assert.deepEqual(reward.parameters.slice(0, 2), [777, 888]);
+});
+
+test("an existing user cannot claim another referral reward by starting through a link", async () => {
+    const db = new WorkerTestDb({ existingUsers: [777, 888] });
+    await captureTelegramCalls(() => worker.fetch(
+        webhookRequest(privateMessageUpdate({ updateId: 182, userId: 888, text: "/start ref_777" })),
+        workerEnv(db)
+    ));
+
+    assert.equal(db.calls.some((call) => call.query?.includes("INSERT OR IGNORE INTO referral_rewards")), false);
+});
+
 test("TikTok landing source survives the CTA and is stored as one bounded campaign", async () => {
     const db = new WorkerTestDb();
     const env = workerEnv(db);

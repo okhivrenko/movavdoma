@@ -10,6 +10,7 @@ function dependencies(overrides = {}) {
         claimDailyWordAddition: async () => true,
         getDailyAdditionLimit: async () => 10,
         dailyLimitReachedText: () => "limit",
+        referralInvitation: async () => ({ text: "referral", replyMarkup: { inline_keyboard: [] } }),
         closePendingSelection: async () => {}, saveAndSendWord: async () => {}, suggestSenses: async () => [],
         senseText: () => "", senseKeyboard: () => ({}), wordCountLabel: () => "слів", listLimit: 10,
         getRecentActiveWords: async () => [], getRecentArchivedWords: async () => [],
@@ -35,6 +36,17 @@ test("an explicitly supplied context is never written to the shared card cache",
     }));
     assert.equal(handled, true);
     assert.deepEqual(saved.slice(3), ["charge", "payment for a service", { sharedCache: false }]);
+});
+
+test("a reached addition limit offers a personal referral invitation", async () => {
+    const sent = [];
+    const handled = await handleVocabularyTextCommand({}, "resilient", { chatId: 1, userId: 2 }, dependencies({
+        sent,
+        claimDailyWordAddition: async () => false,
+        referralInvitation: async (_env, userId) => ({ text: `invite-${userId}`, replyMarkup: { inline_keyboard: [[{ text: "share" }]] } }),
+    }));
+    assert.equal(handled, true);
+    assert.equal(sent[0], "limit\n\ninvite-2");
 });
 
 test("archive all binds its owner and never interpolates user data", async () => {

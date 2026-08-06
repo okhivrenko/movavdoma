@@ -44,6 +44,8 @@ import { handleAdminCallback } from "./src/features/admin/admin-callbacks.js";
 import { handleAdminCommand } from "./src/features/admin/admin-commands.js";
 import { messages } from "./src/domain/messages.js";
 import { acquisitionAttributionFromStartCommand, acquisitionSourceFromLandingParam, isTelegramStartCommand } from "./src/domain/acquisition.js";
+import { referralUserIdFromStartCommand } from "./src/domain/referrals.js";
+import { referralInvitation, rewardReferralFromNewUser } from "./src/features/referrals/referrals.js";
 import {
     getDailySettings,
     handleDailySettingsCallback,
@@ -369,6 +371,10 @@ export default {
         const userId = message.from.id;
         const text = message.text.trim();
         const acquisition = acquisitionAttributionFromStartCommand(text);
+        const referralUserId = referralUserIdFromStartCommand(text);
+        const existingUser = referralUserId
+            ? await env.DB.prepare("SELECT telegram_user_id FROM users WHERE telegram_user_id = ?").bind(userId).first()
+            : null;
         if (acquisition) {
             console.info({ event: "telegram_acquisition_source_received", source: acquisition.reportSource });
         }
@@ -395,6 +401,15 @@ export default {
                 acquisition?.campaign ?? null
             )
             .run();
+
+        if (referralUserId && !existingUser) {
+            try {
+                const rewarded = await rewardReferralFromNewUser(env, referralUserId, userId);
+                console.info({ event: "referral_start_processed", rewarded });
+            } catch (error) {
+                console.error({ event: "referral_reward_failed", message: error instanceof Error ? error.message : "Unknown error" });
+            }
+        }
 
         if (!isTelegramStartCommand(text) && text !== "/menu") {
             await refreshInterfaceIfNeeded(env, chatId, userId);
@@ -471,6 +486,7 @@ export default {
             claimDailyWordAddition,
             getDailyAdditionLimit,
             dailyLimitReachedText,
+            referralInvitation: (targetEnv, targetUserId) => referralInvitation(targetEnv, targetUserId, { getBotLink }),
             closePendingSelection,
             saveAndSendWord,
             suggestSenses,

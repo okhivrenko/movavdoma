@@ -46,6 +46,12 @@ slices and genuine blockers. It is not a stream of intentions.
 
 ## Latest verified result
 
+- Version 1.18.0 released on 6 August 2026: the exhausted learning-list quota now offers a personal Telegram
+  referral link. A first `/start` from a previously unseen account grants the
+  referrer level 1 until the end of that referrer's local day; duplicate,
+  self-, and existing-user referrals cannot grant again. Focused tests and the
+  fresh-D1 migration gate passed. Migration 0027 is applied, the Worker is
+  deployed, and the public endpoint returns HTTP 200.
 - Version 1.10.0 released on 5 August 2026 adds bounded TikTok-ad attribution.
   `?source=tiktok_ads` on the landing is validated server-side and carried to
   every Telegram CTA; `/sources` reports `tiktok_ads` separately while keeping

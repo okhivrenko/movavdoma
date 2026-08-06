@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
  * keeps tests independent from Cloudflare and production data.
  */
 export class WorkerTestDb {
-    constructor({ dailySettings, interfaceVersion = 9 } = {}) {
+    constructor({ dailySettings, interfaceVersion = 9, existingUsers = [] } = {}) {
         this.dailySettings = dailySettings ?? {
             timezone: "Europe/Kyiv",
             daily_time: "10:00",
@@ -16,6 +16,7 @@ export class WorkerTestDb {
         this.interfaceVersion = interfaceVersion;
         this.lastSeenUpdates = 0;
         this.processedUpdates = new Set();
+        this.existingUsers = new Set(existingUsers);
         this.calls = [];
     }
 
@@ -29,8 +30,15 @@ export class WorkerTestDb {
         };
     }
 
-    async first(query) {
-        this.calls.push({ method: "first", query });
+    async first(query, parameters = []) {
+        this.calls.push({ method: "first", query, parameters });
+
+        if (query.includes("SELECT telegram_user_id FROM users")) {
+            return this.existingUsers.has(parameters[0]) ? { telegram_user_id: parameters[0] } : null;
+        }
+        if (query.includes("SELECT timezone FROM users")) {
+            return { timezone: this.dailySettings.timezone };
+        }
 
         if (query.includes("SELECT interface_version FROM users")) {
             return { interface_version: this.interfaceVersion };
@@ -59,7 +67,11 @@ export class WorkerTestDb {
             this.processedUpdates.add(updateId);
             return { meta: { changes } };
         }
-        if (query.includes("INSERT INTO users")) return { meta: { changes: 1 } };
+        if (query.includes("INSERT INTO users")) {
+            this.existingUsers.add(parameters[0]);
+            return { meta: { changes: 1 } };
+        }
+        if (query.includes("INSERT OR IGNORE INTO referral_rewards")) return { meta: { changes: 1 } };
         if (query.includes("UPDATE users SET interface_version")) {
             this.interfaceVersion = parameters[0];
             return { meta: { changes: 1 } };

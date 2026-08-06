@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { getUserAccessLevel, grantAccessLevel } from "./access-levels.js";
 
-function accessDb({ permanent = 0, temporary = 0 } = {}) {
+function accessDb({ permanent = 0, temporary = 0, referral = 0 } = {}) {
     const calls = [];
     return {
         calls,
@@ -11,8 +11,10 @@ function accessDb({ permanent = 0, temporary = 0 } = {}) {
             return { bind: (...parameters) => ({
                 first: async () => {
                     calls.push({ method: "first", query, parameters });
+                    if (query.includes("SELECT timezone FROM users")) return { timezone: "Europe/Kyiv" };
                     if (query.includes("user_access_levels")) return { access_level: permanent };
                     if (query.includes("user_temporary_access_grants")) return { access_level: temporary };
+                    if (query.includes("referral_rewards")) return referral ? { access_level: referral } : null;
                     throw new Error(`Unexpected query: ${query}`);
                 },
                 run: async () => {
@@ -25,12 +27,18 @@ function accessDb({ permanent = 0, temporary = 0 } = {}) {
 }
 
 test("effective access uses the highest non-expired stored level and admin bypass", async () => {
-    const db = accessDb({ permanent: 1, temporary: 3 });
+    const db = accessDb({ permanent: 1, temporary: 3, referral: 1 });
     const env = { DB: db, ADMIN_TELEGRAM_USER_ID: "999" };
 
     assert.equal(await getUserAccessLevel(env, 123), 3);
     assert.equal(await getUserAccessLevel(env, 999), 3);
     assert.ok(db.calls.some((call) => call.query.includes("expires_at > CURRENT_TIMESTAMP")));
+    assert.ok(db.calls.some((call) => call.query.includes("referral_rewards") && call.parameters.length === 2));
+});
+
+test("a referral reward temporarily raises level zero to level one", async () => {
+    const db = accessDb({ referral: 1 });
+    assert.equal(await getUserAccessLevel({ DB: db, ADMIN_TELEGRAM_USER_ID: "999" }, 123), 1);
 });
 
 test("permanent grants cannot lower a user's current level", async () => {
