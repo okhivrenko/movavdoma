@@ -40,8 +40,8 @@ creating more than one reward.
 
 ## Consequences
 
-The invitation is only shown at the point of quota exhaustion. It grants level
-1 (up to 10 new daily cards), not extra learning-list additions; that keeps the
-existing independent quota invariant intact. The data is retained as a compact
+The invitation is only shown at the point of quota exhaustion. Level 1 raises
+both independent counters to their level-1 values: up to 15 added words and 10
+new daily cards on the referrer's local day. The data is retained as a compact
 anti-duplication record. A rollback to an older Worker leaves the additive
 table unused and does not alter existing access levels.

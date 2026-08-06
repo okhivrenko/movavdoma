@@ -230,8 +230,8 @@ local day; the D1 counter is claimed atomically before the DeepL request.
 - When the 10-word learning-list quota is exhausted, the bot offers a personal
   referral link. If a previously unseen Telegram account starts the bot through
   it, the referrer receives level 1 for the rest of the referrer's local day
-  (up to 10 new daily cards). A referral never gives extra word-addition slots,
-  cannot be self-referred, and a referred account can reward only once.
+  (up to 15 added words and 10 new daily cards). A referral cannot be
+  self-referred, and a referred account can reward only once.
 
 ## Important UX rules
 
@@ -270,8 +270,9 @@ local day; the D1 counter is claimed atomically before the DeepL request.
 - Choosing `Вчити` for a daily card also uses one addition from that day's
   limit; choosing `Знаю` does not.
 - `daily_word_additions` stores only the user ID, local date, and count.
-- `daily_word_card_views` independently limits newly generated daily cards to
-  five per local day; it does not reduce the ten-word learning-list quota.
+- `daily_word_card_views` independently limits newly generated daily cards by
+  access level (5, 10, 15, or 20); word additions use the same levels (10, 15,
+  25, or 40) and remain independently counted.
 - `user_access_levels` stores a permanent manual/legacy level. Temporary
   donation grants live in `user_temporary_access_grants`; the highest active
   level determines the limit: 0→5, 1→10, 2→15, and 3→20 daily cards. The

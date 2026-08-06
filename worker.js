@@ -73,6 +73,7 @@ import {
     getDailyAdditionLimit as getDailyAdditionLimitFlow,
 } from "./src/features/daily-words/daily-addition-quota.js";
 import {
+    dailyWordAdditionLimitForLevel,
     dailyWordCardLimitForLevel,
     donationAccessLevel,
 } from "./src/domain/policies.js";
@@ -171,11 +172,15 @@ async function notifyUnmatchedDonations(env) {
 // Remove only already learned vocabulary after its retention period. Child rows
 // are deleted first because examples and reviews reference the vocabulary word.
 async function claimDailyWordAddition(env, userId) {
-    return claimDailyWordAdditionFlow(env, userId, { isAdmin, dailyAddLimit: DAILY_ADD_LIMIT });
+    return claimDailyWordAdditionFlow(env, userId, {
+        isAdmin, dailyAddLimit: DAILY_ADD_LIMIT, getUserAccessLevel, dailyWordAdditionLimitForLevel,
+    });
 }
 
 async function getDailyAdditionLimit(env, userId) {
-    return getDailyAdditionLimitFlow(env, userId, { isAdmin, dailyAddLimit: DAILY_ADD_LIMIT });
+    return getDailyAdditionLimitFlow(env, userId, {
+        isAdmin, dailyAddLimit: DAILY_ADD_LIMIT, getUserAccessLevel, dailyWordAdditionLimitForLevel,
+    });
 }
 
 const syncMonobankDonations = createMonobankDonationSync({

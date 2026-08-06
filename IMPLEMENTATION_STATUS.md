@@ -46,6 +46,11 @@ slices and genuine blockers. It is not a stream of intentions.
 
 ## Latest verified result
 
+- Version 1.18.1 released on 6 August 2026 synchronizes access levels across
+  both local-day quotas: levels 0–3 now map to 10/5, 15/10, 25/15, and 40/20
+  word additions/daily cards. Existing manual word-addition bonuses remain
+  effective when higher. `npm run check` passed with 108 tests and the public
+  Worker returns HTTP 200.
 - Version 1.18.0 released on 6 August 2026: the exhausted learning-list quota now offers a personal Telegram
   referral link. A first `/start` from a previously unseen account grants the
   referrer level 1 until the end of that referrer's local day; duplicate,

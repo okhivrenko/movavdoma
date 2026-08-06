@@ -113,7 +113,7 @@ test("admin user list includes the stored Telegram nickname and first name", asy
                         last_seen_at: "2026-08-04 08:00:00",
                         active_word_count: 2,
                         bonus_daily_limit: null,
-                        access_level: 0,
+                        access_level: 1,
                     }] }),
                 }) };
             },
@@ -124,6 +124,7 @@ test("admin user list includes the stored Telegram nickname and first name", asy
     ));
     const text = telegramCall(calls, "sendMessage").text;
     assert.match(text, /ID 123 · @olena · Олена/);
+    assert.match(text, /ліміт: 15 · рівень: 1/);
     assert.match(text, /був:/);
 });
 

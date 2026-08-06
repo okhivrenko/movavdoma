@@ -58,7 +58,7 @@ export async function handleAdminCallback(env, callback, context, dependencies) 
 
     const commandHints = {
         "admin:grant": "Щоб змінити ліміт користувача, надішли:\n/grant userId ліміт\n\nНаприклад: /grant 123456789 45",
-        "admin:level": "Щоб підвищити рівень доступу, надішли:\n/level userId рівень\n\nРівні: 0→5, 1→10, 2→15, 3→20 щоденних карток.\nПриклад: /level 123456789 2",
+        "admin:level": "Щоб підвищити рівень доступу, надішли:\n/level userId рівень\n\nРівні (додавання слів / щоденні картки): 0→10/5, 1→15/10, 2→25/15, 3→40/20.\nПриклад: /level 123456789 2",
         "admin:testlevel": "Щоб видати тестовий рівень 1 на 1 день, надішли:\n/testlevel userId\n\nНаприклад: /testlevel 123456789",
     };
     if (commandHints[callback.data]) {

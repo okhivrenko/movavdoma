@@ -8,10 +8,11 @@ export async function claimDailyWordAddition(env, userId, dependencies) {
         .prepare("SELECT timezone FROM users WHERE telegram_user_id = ?")
         .bind(userId)
         .first();
-    const limit = await env.DB
-        .prepare("SELECT daily_limit FROM user_daily_limits WHERE user_id = ? AND expires_at > CURRENT_TIMESTAMP")
-        .bind(userId)
-        .first();
+    const [limit, accessLevel] = await Promise.all([
+        env.DB.prepare("SELECT daily_limit FROM user_daily_limits WHERE user_id = ? AND expires_at > CURRENT_TIMESTAMP")
+            .bind(userId).first(),
+        dependencies.getUserAccessLevel(env, userId),
+    ]);
     const localTime = localDateAndTime(user?.timezone ?? DEFAULT_DAILY_SETTINGS.timezone, Date.now());
     if (!localTime) throw new Error("Unable to calculate daily addition date.");
 
@@ -21,7 +22,10 @@ export async function claimDailyWordAddition(env, userId, dependencies) {
       ON CONFLICT(user_id, local_date) DO UPDATE
       SET additions = additions + 1
       WHERE additions < ?
-    `).bind(userId, localTime.date, limit?.daily_limit ?? dependencies.dailyAddLimit).run();
+    `).bind(userId, localTime.date, Math.max(
+        limit?.daily_limit ?? dependencies.dailyAddLimit,
+        dependencies.dailyWordAdditionLimitForLevel(accessLevel)
+    )).run();
 
     return claimed.meta.changes > 0;
 }
@@ -29,9 +33,13 @@ export async function claimDailyWordAddition(env, userId, dependencies) {
 export async function getDailyAdditionLimit(env, userId, dependencies) {
     if (dependencies.isAdmin(env, userId)) return null;
 
-    const limit = await env.DB
-        .prepare("SELECT daily_limit FROM user_daily_limits WHERE user_id = ? AND expires_at > CURRENT_TIMESTAMP")
-        .bind(userId)
-        .first();
-    return limit?.daily_limit ?? dependencies.dailyAddLimit;
+    const [limit, accessLevel] = await Promise.all([
+        env.DB.prepare("SELECT daily_limit FROM user_daily_limits WHERE user_id = ? AND expires_at > CURRENT_TIMESTAMP")
+            .bind(userId).first(),
+        dependencies.getUserAccessLevel(env, userId),
+    ]);
+    return Math.max(
+        limit?.daily_limit ?? dependencies.dailyAddLimit,
+        dependencies.dailyWordAdditionLimitForLevel(accessLevel)
+    );
 }

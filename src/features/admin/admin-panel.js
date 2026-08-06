@@ -1,4 +1,5 @@
 import { editMessage, sendMessage } from "../../platform/telegram.js";
+import { dailyWordAdditionLimitForLevel } from "../../domain/policies.js";
 
 // Profile fields increase each row's length; 25 rows stay safely below
 // Telegram's 4,096-character message limit even with long names.
@@ -24,7 +25,7 @@ export function adminKeyboard() {
 }
 
 export function adminHelpText() {
-    return "🛠 Адмін-панель\n\nЛіміти:\n• Додавання слів: базово 10 на локальний день; /grant задає окремий ліміт на 1 місяць.\n• Щоденні картки: рівень 0→5, 1→10, 2→15, 3→20 нових карток на локальний день.\n\nКоманди:\n• /grant <userId> <ліміт> — ліміт додавання на 1 місяць.\n  Приклад: /grant 123456789 45\n• /level <userId> <0-3> — постійно підвищити рівень.\n  Приклад: /level 123456789 2\n• /testlevel <userId> — рівень 1 на 1 день.\n\n👥 Користувачі показують ID, профіль, активні слова, ліміт додавання, рівень і останню активність. 🎁 Заявки на донати приходять окремими картками.";
+    return "🛠 Адмін-панель\n\nЛіміти за рівнем (додавання слів / щоденні картки): 0→10/5, 1→15/10, 2→25/15, 3→40/20 на локальний день. /grant задає окремий ліміт додавання на 1 місяць і не може зменшити ліміт від рівня.\n\nКоманди:\n• /grant <userId> <ліміт> — ліміт додавання на 1 місяць.\n  Приклад: /grant 123456789 45\n• /level <userId> <0-3> — постійно підвищити рівень.\n  Приклад: /level 123456789 2\n• /testlevel <userId> — рівень 1 на 1 день.\n\n👥 Користувачі показують ID, профіль, активні слова, ліміт додавання, рівень і останню активність. 🎁 Заявки на донати приходять окремими картками.";
 }
 
 export async function sendAcquisitionSourceSummary(env, chatId) {
@@ -186,7 +187,10 @@ export async function sendAdminUserList(env, chatId, requestedPage = 0, messageI
     `).bind(ADMIN_USER_LIST_LIMIT, page * ADMIN_USER_LIST_LIMIT).all();
 
     const text = result.results.map((user, index) => {
-        const dailyLimit = dependencies.isAdmin(env, user.telegram_user_id) ? "∞" : compactAdminNumber(user.bonus_daily_limit ?? dependencies.dailyAddLimit);
+        const dailyLimit = dependencies.isAdmin(env, user.telegram_user_id) ? "∞" : compactAdminNumber(Math.max(
+            user.bonus_daily_limit ?? dependencies.dailyAddLimit,
+            dailyWordAdditionLimitForLevel(user.access_level)
+        ));
         const username = compactProfileField(user.telegram_username, 32);
         const firstName = compactProfileField(user.telegram_first_name, 32);
         const profile = [username && `@${username.replace(/^@/, "")}`, firstName].filter(Boolean).join(" · ");

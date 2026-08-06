@@ -73,10 +73,9 @@
 ## Product invariants
 
 - A vocabulary card must use one selected meaning and exactly two examples.
-- Base learning-list quota: 10 words per local day; admin and temporary manual
-  bonuses are separate.
-- Daily-card quota is separate and uses access levels: `0→5`, `1→10`,
-  `2→15`, `3→20` newly generated cards per local day.
+- Access levels set both local-day limits, in the order `word additions/daily
+  cards`: `0→10/5`, `1→15/10`, `2→25/15`, `3→40/20`. Admin and temporary
+  manual word-addition bonuses remain separate and may only raise that result.
 - Base access levels only rise through `/level`. Donation levels are separate,
   expire after one month, and never reduce a higher base level.
 - Feedback requires the explicit `💬 Відгук` flow; forward only that user's next

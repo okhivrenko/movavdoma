@@ -8,7 +8,7 @@ export async function referralInvitation(env, userId, dependencies) {
     const referralLink = `${botLink}?start=ref_${userId}`;
     const shareLink = `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(REFERRAL_SHARE_TEXT)}`;
     return {
-        text: `🎁 Запроси друга за посиланням нижче. Коли новий користувач запустить бота за ним, ти отримаєш рівень 1 до кінця свого дня — до 10 нових щоденних карток.\n\n${referralLink}`,
+        text: `🎁 Запроси друга за посиланням нижче. Коли новий користувач запустить бота за ним, ти отримаєш рівень 1 до кінця свого дня: до 15 доданих слів і до 10 нових щоденних карток.\n\n${referralLink}`,
         replyMarkup: { inline_keyboard: [[{ text: "Запросити друга", url: shareLink }]] },
     };
 }
