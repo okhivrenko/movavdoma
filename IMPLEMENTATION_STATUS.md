@@ -46,6 +46,15 @@ slices and genuine blockers. It is not a stream of intentions.
 
 ## Latest verified result
 
+- Version 1.20.4 released on 6 August 2026 reduces the remaining cold daily-word
+  latency without changing `gpt-5.4-mini`: recent opted-in users are gradually
+  warmed to three CEFR-matched cards, locally invalid content retries after one
+  second, and generation uses a stricter two-example schema with a smaller
+  completion budget. The sweep excludes dormant and daily-disabled accounts.
+  `npm run check` passed with 125 tests, the production migration journal has
+  no pending entries, and the public Worker returns HTTP 200. In the first
+  verified cron cycle, ready coverage grew from 2 to 10 cards across the eight
+  eligible accounts while the remaining jobs continued processing.
 - Version 1.20.3 released on 6 August 2026 removes the loading state from the
   ready daily-word path, serves CEFR-matched prefetched cards atomically, and
   isolates interactive generation from bounded background prefetch in separate
