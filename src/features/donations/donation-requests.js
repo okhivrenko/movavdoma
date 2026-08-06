@@ -1,5 +1,5 @@
 import { createSupportCode } from "../../domain/helpers.js";
-import { sendMessage } from "../../platform/telegram.js";
+import { answerCallbackQuery, sendMessage } from "../../platform/telegram.js";
 import { publicRuntimeConfig } from "../../platform/runtime-config.js";
 
 export const DONATION_REQUEST_SOURCE = Object.freeze({
@@ -52,39 +52,67 @@ async function getOrCreateManualBonusRequest(env, userId) {
 
 function supportKeyboard(env) {
     const { monobankJarSendId } = publicRuntimeConfig(env);
-    return { inline_keyboard: [[{ text: "☕ Відкрити банку", url: `https://send.monobank.ua/jar/${encodeURIComponent(monobankJarSendId)}` }]] };
+    return { inline_keyboard: [
+        [{ text: "☕ Відкрити банку", url: `https://send.monobank.ua/jar/${encodeURIComponent(monobankJarSendId)}` }],
+        [{ text: "🎁 Отримати бонус після донату", callback_data: "support:bonus" }],
+    ] };
 }
 
 export async function sendDonationInstructions(env, chatId, userId) {
     const request = await getOrCreateDonationRequest(env, userId);
     await sendMessage(env, chatId,
-        `Дякую за підтримку! Відкрий банку й, будь ласка, додай цей код у коментар до платежу:\n\n${request.support_code}\n\nПісля переказу натисни «🎁 Отримати бонус». Код допоможе мені точно знайти твій донат.`,
+        `Дякую за підтримку! Відкрий банку й, будь ласка, додай цей код у коментар до платежу:\n\n${request.support_code}\n\nПісля переказу натисни «🎁 Отримати бонус після донату» нижче. Код допоможе мені точно знайти твій донат.`,
         supportKeyboard(env));
 }
 
-/** Submits either a payment-linked or independent manual request for admin review. */
-export async function submitDonationBonusRequest(env, chatId, userId, notifyPendingDonationRequests) {
-    const supportRequest = await getOpenDonationRequest(env, userId);
-    const request = supportRequest ?? await getOrCreateManualBonusRequest(env, userId);
+async function submitSupportBonusRequest(env, chatId, userId, notifyPendingDonationRequests) {
+    const request = await getOpenDonationRequest(env, userId);
+    if (!request) {
+        await sendMessage(env, chatId, "Спершу натисни «☕ Підтримати бот», щоб отримати код для коментаря до платежу.");
+        return;
+    }
 
-    if (request.request_source === DONATION_REQUEST_SOURCE.SUPPORT && request.status === "awaiting_payment") {
+    if (request.status === "awaiting_payment") {
         await env.DB
             .prepare(`
               UPDATE donation_requests
               SET status = 'awaiting_review', requested_at = CURRENT_TIMESTAMP
-              WHERE id = ?
+              WHERE id = ? AND request_source = ? AND status = 'awaiting_payment'
             `)
-            .bind(request.id)
+            .bind(request.id, DONATION_REQUEST_SOURCE.SUPPORT)
             .run();
     }
 
+    await sendMessage(env, chatId, "🎁 Заявку на бонус прийнято! Адмін перевірить платіж і розгляне рівень доступу.");
+    await notifyPendingDonationRequests(env);
+}
+
+/** Creates an independent manual request for admin review, without a donation. */
+export async function submitDonationBonusRequest(env, chatId, userId, notifyPendingDonationRequests) {
+    await getOrCreateManualBonusRequest(env, userId);
     await sendMessage(
         env,
         chatId,
-        request.request_source === DONATION_REQUEST_SOURCE.SUPPORT
-            ? "🎁 Заявку на бонус прийнято! Адмін перевірить платіж і розгляне рівень доступу."
-            : "🎁 Заявку на бонус надіслано адміну. Ми ще розвиваємо бот, тому адмін індивідуально розгляне рівень доступу."
+        "🎁 Заявку на бонус надіслано адміну. Ми ще розвиваємо бот, тому адмін індивідуально розгляне рівень доступу."
     );
 
     await notifyPendingDonationRequests(env);
+}
+
+/** Handles only the payment-linked bonus button shown with a support request. */
+export async function handleDonationSupportBonusCallback(env, callback, context, dependencies) {
+    if (!callback.data.startsWith("support:")) return false;
+    if (callback.data !== "support:bonus") {
+        await answerCallbackQuery(env, callback.id, "Невірний вибір.");
+        return true;
+    }
+
+    try {
+        await answerCallbackQuery(env, callback.id, "Перевіряю заявку…");
+        await submitSupportBonusRequest(env, context.chatId, context.userId, dependencies.notifyPendingDonationRequests);
+    } catch (error) {
+        console.error({ event: "support_bonus_request_failed", message: error instanceof Error ? error.message : "Unknown error" });
+        await sendMessage(env, context.chatId, "Не вдалося надіслати заявку. Спробуй ще раз за хвилину.");
+    }
+    return true;
 }

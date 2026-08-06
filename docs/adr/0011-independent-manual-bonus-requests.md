@@ -17,8 +17,8 @@ be described as missing payments or accidentally matched to a bank transaction.
 `manual_bonus`. Existing rows default to `support`.
 
 The support action continues to create a `support` request and show a Monobank
-link and code. The bonus action reuses a pending support request when present;
-otherwise it creates one `manual_bonus` request directly in
+link, code, and its own payment-linked bonus button. The separate bonus action
+always creates (or reuses) a `manual_bonus` request directly in
 `awaiting_review`. Both request types use the existing admin review card and
 temporary-access grant path. Monobank matching considers `support` requests
 only.

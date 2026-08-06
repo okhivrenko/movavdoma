@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
     DONATION_REQUEST_SOURCE,
     getOpenDonationRequest,
+    handleDonationSupportBonusCallback,
     sendDonationInstructions,
     submitDonationBonusRequest,
 } from "./donation-requests.js";
@@ -40,10 +41,11 @@ test("open donation requests are scoped to their owner and reused for instructio
     const message = telegramCall(calls, "sendMessage");
     assert.match(message.text, /MOV-ABCD/);
     assert.equal(message.reply_markup.inline_keyboard[0][0].url, "https://send.monobank.ua/jar/test-jar-id");
+    assert.equal(message.reply_markup.inline_keyboard[1][0].callback_data, "support:bonus");
     assert.ok(db.calls.every((call) => call.query.includes("user_id = ?") && call.parameters[0] === 123));
 });
 
-test("submitting a support-linked bonus request marks payment for review and notifies admins", async () => {
+test("the support-message bonus callback marks payment for review and notifies admins", async () => {
     const calls = [];
     const env = {
         TELEGRAM_BOT_TOKEN: "test-token",
@@ -61,14 +63,14 @@ test("submitting a support-linked bonus request marks payment for review and not
     };
     let notified = 0;
 
-    const { calls: telegramCalls } = await captureTelegramCalls(() => submitDonationBonusRequest(
+    const { calls: telegramCalls } = await captureTelegramCalls(() => handleDonationSupportBonusCallback(
         env,
-        123,
-        123,
-        async (notifiedEnv) => {
+        { id: "callback", data: "support:bonus" },
+        { chatId: 123, userId: 123 },
+        { notifyPendingDonationRequests: async (notifiedEnv) => {
             assert.equal(notifiedEnv, env);
             notified += 1;
-        }
+        } }
     ));
 
     assert.equal(notified, 1);
@@ -103,7 +105,8 @@ test("a user can submit an independent manual bonus request without a donation",
 
     const { calls } = await captureTelegramCalls(() => submitDonationBonusRequest(env, 123, 456, async () => { notified += 1; }));
 
-    assert.equal(manualRequestLookup, 2);
+    assert.equal(manualRequestLookup, 1);
+    assert.equal(writes[0].parameters[2], DONATION_REQUEST_SOURCE.MANUAL_BONUS);
     assert.ok(writes.some((write) => write.query.includes("request_source, status, requested_at")));
     assert.equal(notified, 1);
     assert.match(telegramCall(calls, "sendMessage").text, /надіслано адміну/);

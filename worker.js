@@ -19,6 +19,7 @@ import {
 import { createMonobankDonationSync } from "./src/platform/monobank-donations.js";
 import {
     sendDonationInstructions,
+    handleDonationSupportBonusCallback,
     submitDonationBonusRequest as submitDonationBonusRequestFlow,
 } from "./src/features/donations/donation-requests.js";
 import {
@@ -321,6 +322,12 @@ export default {
                 grantDonationBonus: grantDonationBonusRequest,
                 rejectDonationBonus: rejectDonationBonusRequest,
                 grantTemporaryAccessLevel,
+            })) {
+                return new Response("ok");
+            }
+
+            if (await handleDonationSupportBonusCallback(env, callback, { chatId, userId }, {
+                notifyPendingDonationRequests,
             })) {
                 return new Response("ok");
             }
