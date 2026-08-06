@@ -17,6 +17,7 @@ export class WorkerTestDb {
         this.lastSeenUpdates = 0;
         this.processedUpdates = new Set();
         this.existingUsers = new Set(existingUsers);
+        this.prefetchJobs = new Set();
         this.calls = [];
     }
 
@@ -49,6 +50,9 @@ export class WorkerTestDb {
         if (query.includes("SELECT feedback_pending, feedback_kind FROM users")) {
             return { feedback_pending: 0, feedback_kind: "feedback" };
         }
+        if (query.includes("SELECT status FROM daily_word_prefetch_jobs")) {
+            return this.prefetchJobs.has(parameters[0]) ? { status: "queued" } : null;
+        }
 
         throw new Error(`Unexpected D1 first query: ${query}`);
     }
@@ -73,6 +77,10 @@ export class WorkerTestDb {
         }
         if (query.includes("INSERT OR IGNORE INTO user_acquisition_campaigns")) return { meta: { changes: 1 } };
         if (query.includes("INSERT OR IGNORE INTO referral_rewards")) return { meta: { changes: 1 } };
+        if (query.includes("INSERT OR IGNORE INTO daily_word_prefetch_jobs")) {
+            this.prefetchJobs.add(parameters[0]);
+            return { meta: { changes: 1 } };
+        }
         if (query.includes("UPDATE users SET interface_version")) {
             this.interfaceVersion = parameters[0];
             return { meta: { changes: 1 } };
@@ -95,6 +103,7 @@ export class WorkerTestDb {
             this.dailySettings.daily_level = parameters[0];
             return { meta: { changes: 1 } };
         }
+        if (query.includes("DELETE FROM daily_word_prefetches")) return { meta: { changes: 0 } };
         if (query.includes("UPDATE users SET timezone")) {
             this.dailySettings.timezone = parameters[0];
             return { meta: { changes: 1 } };
@@ -114,6 +123,7 @@ export class WorkerTestDb {
 }
 
 export function workerEnv(db) {
+    const queue = { send: async () => ({ metadata: { metrics: { backlogCount: 0, backlogBytes: 0 } } }) };
     return {
         DB: db,
         TELEGRAM_BOT_TOKEN: "test-token",
@@ -122,6 +132,8 @@ export function workerEnv(db) {
         BOT_BRAND_NAME: "MovaYakVDoma",
         PUBLIC_WORKER_URL: "https://example.test",
         MONOBANK_JAR_SEND_ID: "test-jar-id",
+        DAILY_WORD_INTERACTIVE_JOBS: queue,
+        DAILY_WORD_PREFETCH_JOBS: queue,
     };
 }
 

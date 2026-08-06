@@ -16,6 +16,10 @@ function dailyWordRetryKeyboard(action, pendingId) {
 
 /** Handles user-owned actions on an already-sent daily word card. */
 export async function handleDailyWordCallback(env, callback, context, dependencies) {
+    if (callback.data === "daily:loading") {
+        await answerCallbackQuery(env, callback.id, "Ще готую слово…");
+        return true;
+    }
     if (!callback.data.startsWith("daily:learn:") && !callback.data.startsWith("daily:next:") && !callback.data.startsWith("daily:prev:")) return false;
 
     const { chatId, messageId, userId } = context;
@@ -30,7 +34,16 @@ export async function handleDailyWordCallback(env, callback, context, dependenci
     const startedAt = Date.now();
     try {
         if (action === "next") {
-            await answerCallbackQuery(env, callback.id, "Завантажую наступне слово…");
+            await answerCallbackQuery(env, callback.id, "Шукаю наступне слово…");
+            const ready = await dependencies.sendReadyNextDailyWord(env, chatId, userId, pendingId, messageId);
+            if (ready.status === "shown" || ready.status === "limit") {
+                console.info({ event: "daily_word_navigation_ready", source: ready.source ?? ready.status, durationMs: Date.now() - startedAt });
+                return true;
+            }
+            if (ready.status === "unavailable") {
+                await restoreUnavailableDailyWord(env, chatId, messageId);
+                return true;
+            }
             await editMessageReplyMarkup(env, chatId, messageId, dailyWordLoadingKeyboard);
             await dependencies.queueNextDailyWord(env, { chatId, messageId, userId, pendingId });
             console.debug({ event: "daily_word_navigation_queued", action, durationMs: Date.now() - startedAt });

@@ -5,11 +5,13 @@ import {
     dailyCardFromPending,
     dailyWordKeyboard,
     dailyWordText,
+    fillDailyWordPrefetches,
     generateDailyWordCard,
     generateNewDailyWord,
     getPendingDailyWord,
     hasValidDailyExamples,
     savePendingDailyWordToLearning,
+    takeDailyWordPrefetch,
 } from "./daily-words.js";
 
 const card = {
@@ -66,6 +68,62 @@ test("daily generation rejects a word retained in the user's durable history", a
     );
     assert.match(calls[0].query, /FROM user_seen_words/);
     assert.deepEqual(calls[0].parameters, [123, "reliable", 123, "reliable", 123, "reliable", 123, "reliable"]);
+});
+
+test("prefetch filling creates only one level-owned card per invocation", async () => {
+    const calls = [];
+    let countReads = 0;
+    let generated = 0;
+    const env = { DB: { prepare(query) {
+        return { bind: (...parameters) => ({
+            run: async () => {
+                calls.push({ query, parameters });
+                return { meta: { changes: 1 } };
+            },
+            first: async () => {
+                calls.push({ query, parameters });
+                if (query.includes("COUNT(*)")) {
+                    countReads += 1;
+                    return { total: countReads === 1 ? 0 : 1 };
+                }
+                return null;
+            },
+        }) };
+    } } };
+
+    const result = await fillDailyWordPrefetches(env, 123, "B1", async () => {
+        generated += 1;
+        return card;
+    }, 1, 2);
+
+    assert.deepEqual(result, { complete: false, count: 1 });
+    assert.equal(generated, 1);
+    const insert = calls.find((call) => call.query.includes("INSERT OR IGNORE INTO daily_word_prefetches"));
+    assert.equal(insert.parameters.at(-1), "B1");
+    assert.ok(calls.some((call) => call.query.includes("cefr_level <> ?")));
+});
+
+test("prefetch consumption atomically removes only the requested user's current level", async () => {
+    const calls = [];
+    const pending = {
+        id: 9,
+        source_text: card.word,
+        translation_uk: card.translation_uk,
+        context_note: card.context_en,
+        examples_json: JSON.stringify(card.examples),
+    };
+    const env = { DB: { prepare(query) {
+        return { bind: (...parameters) => ({ first: async () => {
+            calls.push({ query, parameters });
+            return pending;
+        } }) };
+    } } };
+
+    const prefetched = await takeDailyWordPrefetch(env, 123, "B1");
+    assert.equal(prefetched.id, 9);
+    assert.match(calls[0].query, /DELETE FROM daily_word_prefetches/);
+    assert.match(calls[0].query, /RETURNING/);
+    assert.deepEqual(calls[0].parameters, [123, "B1", 123]);
 });
 
 test("daily cards reuse a shared card and skip DeepL for a matching word meaning", async () => {

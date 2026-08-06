@@ -9,12 +9,15 @@ validation, idempotent `processed_updates` writes, and composition of feature
 dependencies. Keep database ownership checks and callback validation at this
 edge or inside the corresponding feature handler.
 
-The Worker has two entry points:
+The Worker has three entry points:
 
 - `fetch(request, env)` — Telegram webhook, public landing page, and privacy
   page. The landing is server-rendered HTML/CSS with no client-side state.
 - `scheduled(controller, env)` — webhook repair, daily delivery, cleanup,
   donation expiration notifications, and Monobank synchronization.
+- `queue(batch, env)` — interactive daily-word generation and isolated
+  background prefetch work. Separate queues prevent speculative work from
+  delaying a user waiting for the next card.
 
 ## Module map
 

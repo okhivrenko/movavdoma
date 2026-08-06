@@ -28,7 +28,18 @@
     }
   ],
   "queues": {
-    "producers": [{ "binding": "DAILY_WORD_JOBS", "queue": "movayakvdoma-daily-word-jobs" }],
-    "consumers": [{ "queue": "movayakvdoma-daily-word-jobs", "max_batch_size": 1, "max_batch_timeout": 0, "max_retries": 3, "max_concurrency": 1, "retry_delay": 15 }]
+    "producers": [
+      { "binding": "DAILY_WORD_INTERACTIVE_JOBS", "queue": "movayakvdoma-daily-word-interactive" },
+      { "binding": "DAILY_WORD_PREFETCH_JOBS", "queue": "movayakvdoma-daily-word-prefetch" }
+    ],
+    "consumers": [
+      { "queue": "movayakvdoma-daily-word-interactive", "max_batch_size": 1, "max_batch_timeout": 0, "max_retries": 3, "max_concurrency": 3, "retry_delay": 15, "dead_letter_queue": "movayakvdoma-daily-word-interactive-dlq" },
+      { "queue": "movayakvdoma-daily-word-prefetch", "max_batch_size": 1, "max_batch_timeout": 0, "max_retries": 3, "max_concurrency": 1, "retry_delay": 60, "dead_letter_queue": "movayakvdoma-daily-word-prefetch-dlq" }
+    ]
+  },
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.05 }
   }
 }

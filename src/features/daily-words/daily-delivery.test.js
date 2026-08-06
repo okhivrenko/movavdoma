@@ -112,10 +112,41 @@ test("a card added to vocabulary can still anchor navigation to the next daily c
     try {
         const next = { ...pending, id: 43, source_text: "curious", translation_uk: "допитливий" };
         const env = { TELEGRAM_BOT_TOKEN: "test-token", DB: { prepare(query) {
-            return { bind: () => ({ first: async () => query.includes("id >") ? next : query.includes("FROM users") ? { timezone: "Europe/Warsaw", daily_level: "B1" } : pending }) };
+            return { bind: () => ({
+                first: async () => query.includes("id >") ? next : query.includes("FROM users") ? { timezone: "Europe/Warsaw", daily_level: "B1" } : pending,
+                run: async () => ({ meta: { changes: 1 } }),
+            }) };
         } } };
         const { sendNextDailyWord } = await import("./daily-delivery.js");
         assert.equal(await sendNextDailyWord(env, 123, 123, 42, {}, 7), true);
         assert.match(calls.at(-1).text, /curious — допитливий/);
     } finally { globalThis.fetch = originalFetch; }
+});
+
+test("a failed cold generation releases the claimed daily-card quota", async () => {
+    const dbCalls = [];
+    const env = { DB: { prepare(query) {
+        return { bind: (...parameters) => ({
+            first: async () => query.includes("FROM users")
+                ? { timezone: "Europe/Warsaw", daily_level: "B1" }
+                : query.includes("daily_word_prefetches") || query.includes("id >")
+                ? null
+                : pending,
+            run: async () => {
+                dbCalls.push({ query, parameters });
+                return { meta: { changes: 1 } };
+            },
+        }) };
+    } } };
+    const { sendNextDailyWord } = await import("./daily-delivery.js");
+
+    await assert.rejects(() => sendNextDailyWord(env, 123, 123, 42, {
+        claimDailyWordCard: async () => true,
+        access: {},
+        dailyWordCardLimitForLevel: () => 5,
+        getUserAccessLevel: async () => 0,
+        generateNewDailyWord: async () => { throw new Error("provider unavailable"); },
+    }, 7), /provider unavailable/);
+
+    assert.ok(dbCalls.some((call) => call.query.includes("SET views = views - 1")));
 });

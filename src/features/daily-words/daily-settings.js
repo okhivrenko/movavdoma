@@ -146,7 +146,7 @@ export async function refreshDailySettings(env, chatId, messageId, userId) {
 }
 
 /** Handles the settings-only callback namespaces after the private-chat gate. */
-export async function handleDailySettingsCallback(env, callback, context) {
+export async function handleDailySettingsCallback(env, callback, context, dependencies = {}) {
     const { chatId, messageId, userId } = context;
     if (callback.data === "dailysettings:time") {
         await answerCallbackQuery(env, callback.id, "Обери час.");
@@ -198,6 +198,15 @@ export async function handleDailySettingsCallback(env, callback, context) {
             return true;
         }
         await env.DB.prepare("UPDATE users SET daily_level = ? WHERE telegram_user_id = ?").bind(level, userId).run();
+        await env.DB.prepare("DELETE FROM daily_word_prefetches WHERE user_id = ? AND cefr_level <> ?")
+            .bind(userId, level).run();
+        if (dependencies.queueDailyWordPrefetch) {
+            try {
+                await dependencies.queueDailyWordPrefetch(env, userId);
+            } catch (error) {
+                console.warn({ event: "daily_word_prefetch_after_level_change_failed", message: error instanceof Error ? error.message : "Unknown error" });
+            }
+        }
         await answerCallbackQuery(env, callback.id, "Рівень збережено.");
         await refreshDailySettings(env, chatId, messageId, userId);
         return true;

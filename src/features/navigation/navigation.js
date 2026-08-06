@@ -119,6 +119,13 @@ export async function handleNavigationMessage(env, text, context, dependencies) 
     if (isTelegramStartCommand(text)) {
         await sendMessage(env, chatId, dependencies.welcome(await dependencies.getDailySettings(env, userId)), await keyboardForUser(env, userId));
         await markInterfaceVersion(env, userId);
+        if (dependencies.queueDailyWordPrefetch) {
+            try {
+                await dependencies.queueDailyWordPrefetch(env, userId);
+            } catch (error) {
+                dependencies.logError("daily_word_prefetch_after_start_failed", error);
+            }
+        }
         return true;
     }
 

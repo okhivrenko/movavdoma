@@ -1,5 +1,5 @@
 import { DEFAULT_DAILY_SETTINGS, localDateAndTime } from "../../domain/helpers.js";
-import { consumeDailyWordPrefetch, dailyWordKeyboard, dailyWordText, getDailyWordNavigation, getPendingDailyWord, hasPreviousDailyWord, savePendingDailyWord, takeDailyWordPrefetch } from "./daily-words.js";
+import { dailyWordKeyboard, dailyWordText, getDailyWordNavigation, getPendingDailyWord, hasPreviousDailyWord, restoreDailyWordPrefetch, savePendingDailyWord, takeDailyWordPrefetch } from "./daily-words.js";
 import { editMessage, sendMessage, sendTypingAction } from "../../platform/telegram.js";
 import { recordSeenWord } from "../vocabulary/user-word-history.js";
 
@@ -23,23 +23,36 @@ export async function sendTodayDailyWord(env, chatId, userId, dependencies) {
         await requestDailyWordPrefetch(env, userId, dependencies);
         return;
     }
+    const level = user?.daily_level ?? "B1";
+    const prefetched = await takeDailyWordPrefetch(env, userId, level);
     if (!(await dependencies.claimDailyWordCard(env, userId, localTime.date, dependencies.access))) {
+        if (prefetched) await restorePrefetch(env, userId, level, prefetched);
         const limit = dependencies.dailyWordCardLimitForLevel(await dependencies.getUserAccessLevel(env, userId));
         await sendMessage(env, chatId, `На сьогодні вже показано ${limit} нових карток. Завтра можна буде відкрити ще.`);
         return;
     }
     let pendingId = null;
     try {
+        if (prefetched) {
+            pendingId = await savePendingDailyWord(env, userId, prefetched.card, localTime.date);
+            await sendDailyWordCard(env, chatId, userId, { id: pendingId, card: prefetched.card, localDate: localTime.date }, level);
+            await markDailyWordMenuOpened(env, userId);
+            await requestDailyWordPrefetch(env, userId, dependencies);
+            console.info({ event: "daily_word_ready_served", source: "prefetch", trigger: "menu" });
+            return;
+        }
         console.debug({ event: "daily_word_generation_started", trigger: "menu" });
         await sendTypingAction(env, chatId).catch(() => undefined);
-        const level = user?.daily_level ?? "B1";
         const card = await dependencies.generateNewDailyWord(env, userId, level, dependencies.generateDailyWordCard, dependencies.maxAttempts);
         pendingId = await savePendingDailyWord(env, userId, card, localTime.date);
         await sendDailyWordCard(env, chatId, userId, { id: pendingId, card, localDate: localTime.date }, level);
         await markDailyWordMenuOpened(env, userId);
+        await requestDailyWordPrefetch(env, userId, dependencies);
         console.debug({ event: "daily_word_generation_completed", trigger: "menu" });
     } catch (error) {
         if (pendingId) await env.DB.prepare("DELETE FROM daily_word_cards WHERE id = ? AND user_id = ?").bind(pendingId, userId).run();
+        else if (prefetched) await restorePrefetch(env, userId, level, prefetched);
+        await releaseDailyWordCardClaim(env, userId, localTime.date, dependencies);
         throw error;
     }
 }
@@ -51,8 +64,9 @@ async function markDailyWordMenuOpened(env, userId) {
     `).bind(userId).run();
 }
 
-/** Replaces an already displayed unanswered card with another card for today. */
-export async function sendNextDailyWord(env, chatId, userId, pendingId, dependencies, messageId = null) {
+/** Shows an existing or prefetched next card without entering the generation queue. */
+export async function sendReadyNextDailyWord(env, chatId, userId, pendingId, dependencies, messageId = null) {
+    const startedAt = Date.now();
     const user = await env.DB.prepare("SELECT timezone, daily_level FROM users WHERE telegram_user_id = ?").bind(userId).first();
     const localTime = localDateAndTime(user?.timezone ?? DEFAULT_DAILY_SETTINGS.timezone, Date.now());
     if (!localTime) throw new Error("Unable to calculate local date for daily word.");
@@ -61,39 +75,66 @@ export async function sendNextDailyWord(env, chatId, userId, pendingId, dependen
       FROM daily_word_cards d
       WHERE id = ? AND user_id = ? AND local_date = ?
     `).bind(pendingId, userId, localTime.date).first();
-    if (!current) return false;
+    if (!current) return { status: "unavailable" };
     const next = await getDailyWordNavigation(env, userId, pendingId, localTime.date, "next");
     if (next) {
         await sendDailyWordCard(env, chatId, userId, next, user?.daily_level ?? "B1", messageId);
-        return true;
+        console.info({ event: "daily_word_ready_served", source: "history", durationMs: Date.now() - startedAt });
+        return { status: "shown", source: "history" };
     }
     const level = user?.daily_level ?? "B1";
-    const prefetched = await takeDailyWordPrefetch(env, userId);
-    if (prefetched) {
-        if (!(await dependencies.claimDailyWordCard(env, userId, localTime.date, dependencies.access))) {
-            const limit = dependencies.dailyWordCardLimitForLevel(await dependencies.getUserAccessLevel(env, userId));
-            await sendMessage(env, chatId, `На сьогодні вже показано ${limit} нових карток. Завтра можна буде відкрити ще.`);
-            return true;
-        }
-        const newId = await savePendingDailyWord(env, userId, prefetched.card, localTime.date);
-        await consumeDailyWordPrefetch(env, userId, prefetched.id);
+    const prefetched = await takeDailyWordPrefetch(env, userId, level);
+    if (!prefetched) return { status: "missing" };
+    if (!(await dependencies.claimDailyWordCard(env, userId, localTime.date, dependencies.access))) {
+        await restorePrefetch(env, userId, level, prefetched);
+        const limit = dependencies.dailyWordCardLimitForLevel(await dependencies.getUserAccessLevel(env, userId));
+        await sendMessage(env, chatId, `На сьогодні вже показано ${limit} нових карток. Завтра можна буде відкрити ще.`);
+        return { status: "limit" };
+    }
+    let newId = null;
+    try {
+        newId = await savePendingDailyWord(env, userId, prefetched.card, localTime.date);
         await sendDailyWordCard(env, chatId, userId, { id: newId, card: prefetched.card, localDate: localTime.date }, level, messageId);
         await requestDailyWordPrefetch(env, userId, dependencies);
-        return true;
+        console.info({ event: "daily_word_ready_served", source: "prefetch", durationMs: Date.now() - startedAt });
+        return { status: "shown", source: "prefetch" };
+    } catch (error) {
+        if (!newId) {
+            await restorePrefetch(env, userId, level, prefetched);
+            await releaseDailyWordCardClaim(env, userId, localTime.date, dependencies);
+        }
+        throw error;
     }
-    console.debug({ event: "daily_word_generation_started", trigger: "next" });
-    await sendTypingAction(env, chatId).catch(() => undefined);
-    const card = await dependencies.generateNewDailyWord(env, userId, level, dependencies.generateDailyWordCard, dependencies.maxAttempts);
+}
+
+/** Replaces an already displayed unanswered card with another card for today. */
+export async function sendNextDailyWord(env, chatId, userId, pendingId, dependencies, messageId = null) {
+    const ready = await sendReadyNextDailyWord(env, chatId, userId, pendingId, dependencies, messageId);
+    if (ready.status !== "missing") return ready.status !== "unavailable";
+
+    const user = await env.DB.prepare("SELECT timezone, daily_level FROM users WHERE telegram_user_id = ?").bind(userId).first();
+    const localTime = localDateAndTime(user?.timezone ?? DEFAULT_DAILY_SETTINGS.timezone, Date.now());
+    if (!localTime) throw new Error("Unable to calculate local date for daily word.");
     if (!(await dependencies.claimDailyWordCard(env, userId, localTime.date, dependencies.access))) {
         const limit = dependencies.dailyWordCardLimitForLevel(await dependencies.getUserAccessLevel(env, userId));
         await sendMessage(env, chatId, `На сьогодні вже показано ${limit} нових карток. Завтра можна буде відкрити ще.`);
         return true;
     }
-    const newId = await savePendingDailyWord(env, userId, card, localTime.date);
-    await sendDailyWordCard(env, chatId, userId, { id: newId, card, localDate: localTime.date }, level, messageId);
-    await requestDailyWordPrefetch(env, userId, dependencies);
-    console.debug({ event: "daily_word_generation_completed", trigger: "next" });
-    return true;
+    const level = user?.daily_level ?? "B1";
+    let newId = null;
+    try {
+        console.debug({ event: "daily_word_generation_started", trigger: "next" });
+        await sendTypingAction(env, chatId).catch(() => undefined);
+        const card = await dependencies.generateNewDailyWord(env, userId, level, dependencies.generateDailyWordCard, dependencies.maxAttempts);
+        newId = await savePendingDailyWord(env, userId, card, localTime.date);
+        await sendDailyWordCard(env, chatId, userId, { id: newId, card, localDate: localTime.date }, level, messageId);
+        await requestDailyWordPrefetch(env, userId, dependencies);
+        console.debug({ event: "daily_word_generation_completed", trigger: "next" });
+        return true;
+    } catch (error) {
+        if (!newId) await releaseDailyWordCardClaim(env, userId, localTime.date, dependencies);
+        throw error;
+    }
 }
 
 async function requestDailyWordPrefetch(env, userId, dependencies) {
@@ -101,6 +142,26 @@ async function requestDailyWordPrefetch(env, userId, dependencies) {
         if (dependencies.queueDailyWordPrefetch) await dependencies.queueDailyWordPrefetch(env, userId);
     } catch (error) {
         console.warn({ event: "daily_word_prefetch_failed", userId, message: error instanceof Error ? error.message : "Unknown error" });
+    }
+}
+
+async function restorePrefetch(env, userId, level, prefetched) {
+    try {
+        await restoreDailyWordPrefetch(env, userId, level, prefetched);
+    } catch (error) {
+        console.warn({ event: "daily_word_prefetch_restore_failed", message: error instanceof Error ? error.message : "Unknown error" });
+    }
+}
+
+async function releaseDailyWordCardClaim(env, userId, localDate, dependencies) {
+    if (dependencies.access?.isAdmin?.(env, userId)) return;
+    try {
+        await env.DB.prepare(`
+          UPDATE daily_word_card_views SET views = views - 1
+          WHERE user_id = ? AND local_date = ? AND views > 0
+        `).bind(userId, localDate).run();
+    } catch (error) {
+        console.warn({ event: "daily_word_claim_release_failed", message: error instanceof Error ? error.message : "Unknown error" });
     }
 }
 
@@ -118,10 +179,8 @@ async function sendDailyWordCard(env, chatId, userId, dailyWord, level, messageI
     const hasPrevious = await hasPreviousDailyWord(env, userId, dailyWord.id, dailyWord.localDate);
     const keyboard = dailyWordKeyboard(dailyWord.id, { hasPrevious, canLearn: !dailyWord.learnedAt });
     if (messageId) await editMessage(env, chatId, messageId, dailyWordText(dailyWord.card, level), keyboard);
-    else {
-        await sendMessage(env, chatId, dailyWordText(dailyWord.card, level), keyboard);
-        await recordSeenWord(env, userId, dailyWord.card.word);
-    }
+    else await sendMessage(env, chatId, dailyWordText(dailyWord.card, level), keyboard);
+    await recordSeenWord(env, userId, dailyWord.card.word);
 }
 
 export async function sendDueDailyWords(env, scheduledTime, dependencies) {
@@ -139,8 +198,10 @@ export async function sendDueDailyWords(env, scheduledTime, dependencies) {
         if (!(await dependencies.claimDailyWordCard(env, user.telegram_user_id, localTime.date, dependencies.access))) continue;
         let claimedDelivery = false;
         let pendingId = null;
+        let prefetched = null;
         try {
-            const card = await dependencies.generateNewDailyWord(env, user.telegram_user_id, user.daily_level, dependencies.generateDailyWordCard, dependencies.maxAttempts);
+            prefetched = await takeDailyWordPrefetch(env, user.telegram_user_id, user.daily_level);
+            const card = prefetched?.card ?? await dependencies.generateNewDailyWord(env, user.telegram_user_id, user.daily_level, dependencies.generateDailyWordCard, dependencies.maxAttempts);
             const claimed = await env.DB.prepare(`
               UPDATE users SET last_delivery_local_date = ? WHERE telegram_user_id = ?
               AND (last_delivery_local_date IS NULL OR last_delivery_local_date <> ?)
@@ -154,6 +215,8 @@ export async function sendDueDailyWords(env, scheduledTime, dependencies) {
             console.error({ event: "daily_word_delivery_failed", userId: user.telegram_user_id, message: error instanceof Error ? error.message : "Unknown error" });
             if (claimedDelivery) await env.DB.prepare(`UPDATE users SET last_delivery_local_date = NULL WHERE telegram_user_id = ? AND last_delivery_local_date = ?`).bind(user.telegram_user_id, localTime.date).run();
             if (pendingId) await env.DB.prepare("DELETE FROM daily_word_cards WHERE id = ? AND user_id = ?").bind(pendingId, user.telegram_user_id).run();
+            else if (prefetched) await restorePrefetch(env, user.telegram_user_id, user.daily_level, prefetched);
+            await releaseDailyWordCardClaim(env, user.telegram_user_id, localTime.date, dependencies);
         }
     }
 }

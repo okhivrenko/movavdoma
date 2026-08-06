@@ -5,6 +5,7 @@ import { normalizeSeenWord } from "../vocabulary/user-word-history.js";
 
 // Daily-card persistence and delivery flow. Network and access dependencies are
 // passed in explicitly so the Worker remains the composition root.
+export const DAILY_WORD_PREFETCH_TARGET = 2;
 
 export function hasValidDailyExamples(examples) {
     if (!Array.isArray(examples) || examples.length !== 2) return false;
@@ -125,33 +126,48 @@ export async function generateNewDailyWord(env, userId, level, generateCard, max
     throw new Error("Could not generate a new daily word.");
 }
 
-export async function fillDailyWordPrefetches(env, userId, level, generateCard, maxAttempts, target = 5) {
-    const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM daily_word_prefetches WHERE user_id = ?")
-        .bind(userId).first();
-    const missing = Math.max(0, target - Number(count?.total ?? 0));
-    for (let index = 0; index < missing; index += 1) {
-        const card = await generateNewDailyWord(env, userId, level, generateCard, maxAttempts);
-        await env.DB.prepare(`
-          INSERT OR IGNORE INTO daily_word_prefetches (user_id, source_text, translation_uk, context_note, examples_json)
-          VALUES (?, ?, ?, ?, ?)
-        `).bind(userId, card.word, card.translation_uk, card.context_en, JSON.stringify(card.examples)).run();
-    }
+export async function fillDailyWordPrefetches(env, userId, level, generateCard, maxAttempts, target = DAILY_WORD_PREFETCH_TARGET) {
+    await env.DB.prepare("DELETE FROM daily_word_prefetches WHERE user_id = ? AND cefr_level <> ?")
+        .bind(userId, level).run();
+    const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM daily_word_prefetches WHERE user_id = ? AND cefr_level = ?")
+        .bind(userId, level).first();
+    const current = Number(count?.total ?? 0);
+    if (current >= target) return { complete: true, count: current };
+
+    const card = await generateNewDailyWord(env, userId, level, generateCard, maxAttempts);
+    await env.DB.prepare(`
+      INSERT OR IGNORE INTO daily_word_prefetches (
+        user_id, source_text, translation_uk, context_note, examples_json, cefr_level
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(userId, card.word, card.translation_uk, card.context_en, JSON.stringify(card.examples), level).run();
+    const updated = await env.DB.prepare("SELECT COUNT(*) AS total FROM daily_word_prefetches WHERE user_id = ? AND cefr_level = ?")
+        .bind(userId, level).first();
+    const updatedCount = Number(updated?.total ?? 0);
+    return { complete: updatedCount >= target, count: updatedCount };
 }
 
-export async function takeDailyWordPrefetch(env, userId) {
+export async function takeDailyWordPrefetch(env, userId, level) {
     const prefetched = await env.DB.prepare(`
-      SELECT id, source_text, translation_uk, context_note, examples_json
-      FROM daily_word_prefetches WHERE user_id = ? ORDER BY id ASC LIMIT 1
-    `).bind(userId).first();
+      DELETE FROM daily_word_prefetches
+      WHERE id = (
+        SELECT id FROM daily_word_prefetches
+        WHERE user_id = ? AND cefr_level = ?
+        ORDER BY id ASC LIMIT 1
+      ) AND user_id = ?
+      RETURNING id, source_text, translation_uk, context_note, examples_json, cefr_level
+    `).bind(userId, level, userId).first();
     if (!prefetched) return null;
     const card = dailyCardFromPending(prefetched);
     if (!card) return null;
     return { id: prefetched.id, card: card.card };
 }
 
-export function consumeDailyWordPrefetch(env, userId, prefetchId) {
-    return env.DB.prepare("DELETE FROM daily_word_prefetches WHERE id = ? AND user_id = ?")
-        .bind(prefetchId, userId).run();
+export function restoreDailyWordPrefetch(env, userId, level, prefetched) {
+    return env.DB.prepare(`
+      INSERT OR IGNORE INTO daily_word_prefetches (
+        user_id, source_text, translation_uk, context_note, examples_json, cefr_level
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(userId, prefetched.card.word, prefetched.card.translation_uk, prefetched.card.context_en, JSON.stringify(prefetched.card.examples), level).run();
 }
 
 export async function savePendingDailyWord(env, userId, card, localDate) {

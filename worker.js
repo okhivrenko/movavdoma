@@ -83,10 +83,10 @@ import {
     generateNewDailyWord,
 } from "./src/features/daily-words/daily-words.js";
 import { handleDailyWordCallback } from "./src/features/daily-words/daily-word-callbacks.js";
-import { processDailyWordJob, processDailyWordPrefetch, queueDailyWordPrefetch, queueNextDailyWord, requeueDailyWordPrefetches } from "./src/features/daily-words/daily-word-jobs.js";
+import { processDailyWordJob, processDailyWordPrefetch, queueDailyWordPrefetch, queueNextDailyWord, requeueDailyWordJobs } from "./src/features/daily-words/daily-word-jobs.js";
 import { clearPendingFeedback, startFeedback, submitFeedback, USER_MESSAGE_TYPE } from "./src/features/feedback/feedback.js";
 import { removeExpiredLearnedWords as cleanupLearnedWords } from "./src/features/vocabulary/learned-word-cleanup.js";
-import { sendDueDailyWords as deliverDueDailyWords, sendNextDailyWord as deliverNextDailyWord, sendPreviousDailyWord as deliverPreviousDailyWord, sendTodayDailyWord as deliverTodayDailyWord } from "./src/features/daily-words/daily-delivery.js";
+import { sendDueDailyWords as deliverDueDailyWords, sendNextDailyWord as deliverNextDailyWord, sendPreviousDailyWord as deliverPreviousDailyWord, sendReadyNextDailyWord as deliverReadyNextDailyWord, sendTodayDailyWord as deliverTodayDailyWord } from "./src/features/daily-words/daily-delivery.js";
 import {
     ensureTelegramWebhook as ensureTelegramWebhookFlow,
     sendHelp as sendHelpFlow,
@@ -328,7 +328,7 @@ export default {
                 return new Response("ok");
             }
 
-            if (await handleDailySettingsCallback(env, callback, { chatId, messageId, userId })) {
+            if (await handleDailySettingsCallback(env, callback, { chatId, messageId, userId }, { queueDailyWordPrefetch })) {
                 return new Response("ok");
             }
 
@@ -340,6 +340,13 @@ export default {
                 claimDailyWordAddition,
                 getDailyAdditionLimit,
                 queueNextDailyWord,
+                sendReadyNextDailyWord: (targetEnv, targetChatId, targetUserId, pendingId, targetMessageId) => deliverReadyNextDailyWord(targetEnv, targetChatId, targetUserId, pendingId, {
+                    claimDailyWordCard,
+                    access: { isAdmin, getUserAccessLevel, dailyWordCardLimitForLevel },
+                    dailyWordCardLimitForLevel,
+                    getUserAccessLevel,
+                    queueDailyWordPrefetch,
+                }, targetMessageId),
                 sendNextDailyWord: (targetEnv, targetChatId, targetUserId, pendingId, targetMessageId) => deliverNextDailyWord(targetEnv, targetChatId, targetUserId, pendingId, {
                     claimDailyWordCard,
                     access: { isAdmin, getUserAccessLevel, dailyWordCardLimitForLevel },
@@ -467,6 +474,7 @@ export default {
             addWordHint: contentFor().vocabulary.addWordHint,
             welcome: messages.welcome,
             getDailySettings,
+            queueDailyWordPrefetch,
             contactPrompt: messages.contactPrompt,
             getBotLink,
             referralInvitation: (targetEnv, targetUserId) => referralInvitation(targetEnv, targetUserId, { getBotLink }),
@@ -542,11 +550,16 @@ export default {
     async queue(batch, env) {
         for (const message of batch.messages) {
             try {
-                if (message.body.kind === "prefetch") {
+                if (message.body.kind === "daily-word-prefetch") {
                     const result = await processDailyWordPrefetch(env, message.body.userId, {
                         fillDailyWordPrefetches: (targetEnv, targetUserId, level) => import("./src/features/daily-words/daily-words.js").then(({ fillDailyWordPrefetches }) => fillDailyWordPrefetches(targetEnv, targetUserId, level, generateDailyWordCard, MAX_DAILY_WORD_ATTEMPTS)),
                     });
                     if (result === "retry") message.retry({ delaySeconds: 60 }); else message.ack();
+                    continue;
+                }
+                if (message.body.kind !== "daily-word-interactive" || !Number.isInteger(message.body.jobId)) {
+                    console.warn({ event: "daily_word_queue_message_ignored", kind: message.body?.kind ?? "missing" });
+                    message.ack();
                     continue;
                 }
                 const result = await processDailyWordJob(env, message.body.jobId, {
@@ -558,6 +571,7 @@ export default {
                         generateNewDailyWord,
                         generateDailyWordCard,
                         maxAttempts: MAX_DAILY_WORD_ATTEMPTS,
+                        queueDailyWordPrefetch,
                     }, targetMessageId),
                 });
                 if (result === "retry") message.retry({ delaySeconds: 15 });
@@ -600,9 +614,9 @@ export default {
         }
 
         try {
-            await requeueDailyWordPrefetches(env);
+            await requeueDailyWordJobs(env);
         } catch (error) {
-            console.error({ event: "daily_word_prefetch_requeue_failed", message: error instanceof Error ? error.message : "Unknown error" });
+            console.error({ event: "daily_word_job_requeue_failed", message: error instanceof Error ? error.message : "Unknown error" });
         }
         try {
             await deliverDueDailyWords(env, controller.scheduledTime, {

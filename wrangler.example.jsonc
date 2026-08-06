@@ -20,5 +20,15 @@
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+  "queues": {
+    "producers": [
+      { "binding": "DAILY_WORD_INTERACTIVE_JOBS", "queue": "example-daily-word-interactive" },
+      { "binding": "DAILY_WORD_PREFETCH_JOBS", "queue": "example-daily-word-prefetch" }
+    ],
+    "consumers": [
+      { "queue": "example-daily-word-interactive", "max_batch_size": 1, "max_batch_timeout": 0, "max_retries": 3, "max_concurrency": 3, "retry_delay": 15 },
+      { "queue": "example-daily-word-prefetch", "max_batch_size": 1, "max_batch_timeout": 0, "max_retries": 3, "max_concurrency": 1, "retry_delay": 60 }
+    ]
+  }
 }

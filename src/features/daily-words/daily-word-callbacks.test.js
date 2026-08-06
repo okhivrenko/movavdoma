@@ -9,6 +9,7 @@ const context = { chatId: 123, messageId: 7, userId: 123 };
 const dependencies = {
     claimDailyWordAddition: async () => true,
     getDailyAdditionLimit: async () => 10,
+    sendReadyNextDailyWord: async () => ({ status: "missing" }),
 };
 
 test("daily callback handler leaves other callback namespaces untouched", async () => {
@@ -22,6 +23,27 @@ test("daily callback handler rejects malformed legacy-safe actions before any D1
         assert.equal(handled, true);
     });
     assert.equal(telegramCall(calls, "answerCallbackQuery").text, "Невірний вибір.");
+});
+
+test("daily loading callback is always acknowledged", async () => {
+    const { calls } = await captureTelegramCalls(async () => {
+        assert.equal(await handleDailyWordCallback({ DB: {} }, { ...callback, data: "daily:loading" }, context, dependencies), true);
+    });
+    assert.equal(telegramCall(calls, "answerCallbackQuery").text, "Ще готую слово…");
+});
+
+test("a ready daily card bypasses loading and the queue", async () => {
+    let queued = false;
+    const { calls } = await captureTelegramCalls(async () => {
+        const handled = await handleDailyWordCallback({ DB: {} }, { ...callback, data: "daily:next:42" }, context, {
+            ...dependencies,
+            sendReadyNextDailyWord: async () => ({ status: "shown", source: "prefetch" }),
+            queueNextDailyWord: async () => { queued = true; },
+        });
+        assert.equal(handled, true);
+    });
+    assert.equal(queued, false);
+    assert.equal(calls.some((call) => call.url.endsWith("/editMessageReplyMarkup")), false);
 });
 
 test("daily next callback queues only the owned pending card for replacement", async () => {
@@ -38,7 +60,7 @@ test("daily next callback queues only the owned pending card for replacement", a
     });
 
     assert.deepEqual(calls, [[{ chatId: 123, messageId: 7, userId: 123, pendingId: 42 }]]);
-    assert.equal(telegramCall(telegramCalls, "answerCallbackQuery").text, "Завантажую наступне слово…");
+    assert.equal(telegramCall(telegramCalls, "answerCallbackQuery").text, "Шукаю наступне слово…");
     const loadingCall = telegramCall(telegramCalls, "editMessageReplyMarkup");
     assert.deepEqual(loadingCall.reply_markup, {
         inline_keyboard: [[{ text: "⏳ Завантаження…", callback_data: "daily:loading" }]],

@@ -182,6 +182,15 @@ first; next generates a card only at the end of that day's history. Card
 generation retries transient and whole card-build failures before showing an
 error.
 
+The next-card callback first performs a D1-only ready check. Existing history
+or a CEFR-matched prefetched card is rendered immediately; only a true cache
+miss enters the interactive generation queue. Interactive jobs use a separate,
+higher-concurrency queue from background prefetch jobs, so filling the cache
+cannot block a user request. Prefetch keeps a bounded target of two cards and
+generates at most one card per queue invocation. `/start`, successful delivery,
+and CEFR changes request a refill, while the scheduled recovery sweep requeues
+durable jobs left behind by an interrupted enqueue or Worker execution.
+
 External calls to OpenAI, DeepL, Telegram, and Monobank have bounded request
 times and structured, non-sensitive status and duration logs. Daily-card
 navigation excludes cards whose English word is already in the user's active
