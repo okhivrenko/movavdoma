@@ -32,9 +32,8 @@ export async function handleDailyWordCallback(env, callback, context, dependenci
         if (action === "next") {
             await answerCallbackQuery(env, callback.id, "Завантажую наступне слово…");
             await editMessageReplyMarkup(env, chatId, messageId, dailyWordLoadingKeyboard);
-            const shown = await dependencies.sendNextDailyWord(env, chatId, userId, pendingId, messageId);
-            if (!shown) await restoreUnavailableDailyWord(env, chatId, messageId);
-            console.debug({ event: "daily_word_navigation_completed", action, durationMs: Date.now() - startedAt, shown });
+            await dependencies.queueNextDailyWord(env, { chatId, messageId, userId, pendingId });
+            console.debug({ event: "daily_word_navigation_queued", action, durationMs: Date.now() - startedAt });
             return true;
         }
         if (action === "prev") {

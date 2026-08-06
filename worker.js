@@ -83,6 +83,7 @@ import {
     generateNewDailyWord,
 } from "./src/features/daily-words/daily-words.js";
 import { handleDailyWordCallback } from "./src/features/daily-words/daily-word-callbacks.js";
+import { processDailyWordJob, queueNextDailyWord } from "./src/features/daily-words/daily-word-jobs.js";
 import { clearPendingFeedback, startFeedback, submitFeedback, USER_MESSAGE_TYPE } from "./src/features/feedback/feedback.js";
 import { removeExpiredLearnedWords as cleanupLearnedWords } from "./src/features/vocabulary/learned-word-cleanup.js";
 import { sendDueDailyWords as deliverDueDailyWords, sendNextDailyWord as deliverNextDailyWord, sendPreviousDailyWord as deliverPreviousDailyWord, sendTodayDailyWord as deliverTodayDailyWord } from "./src/features/daily-words/daily-delivery.js";
@@ -338,6 +339,7 @@ export default {
             if (await handleDailyWordCallback(env, callback, { chatId, messageId, userId }, {
                 claimDailyWordAddition,
                 getDailyAdditionLimit,
+                queueNextDailyWord,
                 sendNextDailyWord: (targetEnv, targetChatId, targetUserId, pendingId, targetMessageId) => deliverNextDailyWord(targetEnv, targetChatId, targetUserId, pendingId, {
                     claimDailyWordCard,
                     access: { isAdmin, getUserAccessLevel, dailyWordCardLimitForLevel },
@@ -533,6 +535,29 @@ export default {
         }
 
         return new Response("ok");
+    },
+
+    async queue(batch, env) {
+        for (const message of batch.messages) {
+            try {
+                const result = await processDailyWordJob(env, message.body.jobId, {
+                    sendNextDailyWord: (targetEnv, targetChatId, targetUserId, pendingId, targetMessageId) => deliverNextDailyWord(targetEnv, targetChatId, targetUserId, pendingId, {
+                        claimDailyWordCard,
+                        access: { isAdmin, getUserAccessLevel, dailyWordCardLimitForLevel },
+                        dailyWordCardLimitForLevel,
+                        getUserAccessLevel,
+                        generateNewDailyWord,
+                        generateDailyWordCard,
+                        maxAttempts: MAX_DAILY_WORD_ATTEMPTS,
+                    }, targetMessageId),
+                });
+                if (result === "retry") message.retry({ delaySeconds: 15 });
+                else message.ack();
+            } catch (error) {
+                console.error({ event: "daily_word_queue_message_failed", message: error instanceof Error ? error.message : "Unknown error" });
+                message.retry({ delaySeconds: 15 });
+            }
+        }
     },
 
     async scheduled(controller, env) {

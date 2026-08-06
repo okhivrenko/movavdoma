@@ -24,12 +24,12 @@ test("daily callback handler rejects malformed legacy-safe actions before any D1
     assert.equal(telegramCall(calls, "answerCallbackQuery").text, "Невірний вибір.");
 });
 
-test("daily next callback delegates only the owned pending card to the replacement flow", async () => {
+test("daily next callback queues only the owned pending card for replacement", async () => {
     const calls = [];
     const { calls: telegramCalls } = await captureTelegramCalls(async () => {
         const handled = await handleDailyWordCallback({ DB: {} }, { ...callback, data: "daily:next:42" }, context, {
             ...dependencies,
-            sendNextDailyWord: async (...args) => {
+            queueNextDailyWord: async (...args) => {
                 calls.push(args.slice(1));
                 return true;
             },
@@ -37,7 +37,7 @@ test("daily next callback delegates only the owned pending card to the replaceme
         assert.equal(handled, true);
     });
 
-    assert.deepEqual(calls, [[123, 123, 42, 7]]);
+    assert.deepEqual(calls, [[{ chatId: 123, messageId: 7, userId: 123, pendingId: 42 }]]);
     assert.equal(telegramCall(telegramCalls, "answerCallbackQuery").text, "Завантажую наступне слово…");
     const loadingCall = telegramCall(telegramCalls, "editMessageReplyMarkup");
     assert.deepEqual(loadingCall.reply_markup, {
@@ -49,7 +49,7 @@ test("daily navigation restores a retry button after a generation failure", asyn
     const { calls } = await captureTelegramCalls(async () => {
         const handled = await handleDailyWordCallback({ DB: {} }, { ...callback, data: "daily:next:42" }, context, {
             ...dependencies,
-            sendNextDailyWord: async () => { throw new Error("OpenAI timeout"); },
+            queueNextDailyWord: async () => { throw new Error("Queue unavailable"); },
         });
         assert.equal(handled, true);
     });

@@ -66,16 +66,15 @@ export async function sendNextDailyWord(env, chatId, userId, pendingId, dependen
         await sendDailyWordCard(env, chatId, userId, next, user?.daily_level ?? "B1", messageId);
         return true;
     }
+    const level = user?.daily_level ?? "B1";
+    console.debug({ event: "daily_word_generation_started", trigger: "next" });
+    await sendTypingAction(env, chatId).catch(() => undefined);
+    const card = await dependencies.generateNewDailyWord(env, userId, level, dependencies.generateDailyWordCard, dependencies.maxAttempts);
     if (!(await dependencies.claimDailyWordCard(env, userId, localTime.date, dependencies.access))) {
         const limit = dependencies.dailyWordCardLimitForLevel(await dependencies.getUserAccessLevel(env, userId));
         await sendMessage(env, chatId, `На сьогодні вже показано ${limit} нових карток. Завтра можна буде відкрити ще.`);
         return true;
     }
-
-    const level = user?.daily_level ?? "B1";
-    console.debug({ event: "daily_word_generation_started", trigger: "next" });
-    await sendTypingAction(env, chatId).catch(() => undefined);
-    const card = await dependencies.generateNewDailyWord(env, userId, level, dependencies.generateDailyWordCard, dependencies.maxAttempts);
     const newId = await savePendingDailyWord(env, userId, card, localTime.date);
     await sendDailyWordCard(env, chatId, userId, { id: newId, card, localDate: localTime.date }, level, messageId);
     console.debug({ event: "daily_word_generation_completed", trigger: "next" });

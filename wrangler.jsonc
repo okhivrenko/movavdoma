@@ -1,0 +1,34 @@
+{
+  "name": "movayakvdoma",
+  "main": "worker.js",
+  "compatibility_date": "2026-07-31",
+  "vars": {
+    "BOT_BRAND_NAME": "MovaYakVDoma",
+    "PUBLIC_WORKER_URL": "https://movayakvdoma.com",
+    "MONOBANK_JAR_SEND_ID": "9vp8W5V9nQ"
+  },
+  "triggers": {
+    "crons": ["* * * * *", "0 3 * * *"]
+  },
+  "routes": [
+    {
+      "pattern": "movayakvdoma.com",
+      "custom_domain": true
+    }
+  ],
+  "assets": {
+    "directory": "./public"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "vocab-words-db",
+      "database_id": "62ded422-e125-42b3-99de-a86fdcf5f9f8",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "queues": {
+    "producers": [{ "binding": "DAILY_WORD_JOBS", "queue": "movayakvdoma-daily-word-jobs" }],
+    "consumers": [{ "queue": "movayakvdoma-daily-word-jobs", "max_batch_size": 1, "max_batch_timeout": 0, "max_retries": 3, "max_concurrency": 1, "retry_delay": 15 }]
+  }
+}
