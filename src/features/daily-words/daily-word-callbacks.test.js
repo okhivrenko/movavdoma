@@ -32,6 +32,27 @@ test("daily loading callback is always acknowledged", async () => {
     assert.equal(telegramCall(calls, "answerCallbackQuery").text, "Ще готую слово…");
 });
 
+test("saving a daily card at the addition limit offers the combined growth options", async () => {
+    const options = [];
+    const env = {
+        TELEGRAM_BOT_TOKEN: "test-token",
+        DB: {
+            prepare: () => ({ bind: () => ({ first: async () => ({ id: 42 }) }) }),
+        },
+    };
+    const { calls } = await captureTelegramCalls(async () => {
+        const handled = await handleDailyWordCallback(env, { ...callback, data: "daily:learn:42" }, context, {
+            ...dependencies,
+            claimDailyWordAddition: async () => false,
+            getDailyAdditionLimit: async () => 10,
+            sendLimitReachedOptions: async (...args) => options.push(args),
+        });
+        assert.equal(handled, true);
+    });
+    assert.deepEqual(options, [[env, 123, 123, 10]]);
+    assert.equal(telegramCall(calls, "answerCallbackQuery").text, "Денний ліміт вичерпано.");
+});
+
 test("a ready daily card bypasses loading and the queue", async () => {
     let queued = false;
     const { calls } = await captureTelegramCalls(async () => {

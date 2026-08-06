@@ -14,13 +14,11 @@ async function handleAdd(env, text, { chatId, userId }, d, copy) {
     if (word.length > 80 || explicitContext.length > 250) { await d.sendMessage(env, chatId, copy.wordTooLong); return true; }
     try {
         if (!await d.claimDailyWordAddition(env, userId)) {
-            const limitText = d.dailyLimitReachedText(await d.getDailyAdditionLimit(env, userId));
             try {
-                const invitation = await d.referralInvitation(env, userId);
-                await d.sendMessage(env, chatId, `${limitText}\n\n${invitation.text}`, invitation.replyMarkup);
+                await d.sendLimitReachedOptions(env, chatId, userId, await d.getDailyAdditionLimit(env, userId));
             } catch (error) {
-                logError("referral_invitation_failed", error);
-                await d.sendMessage(env, chatId, limitText);
+                logError("limit_options_failed", error);
+                await d.sendMessage(env, chatId, d.dailyLimitReachedText(await d.getDailyAdditionLimit(env, userId)));
             }
             return true;
         }

@@ -288,3 +288,14 @@ test("callback interactions fill missing Telegram profile fields without overwri
     assert.match(profileUpdate.query, /NULLIF\(TRIM\(telegram_first_name\), ''\) IS NULL/);
     assert.deepEqual(profileUpdate.parameters, [null, "Ірина", 123]);
 });
+
+test("limit-option callbacks are routed only from a private Telegram chat", async () => {
+    const db = new WorkerTestDb({ interfaceVersion: 12 });
+    const { response, calls } = await captureTelegramCalls(() => worker.fetch(
+        webhookRequest(privateCallbackUpdate({ updateId: 15, data: "limit:unknown" })),
+        workerEnv(db)
+    ));
+
+    assert.equal(response.status, 200);
+    assert.equal(telegramCall(calls, "answerCallbackQuery").text, "Невірний вибір.");
+});

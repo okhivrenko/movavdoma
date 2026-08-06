@@ -46,6 +46,7 @@ import { messages } from "./src/domain/messages.js";
 import { acquisitionAttributionFromStartCommand, acquisitionSourceFromLandingParam, isTelegramStartCommand } from "./src/domain/acquisition.js";
 import { referralUserIdFromStartCommand } from "./src/domain/referrals.js";
 import { referralInvitation, rewardReferralFromNewUser } from "./src/features/referrals/referrals.js";
+import { handleLimitOptionsCallback, sendLimitReachedOptions } from "./src/features/referrals/limit-options.js";
 import {
     getDailySettings,
     handleDailySettingsCallback,
@@ -324,6 +325,14 @@ export default {
                 return new Response("ok");
             }
 
+            if (await handleLimitOptionsCallback(env, callback, { chatId, userId }, {
+                sendDonationInstructions,
+                submitDonationBonusRequest: submitDonationBonusRequestFlow,
+                notifyPendingDonationRequests: notifyDonationReviews,
+            })) {
+                return new Response("ok");
+            }
+
             if (await handleExamplesCallback(env, callback, { chatId, userId })) {
                 return new Response("ok");
             }
@@ -339,6 +348,9 @@ export default {
             if (await handleDailyWordCallback(env, callback, { chatId, messageId, userId }, {
                 claimDailyWordAddition,
                 getDailyAdditionLimit,
+                sendLimitReachedOptions: (targetEnv, targetChatId, targetUserId, limit) => sendLimitReachedOptions(targetEnv, targetChatId, targetUserId, limit, {
+                    referralInvitation: (referralEnv, referralUserId) => referralInvitation(referralEnv, referralUserId, { getBotLink }),
+                }),
                 queueNextDailyWord,
                 sendReadyNextDailyWord: (targetEnv, targetChatId, targetUserId, pendingId, targetMessageId) => deliverReadyNextDailyWord(targetEnv, targetChatId, targetUserId, pendingId, {
                     claimDailyWordCard,
@@ -511,7 +523,9 @@ export default {
             claimDailyWordAddition,
             getDailyAdditionLimit,
             dailyLimitReachedText,
-            referralInvitation: (targetEnv, targetUserId) => referralInvitation(targetEnv, targetUserId, { getBotLink }),
+            sendLimitReachedOptions: (targetEnv, targetChatId, targetUserId, limit) => sendLimitReachedOptions(targetEnv, targetChatId, targetUserId, limit, {
+                referralInvitation: (referralEnv, referralUserId) => referralInvitation(referralEnv, referralUserId, { getBotLink }),
+            }),
             closePendingSelection,
             saveAndSendWord,
             suggestSenses,

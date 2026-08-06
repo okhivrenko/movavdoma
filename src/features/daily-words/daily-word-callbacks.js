@@ -1,4 +1,3 @@
-import { dailyLimitReachedText } from "../../domain/helpers.js";
 import {
     hasPendingDailyWord,
     savePendingDailyWordToLearning,
@@ -65,7 +64,7 @@ export async function handleDailyWordCallback(env, callback, context, dependenci
             if (!(await dependencies.claimDailyWordAddition(env, userId))) {
                 const dailyLimit = await dependencies.getDailyAdditionLimit(env, userId);
                 await answerCallbackQuery(env, callback.id, "Денний ліміт вичерпано.");
-                await sendMessage(env, chatId, dailyLimitReachedText(dailyLimit));
+                await dependencies.sendLimitReachedOptions(env, chatId, userId, dailyLimit);
                 return true;
             }
         }

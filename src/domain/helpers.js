@@ -22,7 +22,7 @@ export function wordCountLabel(count) {
 }
 
 export function dailyLimitReachedText(limit) {
-    return `На сьогодні ліміт — ${limit} ${wordCountLabel(limit)} — уже використано. Нові слова можна буде додати завтра.\n\nЯкщо бот корисний, підтримка допомагає його розвивати й може збільшити персональний ліміт.`;
+    return `На сьогодні ліміт — ${limit} ${wordCountLabel(limit)} — уже використано. Нові слова можна буде додати завтра.`;
 }
 
 export function localDateAndTime(timezone, timestamp) {

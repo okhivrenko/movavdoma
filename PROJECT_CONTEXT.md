@@ -241,10 +241,13 @@ local day; the D1 counter is claimed atomically before the DeepL request.
   `📩 Зв’язатися з нами` are stored separately; the admin panel lists each type
   independently in pages of 10.
 - When the 10-word learning-list quota is exhausted, the bot offers a personal
-  referral link. If a previously unseen Telegram account starts the bot through
-  it, the referrer receives level 1 for the rest of the referrer's local day
+  referral link, a voluntary-support flow, and a button to request a bonus.
+  If a previously unseen Telegram account starts the bot through the referral
+  link, the referrer receives level 1 for the rest of the referrer's local day
   (up to 15 added words and 10 new daily cards). A referral cannot be
-  self-referred, and a referred account can reward only once.
+  self-referred, and a referred account can reward only once. The same choices
+  are shown when a user tries to save a daily card after using the addition
+  quota.
 
 ## Important UX rules
 
