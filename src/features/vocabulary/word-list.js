@@ -1,4 +1,5 @@
 import { answerCallbackQuery, editMessage, sendMessage } from "../../platform/telegram.js";
+import { repairWordExamples } from "./vocabulary-cards.js";
 
 export const LIST_LIMIT = 10;
 // Keep both vocabulary lists compact and visually consistent in Telegram.
@@ -89,14 +90,21 @@ function examplesText(word, examples) {
 
 export async function sendWordExamples(env, chatId, userId, wordId) {
     const word = await env.DB.prepare(`
-      SELECT source_text, translation_uk FROM words
+      SELECT id, user_id, source_text, translation_uk, context_note FROM words
       WHERE id = ? AND user_id = ? AND is_active = 1
     `).bind(wordId, userId).first();
     if (!word) return false;
     const result = await env.DB.prepare(`
       SELECT sentence_source, sentence_uk FROM examples WHERE word_id = ? ORDER BY position ASC
     `).bind(wordId).all();
-    await sendMessage(env, chatId, examplesText(word, result.results));
+    let examples = result.results;
+    if (examples.length !== 2) {
+        console.warn({ event: "word_card_examples_incomplete", wordId, count: examples.length });
+        const repaired = await repairWordExamples(env, word);
+        examples = repaired.examples.map((example) => ({ sentence_source: example.source, sentence_uk: example.uk }));
+        word.translation_uk = repaired.translation_uk;
+    }
+    await sendMessage(env, chatId, examplesText(word, examples));
     return true;
 }
 

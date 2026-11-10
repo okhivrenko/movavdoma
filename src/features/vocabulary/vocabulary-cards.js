@@ -52,6 +52,47 @@ async function generateWordCard(env, word, context, sharedCache) {
         : createWordCard(env, word, context);
 }
 
+function exampleInsertStatement(env, wordIdExpression, example, position) {
+    return env.DB.prepare(`
+      INSERT INTO examples (word_id, sentence_source, sentence_uk, position)
+      VALUES (${wordIdExpression}, ?, ?, ?)
+    `).bind(example.source, example.uk, position);
+}
+
+function exampleInsertForExistingWord(env, wordId, example, position) {
+    return env.DB.prepare(`
+      INSERT INTO examples (word_id, sentence_source, sentence_uk, position)
+      VALUES (?, ?, ?, ?)
+    `).bind(wordId, example.source, example.uk, position);
+}
+
+/** Persists a complete vocabulary card in one D1 transaction. */
+export async function persistWordCard(env, userId, word, context, card) {
+    const results = await env.DB.batch([
+        env.DB.prepare(`
+          INSERT INTO words (user_id, source_text, source_language, translation_uk, context_note)
+          VALUES (?, ?, 'en', ?, ?)
+        `).bind(userId, word, card.translation_uk, context),
+        exampleInsertStatement(env, "last_insert_rowid()", card.examples[0], 1),
+        exampleInsertStatement(env, "last_insert_rowid()", card.examples[1], 2),
+    ]);
+    return results[0]?.meta?.last_row_id;
+}
+
+/** Rebuilds a legacy incomplete card only when its owner requests its examples. */
+export async function repairWordExamples(env, word) {
+    const card = await generateWordCard(env, word.source_text, word.context_note, false);
+    await env.DB.batch([
+        env.DB.prepare("UPDATE words SET translation_uk = ? WHERE id = ? AND user_id = ?")
+            .bind(card.translation_uk, word.id, word.user_id),
+        env.DB.prepare("DELETE FROM examples WHERE word_id = ?").bind(word.id),
+        exampleInsertForExistingWord(env, word.id, card.examples[0], 1),
+        exampleInsertForExistingWord(env, word.id, card.examples[1], 2),
+    ]);
+    console.info({ event: "word_card_examples_repaired", wordId: word.id });
+    return card;
+}
+
 export function senseKeyboard(senses, page) {
     const totalPages = Math.ceil(senses.length / SENSES_PER_PAGE);
     const start = page * SENSES_PER_PAGE;
@@ -95,17 +136,7 @@ export async function closePendingSelection(env, userId) {
 
 export async function saveAndSendWord(env, chatId, userId, word, context, { sharedCache = true } = {}) {
     const card = await generateWordCard(env, word, context, sharedCache);
-    const insertedWord = await env.DB.prepare(`
-      INSERT INTO words (user_id, source_text, source_language, translation_uk, context_note)
-      VALUES (?, ?, 'en', ?, ?)
-    `).bind(userId, word, card.translation_uk, context).run();
-
-    for (let index = 0; index < card.examples.length; index += 1) {
-        const example = card.examples[index];
-        await env.DB.prepare(`
-          INSERT INTO examples (word_id, sentence_source, sentence_uk, position) VALUES (?, ?, ?, ?)
-        `).bind(insertedWord.meta.last_row_id, example.source, example.uk, index + 1).run();
-    }
+    await persistWordCard(env, userId, word, context, card);
 
     await sendMessage(env, chatId,
         `✅ ${word} — ${card.translation_uk}\n\n1. ${card.examples[0].source}\n${card.examples[0].uk}\n\n2. ${card.examples[1].source}\n${card.examples[1].uk}`);

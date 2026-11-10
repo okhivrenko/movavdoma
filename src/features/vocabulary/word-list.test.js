@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { sendActiveWordList, sendLearnedWordList } from "./word-list.js";
+import { sendActiveWordList, sendLearnedWordList, sendWordExamples } from "./word-list.js";
 
 function envWithWords(words, total = words.length) {
     return {
@@ -105,4 +105,62 @@ test("vocabulary list numbering continues from eleven on the second page", async
     const learned = await captureTelegramMessage(() => sendLearnedWordList(envWithWords(words, 20), 1, 2, 1));
     assert.match(learned.text, /11\. word-11/);
     assert.equal(learned.reply_markup.inline_keyboard[0][0].text, "11");
+});
+
+test("opening a legacy incomplete card repairs its examples before sending them", async () => {
+    const batches = [];
+    const word = {
+        id: 10,
+        user_id: 2,
+        source_text: "resilient",
+        translation_uk: "стійкий",
+        context_note: "able to recover quickly",
+    };
+    const env = {
+        TELEGRAM_BOT_TOKEN: "test-token",
+        OPENAI_API_KEY: "openai-test",
+        DEEPL_API_KEY: "deepl-test:fx",
+        DB: {
+            prepare(query) {
+                return { bind: (...parameters) => ({
+                    query,
+                    parameters,
+                    first: async () => query.includes("FROM words") ? word : undefined,
+                    all: async () => ({ results: [{ sentence_source: "Old incomplete example.", sentence_uk: "Старий неповний приклад." }] }),
+                }) };
+            },
+            batch: async (batch) => { batches.push(batch); return batch.map(() => ({ meta: { changes: 1 } })); },
+        },
+    };
+    const originalFetch = globalThis.fetch;
+    const calls = [];
+    globalThis.fetch = async (url, options) => {
+        calls.push({ url: String(url), payload: JSON.parse(options.body) });
+        if (String(url).includes("api.openai.com")) {
+            return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ examples: [
+                { source: "The team stayed resilient during the crisis." },
+                { source: "She remained resilient after several setbacks." },
+            ] }) } }] }));
+        }
+        if (String(url).includes("api-free.deepl.com")) {
+            return new Response(JSON.stringify({ translations: [
+                { text: "стійкий" },
+                { text: "Команда залишалася стійкою під час кризи." },
+                { text: "Вона залишалася стійкою після кількох невдач." },
+            ] }));
+        }
+        return new Response(JSON.stringify({ ok: true, result: {} }));
+    };
+    try {
+        assert.equal(await sendWordExamples(env, 1, 2, 10), true);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+    assert.equal(batches.length, 1);
+    assert.match(batches[0][0].query, /UPDATE words SET translation_uk/);
+    assert.match(batches[0][1].query, /DELETE FROM examples/);
+    assert.equal(batches[0].length, 4);
+    const telegramMessage = calls.find((call) => call.url.includes("sendMessage"));
+    assert.match(telegramMessage.payload.text, /1\. The team stayed resilient/);
+    assert.match(telegramMessage.payload.text, /2\. She remained resilient/);
 });
