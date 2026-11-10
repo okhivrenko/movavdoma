@@ -1,14 +1,29 @@
-import { sendMessage } from "../../platform/telegram.js";
+import { deleteMessage, sendMessage } from "../../platform/telegram.js";
 
-export async function handleAdminCommand(env, text, { chatId, userId }, d) {
+export async function handleAdminCommand(env, text, { chatId, userId, replyToMessageId }, d) {
     const grant = text.match(/^\/grant(?:\s+(.+))?$/i);
     const level = text.match(/^\/level(?:\s+(.+))?$/i);
     const test = text.match(/^\/testlevel(?:\s+(.+))?$/i);
     const sources = /^\/sources$/i.test(text);
     const directMessage = text.match(/^\/message\s+(\d+)\s+([\s\S]+)$/i);
     const messageCommand = /^\/message(?:\s+.*)?$/i.test(text);
-    if (!grant && !level && !test && !sources && !messageCommand) return false;
+    const deleteNotification = /^\/delete_notification$/i.test(text);
+    if (!grant && !level && !test && !sources && !messageCommand && !deleteNotification) return false;
     if (!d.isAdmin(env, userId)) { await sendMessage(env, chatId, "Ця команда доступна лише адміну."); return true; }
+    if (deleteNotification) {
+        if (!Number.isInteger(replyToMessageId) || replyToMessageId <= 0) {
+            await sendMessage(env, chatId, "Відповідай командою /delete_notification на сповіщення, яке треба прибрати.");
+            return true;
+        }
+        try {
+            await deleteMessage(env, chatId, replyToMessageId);
+            console.info({ event: "admin_notification_deleted", messageId: replyToMessageId });
+        } catch (error) {
+            console.error({ event: "admin_notification_delete_failed", messageId: replyToMessageId, message: error instanceof Error ? error.message : "Unknown error" });
+            await sendMessage(env, chatId, "Не вдалося прибрати це сповіщення. Спробуй ще раз.");
+        }
+        return true;
+    }
     if (sources) {
         await d.sendAcquisitionSourceSummary(env, chatId);
         return true;

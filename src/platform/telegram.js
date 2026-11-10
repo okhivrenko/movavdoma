@@ -37,6 +37,10 @@ export function editMessageReplyMarkup(env, chatId, messageId, replyMarkup) {
     });
 }
 
+export function deleteMessage(env, chatId, messageId) {
+    return telegramApi(env, "deleteMessage", { chat_id: chatId, message_id: messageId });
+}
+
 export function answerCallbackQuery(env, callbackQueryId, text) {
     return telegramApi(env, "answerCallbackQuery", { callback_query_id: callbackQueryId, text });
 }

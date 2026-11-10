@@ -59,3 +59,44 @@ test("an admin can send one bounded message only to an active known user", async
         globalThis.fetch = originalFetch;
     }
 });
+
+test("an admin can delete a bot notification by replying with the dedicated command", async () => {
+    const originalFetch = globalThis.fetch;
+    const sent = [];
+    globalThis.fetch = async (_url, options) => {
+        sent.push(JSON.parse(options.body));
+        return new Response(JSON.stringify({ ok: true, result: true }));
+    };
+    try {
+        const handled = await handleAdminCommand(
+            { TELEGRAM_BOT_TOKEN: "test-token" },
+            "/delete_notification",
+            { chatId: 999, userId: 999, replyToMessageId: 321 },
+            { isAdmin: (_env, userId) => userId === 999 }
+        );
+        assert.equal(handled, true);
+        assert.deepEqual(sent, [{ chat_id: 999, message_id: 321 }]);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
+test("notification deletion requires replying to the notification", async () => {
+    const originalFetch = globalThis.fetch;
+    const sent = [];
+    globalThis.fetch = async (_url, options) => {
+        sent.push(JSON.parse(options.body));
+        return new Response(JSON.stringify({ ok: true, result: {} }));
+    };
+    try {
+        await handleAdminCommand(
+            { TELEGRAM_BOT_TOKEN: "test-token" },
+            "/delete_notification",
+            { chatId: 999, userId: 999 },
+            { isAdmin: () => true }
+        );
+        assert.match(sent[0].text, /Відповідай командою/);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});

@@ -556,7 +556,7 @@ export default {
             return new Response("ok");
         }
 
-        if (await handleAdminCommand(env, text, { chatId, userId }, {
+        if (await handleAdminCommand(env, text, { chatId, userId, replyToMessageId: message.reply_to_message?.message_id }, {
             isAdmin,
             wordCountLabel,
             dailyWordCardLimitForLevel,
